@@ -32,7 +32,7 @@ component starts **Disabled**. See [docs/design-brief.md](docs/design-brief.md).
 | Design brief | Written |
 | Implementation plan for the install case | Written: [docs/implementation-plan.md](docs/implementation-plan.md) |
 | Implementation | Done: Tasks 1–10 (operator, operand manifests, bundle, image, POC catalog, live-cluster harness, docs) |
-| Live install verification | Run on a disposable OpenShift 4.22 cluster (3 nodes, `HighlyAvailable`): the first run found a WAO RBAC bug that made WAO-INST-12 fail (see [Deviations from the plan](#deviations-from-the-plan), item 8). It is fixed; the final verification run is pending a re-run after this fix. Raw results are not committed |
+| Live install verification | Run on a disposable OpenShift 4.22 cluster (3 nodes, `HighlyAvailable`): four full runs of 19 cases. Runs found two WAO RBAC bugs, both fixed (see [Deviations from the plan](#deviations-from-the-plan), items 3 and 8). The final run passed 17 of 19: WAO-INST-09 and WAO-INST-12 failed only because the upstream MDR manager could not start under its 30Mi memory limit, which reproduces without WAO (see [Known upstream issues](#known-upstream-issues)). Every other case passed. Raw results are not committed |
 | Upgrade scenarios | Future plan |
 
 ## Layout
@@ -239,8 +239,17 @@ WAO copies each component's Deployment and RBAC faithfully, by design, so upstre
 defects carry over unchanged.
 
 - **MDR v0.7.0 memory limit.** The upstream CSV limits the MDR manager to 30Mi of
-  memory and the manager runs at about 98% of it, which made MDR fail
-  intermittently in one run.
+  memory. The `/manager` binary is 53 MB, and its page-cache pages count against
+  that limit. When the binary is not already cached on the node, the container
+  thrashes re-reading it and never reaches `main()`: no log output, the health
+  port never opens, and the liveness probe kills it every 60 s (exit 2, not
+  OOMKilled). This made WAO-INST-09 (and WAO-INST-12 as a knock-on) fail in 2 of
+  4 live runs. The same bundle installed standalone by OLM, without WAO, fails
+  the same way: 6 of 6 cold-cache starts failed and 9 warm starts were Ready in
+  about 13 s. With only the limit raised, 40Mi started but still thrashed and 64Mi
+  started cleanly. The OLM-deployed and WAO-rendered MDR Deployments match in
+  everything that matters, and MDR caches nothing in its own namespace. The fix
+  is upstream: raise the limit to 64Mi or more.
 
 ## Deviations from the plan
 
