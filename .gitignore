@@ -30,3 +30,8 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+*.kubeconfig
+
+# Local pointers to disposable test clusters (cluster-identifying)
+DISPOSABLE_OPENSHIFT_CLUSTERS.md
