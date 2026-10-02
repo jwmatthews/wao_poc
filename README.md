@@ -31,7 +31,7 @@ component starts **Disabled**. See [docs/design-brief.md](docs/design-brief.md).
 | --- | --- |
 | Design brief | Written |
 | Implementation plan for the install case | Written: [docs/implementation-plan.md](docs/implementation-plan.md) |
-| Implementation | In progress: Task 1 (operator scaffold) done |
+| Implementation | In progress: Tasks 1–8 done (operator, bundle, image, POC catalog) |
 | Upgrade scenarios | Future plan |
 
 ## Layout
@@ -43,6 +43,7 @@ component starts **Disabled**. See [docs/design-brief.md](docs/design-brief.md).
 | `docs/implementation-plan.md` | Task-by-task plan with tests, written for a coding agent |
 | `release-set.yaml` | The pinned upstream bundle and image digests the POC installs |
 | `hack/fetch-bundles.py` | Fetches the pinned bundles anonymously from quay.io and verifies digests |
+| `hack/configmap-catalog.py` | Renders the POC ConfigMap-backed CatalogSource from `bundle/` |
 | `AGENTS.md` | Instructions for coding agents working in this repository |
 
 ## Quick start for contributors
@@ -54,6 +55,46 @@ python3 -m venv .venv
 ```
 
 Then follow [docs/implementation-plan.md](docs/implementation-plan.md) from Task 1.
+
+## Operator image and POC catalog
+
+**Registry choice:** the OpenShift internal image registry of the disposable test
+cluster (plan Task 8, option B). No external registry credentials are needed. The
+image is built on the cluster in its own namespace `wao-poc-build`, not in the
+install namespace, because preflight (WAO-INST-00) requires
+`openshift-workload-availability` to be absent and OLM creates it later. The bundle
+references the image **by digest**.
+
+The build uploads a clean `git archive` of `HEAD`, never the working directory, so
+git-ignored files such as kubeconfigs are never sent to the cluster.
+
+```sh
+KC=/path/to/disposable-cluster.kubeconfig   # always passed explicitly
+SRC=$(mktemp -d) && git archive HEAD | tar -x -C "$SRC"
+
+oc create namespace wao-poc-build --kubeconfig "$KC"
+oc new-build --binary --name wao -n wao-poc-build --strategy docker --kubeconfig "$KC"
+# Let pods in the install namespace pull from the build namespace (works before it exists).
+oc policy add-role-to-group system:image-puller \
+  system:serviceaccounts:openshift-workload-availability -n wao-poc-build --kubeconfig "$KC"
+oc start-build wao -n wao-poc-build --from-dir="$SRC" --follow --kubeconfig "$KC"
+
+DIGEST=$(oc get istag wao:latest -n wao-poc-build --kubeconfig "$KC" -o jsonpath='{.image.metadata.name}')
+IMG=image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@$DIGEST
+
+make bundle IMG=$IMG VERSION=0.1.0 CHANNELS=alpha DEFAULT_CHANNEL=alpha
+make bundle-check
+make catalog-configmap DEFAULT_CHANNEL=alpha   # writes dist/wao-poc-catalog.yaml (git-ignored)
+```
+
+The committed bundle currently references
+`image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@sha256:784641dbcbd891a0bbd38bca35591f1b46dd9787d586bb1b40d65f8b821c7972`
+(linux/amd64). A different cluster needs its own build and a regenerated bundle.
+
+`dist/wao-poc-catalog.yaml` holds a ConfigMap with the CSV and thirteen CRDs and a
+`sourceType: internal` CatalogSource named `wao-poc-catalog` in
+`openshift-marketplace`. It is for the POC install case only. The upgrade case needs
+an FBC catalog image (`make catalog-build catalog-push`).
 
 ## Toolchain
 

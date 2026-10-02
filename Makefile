@@ -113,6 +113,12 @@ operand-manifests-check: ## Verify the committed operand manifests, CRDs and uni
 bundle-check: ## Verify the generated bundle against the POC contract and release-set.yaml.
 	$(PYTHON) hack/check-bundle.py bundle release-set.yaml
 
+CATALOG_NS ?= openshift-marketplace
+.PHONY: catalog-configmap
+catalog-configmap: bundle-check ## Render the POC ConfigMap-backed CatalogSource into dist/wao-poc-catalog.yaml.
+	mkdir -p dist
+	$(PYTHON) hack/configmap-catalog.py --bundle bundle --package workload-availability-operator --channel $(or $(DEFAULT_CHANNEL),alpha) --name wao-poc-catalog --namespace $(CATALOG_NS) > dist/wao-poc-catalog.yaml
+
 ##@ Development
 
 .PHONY: manifests
