@@ -25,6 +25,9 @@ expect "FAR manager ServiceAccount can watch secrets cluster-wide" k auth can-i 
 expect "service-ca created the webhook serving Secret with tls.crt and tls.key (key names only)" \
   secret_has_keys "$NS" fence-agents-remediation-webhook-server-cert tls.crt tls.key
 
+# FAR v0.8.0 rejects a template without parameters ("mandatory parameters are missing"), so the template
+# carries one node parameter for a node that does not exist. The CRD field names are lower case
+# (nodeparameters, sharedparameters); camelCase keys are pruned and the template looks empty.
 template() { # template NAME AGENT : print a FenceAgentsRemediationTemplate manifest
   cat <<YAML
 apiVersion: fence-agents-remediation.medik8s.io/v1alpha1
@@ -36,6 +39,9 @@ spec:
   template:
     spec:
       agent: $2
+      nodeparameters:
+        --plug:
+          wao-node-that-does-not-exist: "1"
 YAML
 }
 expect "unknown fence agent rejected (dry-run)" dry_run_rejected 08-admission-unknown-agent create < <(template wao-inst-08-bad fence_wao_does_not_exist)
