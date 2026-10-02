@@ -35,6 +35,26 @@ class ParityTest(unittest.TestCase):
                 live = yaml.safe_load(f.read_text())
                 self.assertEqual(parity.compare_rules(p["serviceAccountName"], p["rules"], live["rules"]), 0, comp)
 
+    def test_extracted_namespaced_permissions_are_granted_cluster_wide(self):
+        # OLM copies CSV `permissions` into a ClusterRole/ClusterRoleBinding for an AllNamespaces OperatorGroup.
+        for comp in COMPONENTS:
+            perms = parity.bundle_csv(comp)["spec"]["install"]["spec"].get("permissions") or []
+            self.assertTrue(perms, comp)
+            for p in perms:
+                sa, name = p["serviceAccountName"], parity.all_namespaces_name(p["serviceAccountName"])
+                d = REPO / "internal/operands/manifests" / comp
+                role = yaml.safe_load((d / f"20-Role-{sa}.yaml").read_text())
+                self.assertEqual(parity.compare_rules(sa, p["rules"], role["rules"], kind="Role"), 0, comp)
+                cr = yaml.safe_load((d / f"10-ClusterRole-{name}.yaml").read_text())
+                self.assertEqual(parity.compare_rules(name, p["rules"], cr["rules"]), 0, comp)
+                crb = yaml.safe_load((d / f"11-ClusterRoleBinding-{name}.yaml").read_text())
+                self.assertEqual(parity.compare_binding(name, name, sa, "__WAO_NAMESPACE__", crb), 0, comp)
+
+    def test_detects_wrong_binding_subject(self):
+        live = {"roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": "x-all-namespaces"},
+                "subjects": [{"kind": "ServiceAccount", "name": "x", "namespace": "other"}]}
+        self.assertEqual(parity.compare_binding("x-all-namespaces", "x-all-namespaces", "x", "ns", live), 1)
+
     def test_detects_changed_rules(self):
         p = parity.bundle_csv("nhc")["spec"]["install"]["spec"]["clusterPermissions"][0]
         live = copy.deepcopy(p["rules"])

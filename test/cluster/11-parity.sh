@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# test/cluster/11-parity.sh — WAO-INST-11: live operand Deployments and ClusterRoles equal the upstream bundles. Read-only.
+# test/cluster/11-parity.sh — WAO-INST-11: live operand Deployments and RBAC (incl. the OLM all-namespaces copies) equal the upstream bundles. Read-only.
 source "$(dirname "$0")/lib.sh"
 echo "== WAO-INST-11 parity, all six"
 parity_ok() { # parity_ok COMPONENT : run parity.py, keep its diff output in raw/

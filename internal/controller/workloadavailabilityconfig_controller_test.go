@@ -115,6 +115,11 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		Expect(*dep.OwnerReferences[0].Controller).To(BeTrue())
 
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager"}, &rbacv1.ClusterRole{})).To(Succeed())
+		// OLM AllNamespaces behaviour: the CSV's namespaced permissions are also granted cluster-wide.
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager-all-namespaces"}, &rbacv1.ClusterRole{})).To(Succeed())
+		allNS := &rbacv1.ClusterRoleBinding{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager-all-namespaces"}, allNS)).To(Succeed())
+		Expect(allNS.Subjects).To(ConsistOf(rbacv1.Subject{Kind: "ServiceAccount", Name: "node-healthcheck-controller-manager", Namespace: ns}))
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-controller-manager"}, &corev1.ServiceAccount{})).To(Succeed())
 		vw := &admissionregistrationv1.ValidatingWebhookConfiguration{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-validating-webhook-configuration"}, vw)).To(Succeed())
@@ -160,6 +165,8 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-controller-manager"}, &appsv1.Deployment{}))).To(BeTrue())
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-validating-webhook-configuration"}, &admissionregistrationv1.ValidatingWebhookConfiguration{}))).To(BeTrue())
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager"}, &rbacv1.ClusterRole{}))).To(BeTrue())
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager-all-namespaces"}, &rbacv1.ClusterRole{}))).To(BeTrue())
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager-all-namespaces"}, &rbacv1.ClusterRoleBinding{}))).To(BeTrue())
 	})
 
 	It("reports DisableIncomplete when SNR agents survive a manager-level disable", func() {

@@ -687,6 +687,8 @@ PLACEHOLDER_NAMESPACES = {"system", "sbr-operator-system", "node-healthcheck-ope
 NAMESPACED_KINDS = {"Deployment", "Service", "ConfigMap", "Role", "RoleBinding", "ServiceAccount", "Secret"}
 WEBHOOK_CERT_DIR = "/tmp/k8s-webhook-server/serving-certs"  # controller-runtime default; upstream managers fall back to it
 COMPONENT_LABEL = "workloadavailability.medik8s.io/component"
+# Name suffix of the cluster-wide copy of a CSV's namespaced permissions (OLM AllNamespaces behaviour).
+ALL_NAMESPACES_SUFFIX = "-all-namespaces"
 SERVING_CERT_ANNOTATION = "service.beta.openshift.io/serving-cert-secret-name"
 INJECT_CABUNDLE_ANNOTATION = "service.beta.openshift.io/inject-cabundle"
 ORDER = {"ServiceAccount": "00", "ClusterRole": "10", "ClusterRoleBinding": "11", "Role": "20", "RoleBinding": "21",
@@ -790,12 +792,24 @@ def rbac(csv, mods):
     out, sas = [], set()
     for p in spec.get("permissions", []) or []:
         sa = p["serviceAccountName"]; sas.add(sa)
+        subjects = [{"kind": "ServiceAccount", "name": sa, "namespace": NAMESPACE_PLACEHOLDER}]
         out.append({"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "Role",
                     "metadata": {"name": sa, "namespace": NAMESPACE_PLACEHOLDER}, "rules": p["rules"]})
         out.append({"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "RoleBinding",
                     "metadata": {"name": sa, "namespace": NAMESPACE_PLACEHOLDER},
                     "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "Role", "name": sa},
-                    "subjects": [{"kind": "ServiceAccount", "name": sa, "namespace": NAMESPACE_PLACEHOLDER}]})
+                    "subjects": copy.deepcopy(subjects)})
+        # OLM's OperatorGroup controller (ensureSingletonRBAC) also grants a CSV's namespaced permissions
+        # cluster-wide when the OperatorGroup targets all namespaces, the only install mode these CSVs
+        # support. Reproduce that copy; the suffix keeps it apart from the clusterPermissions role named after the SA.
+        cluster_name = f"{sa}{ALL_NAMESPACES_SUFFIX}"
+        out.append({"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "ClusterRole",
+                    "metadata": {"name": cluster_name}, "rules": copy.deepcopy(p["rules"])})
+        out.append({"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "ClusterRoleBinding", "metadata": {"name": cluster_name},
+                    "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": cluster_name},
+                    "subjects": copy.deepcopy(subjects)})
+        mods.append(f"CSV permissions for {sa} also rendered as ClusterRole/ClusterRoleBinding {cluster_name}, "
+                    "as OLM grants them for an AllNamespaces OperatorGroup")
     for p in spec.get("clusterPermissions", []) or []:
         sa = p["serviceAccountName"]; sas.add(sa)
         out.append({"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "ClusterRole", "metadata": {"name": sa}, "rules": p["rules"]})
@@ -3938,10 +3952,10 @@ Raw output goes only to the git-ignored `evidence/`. Before the run, create `evi
 | WAO-INST-05 | Enable NHC (`05-enable-nhc.sh`) | Patch `nodeHealthCheck.state: Enabled` | Manager Available; serving Secret `node-healthcheck-webhook-server-cert` created by service-ca; CA bundle injected; status `Available` with `admissionReady: true`; dry-run NHC with both `minHealthy` and `maxUnhealthy` rejected by `vnodehealthcheck.kb.io` with "cannot be specified at the same time"; aggregation ClusterRole created by NHC; no NHC policy exists. Record whether `ConsolePlugin` and `ServiceMonitor` were created; the upstream bundle ships no console-plugin backend |
 | WAO-INST-06 | Enable SNR (`07-enable-snr.sh`) | Patch `selfNodeRemediation.state: Enabled` | Manager Available; all four webhooks carry CA bundles; status `Available`; SNR itself creates `self-node-remediation-config`, `self-node-remediation-automatic-strategy-template` and Secret `self-node-remediation-certificates`; DaemonSet `self-node-remediation-ds` ready on every scheduled node; dry-run config `second-config` rejected by `vselfnoderemediationconfig.kb.io`; dry-run template returns annotation `remediation.medik8s.io/multiple-templates-support: "true"` |
 | WAO-INST-07 | Enable SBR | Patch `storageBasedRemediation.state: Enabled` | Manager Available; ServiceAccount `sbr-operator-sbr-agent`; ClusterRoleBinding `sbr-operator-sbr-agent-rolebinding` subject namespace is `openshift-workload-availability`; no DaemonSet, PVC or Job; status `Available` with no `admissionReady` field; dry-run `StorageBasedRemediationConfig` create succeeds and is not applied for real |
-| WAO-INST-08 | Enable FAR (`11-enable-far.sh`) | Patch `fenceAgentsRemediation.state: Enabled` | Manager Available; all four FAR webhooks carry CA bundles; status `Available`; dry-run template with agent `fence_wao_does_not_exist` rejected with "unsupported fence agent"; dry-run template with agent `fence_ipmilan` returns the multiple-templates annotation; no `FenceAgentsRemediation` exists |
+| WAO-INST-08 | Enable FAR (`11-enable-far.sh`) | Patch `fenceAgentsRemediation.state: Enabled` | Manager Available; all four FAR webhooks carry CA bundles; status `Available`; the manager ServiceAccount can list and watch Secrets in all namespaces (OLM all-namespaces copy of the CSV `permissions`) and its log has no "secrets is forbidden" error; dry-run template with agent `fence_wao_does_not_exist` rejected with "unsupported fence agent"; dry-run template with agent `fence_ipmilan` returns the multiple-templates annotation; no `FenceAgentsRemediation` exists |
 | WAO-INST-09 | Enable MDR (`12-enable-mdr.sh`) | Patch `machineDeletionRemediation.state: Enabled` | Manager Available; status `Available` with no `admissionReady` field; metrics Service selector carries `workloadavailability.medik8s.io/component=machineDeletionRemediation`; its EndpointSlices contain exactly the MDR pods, although five other `control-plane: controller-manager` managers run in the namespace (D10) |
 | WAO-INST-10 | Enable NMO (`13-enable-nmo.sh`) | Patch `nodeMaintenance.state: Enabled` | Manager Available; CA bundle injected; status `Available`; dry-run `NodeMaintenance` for `wao-node-that-does-not-exist` rejected by `vnodemaintenance.kb.io` with "no node with name"; no `NodeMaintenance` exists. Record whether `medik8s-leases` exists; NHC and NMO share it by default |
-| WAO-INST-11 | Parity, all six | Run `test/cluster/parity.py --component C` for each of `nhc`, `snr`, `sbr`, `far`, `mdr` and `nmo` | Exit 0 for each; SNR agent DaemonSet image equals the pinned SNR digest |
+| WAO-INST-11 | Parity, all six | Run `test/cluster/parity.py --component C` for each of `nhc`, `snr`, `sbr`, `far`, `mdr` and `nmo` | Exit 0 for each (Deployments, `clusterPermissions` ClusterRoles, and each `permissions` Role plus its `<sa>-all-namespaces` ClusterRole and ClusterRoleBinding); SNR agent DaemonSet image equals the pinned SNR digest |
 | WAO-INST-12 | WAO restart idempotence | Record `metadata.generation` and `resourceVersion` of every operand Deployment, the webhook configurations and the config; delete the WAO pod; wait 2 minutes | Generations unchanged; no operand pod restarted; the config's `resourceVersion` changes at most once; all conditions keep their `lastTransitionTime` |
 | WAO-INST-13 | Drift repair and field ownership | Scale `sbr-operator-controller-manager` to 0 | WAO restores 2 replicas within 60 s; `managedFields` shows manager `workload-availability-operator` owning `spec.replicas` |
 | WAO-INST-14 | Disable SBR, FAR, MDR | Patch the three states to `Disabled` | Each manager's Deployment, Services, ServiceAccounts, roles, bindings and webhooks removed; CRDs remain; each phase `Disabled` with no `retainedResources` |

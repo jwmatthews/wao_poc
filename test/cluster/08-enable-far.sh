@@ -17,6 +17,11 @@ expect "all four FAR webhooks registered" four_webhooks
 wait_for 180 "status phase Available" phase_is fenceAgentsRemediation Available
 expect "status admissionReady true" field_is fenceAgentsRemediation admissionReady true
 expect "every rendered FAR operand object exists" operands_present far
+# OLM grants CSV namespaced permissions cluster-wide for an AllNamespaces OperatorGroup; FAR's manager
+# lists Secrets across namespaces and its template webhook times out without it.
+far_sa="system:serviceaccount:${NS}:fence-agents-remediation-controller-manager"
+expect "FAR manager ServiceAccount can list secrets cluster-wide" k auth can-i list secrets --all-namespaces --as="$far_sa" -q
+expect "FAR manager ServiceAccount can watch secrets cluster-wide" k auth can-i watch secrets --all-namespaces --as="$far_sa" -q
 expect "service-ca created the webhook serving Secret with tls.crt and tls.key (key names only)" \
   secret_has_keys "$NS" fence-agents-remediation-webhook-server-cert tls.crt tls.key
 
@@ -39,5 +44,7 @@ ann=$(template wao-inst-08-ok fence_ipmilan | k create --dry-run=server -o jsonp
 expect "mutating webhook reachable (dry-run fence_ipmilan template gained multiple-templates annotation)" test "$ann" = "true"
 expect "no FenceAgentsRemediationTemplate was persisted" none_found fenceagentsremediationtemplates -A
 expect "no FenceAgentsRemediation objects exist" none_found fenceagentsremediations -A
-record 08-manager-logs logs deployment/fence-agents-remediation-controller-manager -n "$NS" --tail=200 >/dev/null
+far_logs=$(record 08-manager-logs logs deployment/fence-agents-remediation-controller-manager -n "$NS" --tail=200 2>/dev/null) || far_logs="__LOGS_UNAVAILABLE__"
+no_forbidden_secrets() { [ "$far_logs" != "__LOGS_UNAVAILABLE__" ] && ! grep -q 'secrets is forbidden' <<<"$far_logs"; }
+expect "FAR manager log has no 'secrets is forbidden' error" no_forbidden_secrets
 snapshot 08

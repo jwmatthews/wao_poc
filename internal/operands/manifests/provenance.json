@@ -19,9 +19,11 @@
       },
       "outputs": {
         "far/00-ServiceAccount-fence-agents-remediation-controller-manager.yaml": "33f994f37c5596aa29d844da342ef3aab73363a6f93bffef0d24b6ca7e10d49b",
+        "far/10-ClusterRole-fence-agents-remediation-controller-manager-all-namespaces.yaml": "8b555166847f2fc50308651b148a781c0ab08e5725a5e4892ac1ac5640660382",
         "far/10-ClusterRole-fence-agents-remediation-controller-manager.yaml": "d21b5fbabce229bcff2c925e85683875e9670d6692afed2f3da00f4f07c61fd3",
         "far/10-ClusterRole-fence-agents-remediation-ext-remediation.yaml": "541b503a2b942599c5d874e57c452587544f0f8a0c63b4b4b6cd7c6f0def2a7b",
         "far/10-ClusterRole-fence-agents-remediation-metrics-reader.yaml": "0621046914984d7f645410aab247d143fec6608d5843261def02760182e909f1",
+        "far/11-ClusterRoleBinding-fence-agents-remediation-controller-manager-all-namespaces.yaml": "74c88d7786f5be31bcb80559eb9dc3985f76a160520365928b8671f9e447b8e7",
         "far/11-ClusterRoleBinding-fence-agents-remediation-controller-manager.yaml": "1d0707a662a003383b9d56b7e72cf7c7541e941b1fa3d7e3c4c782bb402912c0",
         "far/20-Role-fence-agents-remediation-controller-manager.yaml": "32b74536d82e5cd762693dc7ade33086695f201b6fb2ab12de83b63cef6593ce",
         "far/21-RoleBinding-fence-agents-remediation-controller-manager.yaml": "03f5913e7ca4963a8e80bcd1b1ed00304748a92fc4dc1228d839631880a8f252",
@@ -33,6 +35,7 @@
         "far/61-MutatingWebhookConfiguration-fence-agents-remediation-mutating-webhook-configuration.yaml": "c8087c9a2fbae66c99e8b9d2ff7fa7512251ecd2a6d1eca559b8427ea1e9433e"
       },
       "wao_modifications": [
+        "CSV permissions for fence-agents-remediation-controller-manager also rendered as ClusterRole/ClusterRoleBinding fence-agents-remediation-controller-manager-all-namespaces, as OLM grants them for an AllNamespaces OperatorGroup",
         "CSV permissions/clusterPermissions rendered as Role/RoleBinding/ClusterRole/ClusterRoleBinding named after each ServiceAccount",
         "Deployment/fence-agents-remediation-controller-manager: added service-ca webhook certificate volume fence-agents-remediation-webhook-server-cert at /tmp/k8s-webhook-server/serving-certs",
         "Deployment/fence-agents-remediation-controller-manager: pod template labeled workloadavailability.medik8s.io/component=fenceAgentsRemediation",
@@ -59,9 +62,11 @@
       },
       "outputs": {
         "mdr/00-ServiceAccount-machine-deletion-remediation-controller-manager.yaml": "2f943f32c9d4e06fd10f4b2693ea905845f2e4fdedf91e10ddd6fd44427a403e",
+        "mdr/10-ClusterRole-machine-deletion-remediation-controller-manager-all-namespaces.yaml": "3976b51f791543a9fe232c4c5645da761a7e79dc6e3b29fb3331876a9b6e8e0d",
         "mdr/10-ClusterRole-machine-deletion-remediation-controller-manager.yaml": "2a5091835ad90034e4fa507ae2db3f3bc6d9e3a1e7d30ffd13b6b2f08f51d097",
         "mdr/10-ClusterRole-machine-deletion-remediation-machine-deletion-remediation-ext-remediation.yaml": "824200ed3a602b6ceb4a7aaa68d664be2321b8f57605ce5675d1a70954a65326",
         "mdr/10-ClusterRole-machine-deletion-remediation-metrics-reader.yaml": "9b905e9af077b8afa687c7d6aee47922c51e5e370b2ce9b8514f50e6767601b9",
+        "mdr/11-ClusterRoleBinding-machine-deletion-remediation-controller-manager-all-namespaces.yaml": "76b600a32c54e23fc4a5af9c1db50b3b045ac37a0d3a62b75ce55004c9698fad",
         "mdr/11-ClusterRoleBinding-machine-deletion-remediation-controller-manager.yaml": "f056e0465be4f63b476f114e0d6e073b8dd38444614319124a4e4226dc41d6b7",
         "mdr/20-Role-machine-deletion-remediation-controller-manager.yaml": "7a6a23c93185f8b86ee55207e2dd832bac25a33b10719d212e488f504faeade4",
         "mdr/21-RoleBinding-machine-deletion-remediation-controller-manager.yaml": "49fd3b849b56a8058d9b1da5b28a5aceed6708b07b548269a7bb036097171b7d",
@@ -70,6 +75,7 @@
         "mdr/50-Deployment-machine-deletion-remediation-controller-manager.yaml": "c84a6762b2aa75a8e1c3a833e2bfc22134361885490ca7b0577497670f14e55c"
       },
       "wao_modifications": [
+        "CSV permissions for machine-deletion-remediation-controller-manager also rendered as ClusterRole/ClusterRoleBinding machine-deletion-remediation-controller-manager-all-namespaces, as OLM grants them for an AllNamespaces OperatorGroup",
         "CSV permissions/clusterPermissions rendered as Role/RoleBinding/ClusterRole/ClusterRoleBinding named after each ServiceAccount",
         "Deployment/machine-deletion-remediation-controller-manager: pod template labeled workloadavailability.medik8s.io/component=machineDeletionRemediation",
         "Service/machine-deletion-remediation-controller-manager-metrics-service: selector narrowed with workloadavailability.medik8s.io/component=machineDeletionRemediation; it also matched far, nmo, sbr, snr pods"
@@ -90,8 +96,10 @@
       },
       "outputs": {
         "nhc/00-ServiceAccount-node-healthcheck-controller-manager.yaml": "3da42c6d60e6a99d8f25815e2c6940e0ee727020348deef644e75651cb98a872",
+        "nhc/10-ClusterRole-node-healthcheck-controller-manager-all-namespaces.yaml": "5e2d8042db372654d7996c7f3f374de86a208f856435cdc9e8b08b19eb9d1ee2",
         "nhc/10-ClusterRole-node-healthcheck-controller-manager.yaml": "3501f21df24ed312105400b863a00c669e0ca4e31371bd8ec42a09a9558b9434",
         "nhc/10-ClusterRole-node-healthcheck-metrics-reader.yaml": "bf5d9360d45f49169a4b52e0c3da5766ed91b3ef012da7daea30fac25b5b114f",
+        "nhc/11-ClusterRoleBinding-node-healthcheck-controller-manager-all-namespaces.yaml": "6d08f04c064090745eb101ec9b332458679669fd44fc05642c9124e5da2cd9d8",
         "nhc/11-ClusterRoleBinding-node-healthcheck-controller-manager.yaml": "aeb21d9b91f11813a5d165356622852beca956a8e05d093b20f9924d823a3395",
         "nhc/20-Role-node-healthcheck-controller-manager.yaml": "6892fd3c6e2b4f4ab0e7f8bb0798e294ff9e2b359498deb0a507b267017c7ff4",
         "nhc/21-RoleBinding-node-healthcheck-controller-manager.yaml": "9997d7d9eed0e9258427e217c38653403077dca94b47d3cadab6b983bc14aed0",
@@ -101,6 +109,7 @@
         "nhc/60-ValidatingWebhookConfiguration-node-healthcheck-validating-webhook-configuration.yaml": "a20d2901420f6d0de879abedebff203a46ccdd7eed2615ad1ca62292c3bcfd1e"
       },
       "wao_modifications": [
+        "CSV permissions for node-healthcheck-controller-manager also rendered as ClusterRole/ClusterRoleBinding node-healthcheck-controller-manager-all-namespaces, as OLM grants them for an AllNamespaces OperatorGroup",
         "CSV permissions/clusterPermissions rendered as Role/RoleBinding/ClusterRole/ClusterRoleBinding named after each ServiceAccount",
         "Deployment/node-healthcheck-controller-manager: added service-ca webhook certificate volume node-healthcheck-webhook-server-cert at /tmp/k8s-webhook-server/serving-certs",
         "Deployment/node-healthcheck-controller-manager: pod template labeled workloadavailability.medik8s.io/component=nodeHealthCheck",
@@ -123,8 +132,10 @@
       },
       "outputs": {
         "nmo/00-ServiceAccount-node-maintenance-operator-controller-manager.yaml": "92d24870ff62d244081132fac08a4f935353b81838ac617fa4098ad5dd2dcff6",
+        "nmo/10-ClusterRole-node-maintenance-operator-controller-manager-all-namespaces.yaml": "43920d9a4181154df52a57b6c09e57a259a59f6a4f42894dd0c8ee89e91d23a1",
         "nmo/10-ClusterRole-node-maintenance-operator-controller-manager.yaml": "3b1c29a436c5db138b4c87d23baf14be9ed4730b2e973acd420115251d146926",
         "nmo/10-ClusterRole-node-maintenance-operator-metrics-reader.yaml": "fe8b5148cffba93e067f88a9186893568a59886aad94519617b0654f8b8ab13c",
+        "nmo/11-ClusterRoleBinding-node-maintenance-operator-controller-manager-all-namespaces.yaml": "107e057909a36c9216bea85545df44e1cac28b0803bafaefcf6f9ddec0300ec6",
         "nmo/11-ClusterRoleBinding-node-maintenance-operator-controller-manager.yaml": "7403d748fd7b48c8b6999a018d616700540ced96901f86659a40662b149fda1b",
         "nmo/20-Role-node-maintenance-operator-controller-manager.yaml": "c4ae505d944067ed611b89f30ba96895a2eb76d68ce44eb02f7e302701f63814",
         "nmo/21-RoleBinding-node-maintenance-operator-controller-manager.yaml": "9e8229feada63add19c4e380dcbd5f0da33d7124672032941f07b0f660a75bb6",
@@ -134,6 +145,7 @@
         "nmo/60-ValidatingWebhookConfiguration-node-maintenance-operator-validating-webhook-configuration.yaml": "1133ab3ec785450067a5239e29f3c13e7bfcf2a1f3181ae91ab22c036bf7451e"
       },
       "wao_modifications": [
+        "CSV permissions for node-maintenance-operator-controller-manager also rendered as ClusterRole/ClusterRoleBinding node-maintenance-operator-controller-manager-all-namespaces, as OLM grants them for an AllNamespaces OperatorGroup",
         "CSV permissions/clusterPermissions rendered as Role/RoleBinding/ClusterRole/ClusterRoleBinding named after each ServiceAccount",
         "Deployment/node-maintenance-operator-controller-manager: added service-ca webhook certificate volume node-maintenance-operator-webhook-server-cert at /tmp/k8s-webhook-server/serving-certs",
         "Deployment/node-maintenance-operator-controller-manager: pod template labeled workloadavailability.medik8s.io/component=nodeMaintenance",
@@ -174,6 +186,7 @@
       "outputs": {
         "sbr/00-ServiceAccount-sbr-operator-controller-manager.yaml": "de34745c87b4de993522bbf5c296c864adbc1ac6995c0ad2f5ff564b7a51dae5",
         "sbr/00-ServiceAccount-sbr-operator-sbr-agent.yaml": "de3908ba5e77943e08f9fccc3ee297899d821be60a5f84684db308d58bab167a",
+        "sbr/10-ClusterRole-sbr-operator-controller-manager-all-namespaces.yaml": "deebf05dbf2ece8fb24199a908dc1cfd3a8e80608e65c48d0ce491c10fd8ac42",
         "sbr/10-ClusterRole-sbr-operator-controller-manager.yaml": "e43c5e0b53a2df32601e1a35bb93d15b6da3fc1ad9c79f340197a9ec9f46308b",
         "sbr/10-ClusterRole-sbr-operator-ext-remediation.yaml": "2086fad8459343e4b49800f2f857fdd4d356a84e374786db89a7641965ca59aa",
         "sbr/10-ClusterRole-sbr-operator-metrics-reader.yaml": "e840758b092dd0796ef01f369e8f8ddf8bff048af08b845c2511d602a8392469",
@@ -188,6 +201,7 @@
         "sbr/10-ClusterRole-sbr-operator-storagebasedremediationtemplate-admin-role.yaml": "8e266a587b054195be20ba36f88c6144bd56f60d174803d31305d7721e363775",
         "sbr/10-ClusterRole-sbr-operator-storagebasedremediationtemplate-editor-role.yaml": "ad13db66bae20203b9253fca98a5294066fc145b404ed17046feab312bc05248",
         "sbr/10-ClusterRole-sbr-operator-storagebasedremediationtemplate-viewer-role.yaml": "38985e29303491e9d7cac56476af941f74168c65caab15da4798a471c3bf0741",
+        "sbr/11-ClusterRoleBinding-sbr-operator-controller-manager-all-namespaces.yaml": "f47d3af6bf1eb5a2e94cdac37971126315b6e84fe94aa8ca384ff32703fbf320",
         "sbr/11-ClusterRoleBinding-sbr-operator-controller-manager.yaml": "561b653c83e844a479657a1a9e838e8626a42b500e9ad4107f7b7d886ab9d7e8",
         "sbr/11-ClusterRoleBinding-sbr-operator-sbr-agent-rolebinding.yaml": "eacfd1785227149cde1d70bd3954ff0acf39a3367c69bb8116e6bdb3d2fa9e7f",
         "sbr/20-Role-sbr-operator-controller-manager.yaml": "bbd1e3f997b7f23a794f7f360f04c36ae8587ef60117114143df99c299cf9cb7",
@@ -196,6 +210,7 @@
         "sbr/50-Deployment-sbr-operator-controller-manager.yaml": "e9b848f5002f937bd33c641b8869c3118bdff33779ad24d00ccd8804c9886904"
       },
       "wao_modifications": [
+        "CSV permissions for sbr-operator-controller-manager also rendered as ClusterRole/ClusterRoleBinding sbr-operator-controller-manager-all-namespaces, as OLM grants them for an AllNamespaces OperatorGroup",
         "CSV permissions/clusterPermissions rendered as Role/RoleBinding/ClusterRole/ClusterRoleBinding named after each ServiceAccount",
         "ClusterRoleBinding/sbr-operator-sbr-agent-rolebinding: subject namespace sbr-operator-system -> install namespace",
         "Deployment/sbr-operator-controller-manager: pod template labeled workloadavailability.medik8s.io/component=storageBasedRemediation"
@@ -222,9 +237,11 @@
       },
       "outputs": {
         "snr/00-ServiceAccount-self-node-remediation-controller-manager.yaml": "fb058f91feeb5f0d91b5b4d40f6c0671607378d33a80912622f0a566b4c45077",
+        "snr/10-ClusterRole-self-node-remediation-controller-manager-all-namespaces.yaml": "1ed9df17ce7030d6fde9156c8136561589596b8b2f4b9d7f6cc54e178e09d05b",
         "snr/10-ClusterRole-self-node-remediation-controller-manager.yaml": "10a3e70f922f628b54728a0c0c0ac2708e700868dc52f8740ec73908e0471510",
         "snr/10-ClusterRole-self-node-remediation-ext-remediation.yaml": "3c04ae23e16215f25ac0f630e6b740c26953dbbd5d625cf43d3205dcbc0dc131",
         "snr/10-ClusterRole-self-node-remediation-metrics-reader.yaml": "b2b51dea0ea16a283536f59fb05f6dae4c22fa8df51662303719d441ede69cf1",
+        "snr/11-ClusterRoleBinding-self-node-remediation-controller-manager-all-namespaces.yaml": "dc31378f03717363bc9e12f57d90c3534aed317c4c6efece116892f0a29acebb",
         "snr/11-ClusterRoleBinding-self-node-remediation-controller-manager.yaml": "ac8ebe88f15e821e7d14a8d1abe7616bce1cb30975364b4244cccdb945659ea6",
         "snr/20-Role-self-node-remediation-controller-manager.yaml": "06e12f6b68d8ab67b07dbd65037ca944c6df9f977532f0e43bb8c13cb3ef452b",
         "snr/21-RoleBinding-self-node-remediation-controller-manager.yaml": "bf3c90bf02bcfead427ae3f5bf320f115826cf27c1b1e9d88b291095cb9dc04e",
@@ -236,6 +253,7 @@
         "snr/61-MutatingWebhookConfiguration-self-node-remediation-mutating-webhook-configuration.yaml": "35fee11c0ef04f0737aa53b6faaf769644418766c46fa1ae3b0688c1a908f2b5"
       },
       "wao_modifications": [
+        "CSV permissions for self-node-remediation-controller-manager also rendered as ClusterRole/ClusterRoleBinding self-node-remediation-controller-manager-all-namespaces, as OLM grants them for an AllNamespaces OperatorGroup",
         "CSV permissions/clusterPermissions rendered as Role/RoleBinding/ClusterRole/ClusterRoleBinding named after each ServiceAccount",
         "Deployment/self-node-remediation-controller-manager: added service-ca webhook certificate volume self-node-remediation-webhook-server-cert at /tmp/k8s-webhook-server/serving-certs",
         "Deployment/self-node-remediation-controller-manager: pod template labeled workloadavailability.medik8s.io/component=selfNodeRemediation",

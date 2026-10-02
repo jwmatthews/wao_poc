@@ -149,3 +149,38 @@ func TestRenderReplacesEveryUpstreamImage(t *testing.T) {
 		}
 	}
 }
+
+// OLM grants a CSV's namespaced permissions cluster-wide for an AllNamespaces OperatorGroup;
+// every component's manager ServiceAccount must get the same ClusterRole and ClusterRoleBinding.
+func TestRenderGrantsCSVNamespacedPermissionsClusterWide(t *testing.T) {
+	for _, def := range components.All() {
+		objs, err := operands.Render(def, "wao-ns", testImages())
+		if err != nil {
+			t.Fatal(err)
+		}
+		sa := def.Deployments[0]
+		name := sa + "-all-namespaces"
+		role := find(t, objs, "Role", sa)
+		cr := find(t, objs, "ClusterRole", name)
+		roleRules, _, _ := unstructured.NestedSlice(role.Object, "rules")
+		crRules, _, _ := unstructured.NestedSlice(cr.Object, "rules")
+		if len(crRules) == 0 || len(crRules) != len(roleRules) {
+			t.Errorf("%s: ClusterRole/%s rules %v differ from Role/%s rules %v", def.Key, name, crRules, sa, roleRules)
+		}
+		crb := find(t, objs, "ClusterRoleBinding", name)
+		ref, _, _ := unstructured.NestedStringMap(crb.Object, "roleRef")
+		subjects, _, _ := unstructured.NestedSlice(crb.Object, "subjects")
+		if ref["kind"] != "ClusterRole" || ref["name"] != name || len(subjects) != 1 {
+			t.Fatalf("%s: ClusterRoleBinding/%s = %v %v", def.Key, name, ref, subjects)
+		}
+		s := subjects[0].(map[string]interface{})
+		if s["kind"] != "ServiceAccount" || s["name"] != sa || s["namespace"] != "wao-ns" {
+			t.Errorf("%s: ClusterRoleBinding/%s subject = %v", def.Key, name, s)
+		}
+		for _, o := range []*unstructured.Unstructured{cr, crb} {
+			if o.GetLabels()[operands.LabelManagedBy] != operands.ManagedByValue || o.GetLabels()[operands.LabelComponent] != def.Key {
+				t.Errorf("%s/%s missing WAO labels: %v", o.GetKind(), o.GetName(), o.GetLabels())
+			}
+		}
+	}
+}

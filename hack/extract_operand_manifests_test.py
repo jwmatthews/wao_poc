@@ -90,6 +90,50 @@ class ExtractionTest(unittest.TestCase):
         role = next(x for x in self.kinds(self.snr, "Role") if x["metadata"]["name"] == "self-node-remediation-controller-manager")
         self.assertTrue(any("leases" in r["resources"] for r in role["rules"]))
 
+    def csv(self, comp):
+        f = next((CACHE / comp / "manifests").glob("*.clusterserviceversion.yaml"))
+        return yaml.safe_load(f.read_text())
+
+    def test_csv_namespaced_permissions_are_also_granted_cluster_wide(self):
+        # OLM's OperatorGroup controller (ensureSingletonRBAC) copies every Role produced from CSV `permissions`
+        # into a ClusterRole and ClusterRoleBinding when the OperatorGroup targets all namespaces, the only install
+        # mode these CSVs support. WAO must grant the same effective RBAC.
+        for comp, docs in self.docs.items():
+            perms = self.csv(comp)["spec"]["install"]["spec"].get("permissions") or []
+            self.assertTrue(perms, comp)
+            cluster_roles = {d["metadata"]["name"]: d for d in self.kinds(docs, "ClusterRole")}
+            bindings = self.kinds(docs, "ClusterRoleBinding")
+            for p in perms:
+                sa = p["serviceAccountName"]
+                # the namespaced Role and RoleBinding stay, as OLM keeps them too
+                self.assertTrue(any(r["rules"] == p["rules"] for r in self.kinds(docs, "Role")), f"{comp} Role for {sa}")
+                self.assertTrue(any(b["subjects"] == [{"kind": "ServiceAccount", "name": sa, "namespace": "__WAO_NAMESPACE__"}]
+                                    for b in self.kinds(docs, "RoleBinding")), f"{comp} RoleBinding for {sa}")
+                copies = [b for b in bindings
+                          if b["subjects"] == [{"kind": "ServiceAccount", "name": sa, "namespace": "__WAO_NAMESPACE__"}]
+                          and b["roleRef"]["kind"] == "ClusterRole"
+                          and b["roleRef"]["name"] in cluster_roles
+                          and cluster_roles[b["roleRef"]["name"]]["rules"] == p["rules"]]
+                self.assertEqual(len(copies), 1, f"{comp}: no cluster-wide copy of the CSV permissions for {sa}")
+
+    def test_far_manager_can_list_secrets_cluster_wide(self):
+        sa = "fence-agents-remediation-controller-manager"
+        roles = {d["metadata"]["name"]: d for d in self.kinds(self.far, "ClusterRole")}
+        granted = [roles[b["roleRef"]["name"]] for b in self.kinds(self.far, "ClusterRoleBinding")
+                   if {"kind": "ServiceAccount", "name": sa, "namespace": "__WAO_NAMESPACE__"} in b["subjects"]
+                   and b["roleRef"]["name"] in roles]
+        self.assertTrue(any("" in r["apiGroups"] and "secrets" in r["resources"] and {"list", "watch"} <= set(r["verbs"])
+                            for role in granted for r in role["rules"]), "FAR manager lacks cluster-wide list/watch on secrets")
+
+    def test_cluster_scoped_rbac_names_are_unique_across_components(self):
+        seen = {}
+        for comp, docs in self.docs.items():
+            for kind in ("ClusterRole", "ClusterRoleBinding"):
+                for d in self.kinds(docs, kind):
+                    ident = (kind, d["metadata"]["name"])
+                    self.assertNotIn(ident, seen, f"{ident} rendered by {seen.get(ident)} and {comp}")
+                    seen[ident] = comp
+
     def test_images_keep_upstream_references(self):
         text = "".join((self.out / "snr" / n).read_text() for n in self.snr)
         self.assertIn("quay.io/medik8s/self-node-remediation-operator:v0.13.0", text)
