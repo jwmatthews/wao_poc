@@ -31,7 +31,7 @@ component starts **Disabled**. See [docs/design-brief.md](docs/design-brief.md).
 | --- | --- |
 | Design brief | Written |
 | Implementation plan for the install case | Written: [docs/implementation-plan.md](docs/implementation-plan.md) |
-| Implementation | Not started |
+| Implementation | In progress: Task 1 (operator scaffold) done |
 | Upgrade scenarios | Future plan |
 
 ## Layout
@@ -54,6 +54,18 @@ python3 -m venv .venv
 ```
 
 Then follow [docs/implementation-plan.md](docs/implementation-plan.md) from Task 1.
+
+## Toolchain
+
+Versions used to build this POC (recorded in Task 1):
+
+| Tool | Version | Notes |
+| --- | --- | --- |
+| Go | go1.27.1 darwin/arm64 | `go.mod` declares `go 1.24.0` (scaffold default) |
+| operator-sdk | v1.42.3 (kubernetes v1.33.1, built with go1.26.4) | kubebuilder `go.kubebuilder.io/v4` layout |
+| controller-gen | v0.18.0 | Downloaded into `bin/` by the Makefile |
+| envtest | Kubernetes 1.33.0 | Downloaded into `bin/k8s/` by `make test` |
+| podman | 5.7.0 | The local podman VM is not used; the operator image is built on the cluster |
 
 ## License
 
