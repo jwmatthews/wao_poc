@@ -3806,6 +3806,9 @@ for w in validatingwebhookconfiguration/fence-agents-remediation-validating-webh
 done
 wait_for 180 "status phase Available" bash -c "[ \"\$(component_field fenceAgentsRemediation phase)\" = Available ]"
 
+# FAR v0.8.0 rejects a template without parameters ("mandatory parameters are missing"), so the template
+# carries one node parameter for a node that does not exist. The CRD field names are lower case
+# (nodeparameters, sharedparameters); camelCase keys are pruned and the template looks empty.
 template() { # template NAME AGENT : print a FenceAgentsRemediationTemplate manifest
   cat <<YAML
 apiVersion: fence-agents-remediation.medik8s.io/v1alpha1
@@ -3817,6 +3820,9 @@ spec:
   template:
     spec:
       agent: $2
+      nodeparameters:
+        --plug:
+          wao-node-that-does-not-exist: "1"
 YAML
 }
 set +e
@@ -3929,7 +3935,7 @@ git add -A && git commit -m "wao: document POC usage"
 
 ## 4. Live-cluster verification: install case
 
-Run from the repository root after Tasks 1–9, with `KUBECONFIG` pointing at the test cluster. Each case has a script `test/cluster/NN-<slug>.sh`.
+Run from the repository root after Tasks 1–9, with `KUBECONFIG` pointing at the test cluster. Each case `WAO-INST-NN` has a script `test/cluster/NN-<slug>.sh`; see `test/cluster/README.md` for the list. The script listings in Task 9 predate this numbering and the stricter checks; the scripts in `test/cluster/` are authoritative.
 
 **Prerequisites:**
 - A disposable OpenShift 4.x cluster with classic OLM that you are authorized to modify.
@@ -3945,16 +3951,16 @@ Raw output goes only to the git-ignored `evidence/`. Before the run, create `evi
 | ID | Case | Steps | Pass criteria |
 | --- | --- | --- | --- |
 | WAO-INST-00 | Preflight (`00-preflight.sh`) | Read-only checks | Supported topology; amd64 nodes; OLM present; no `medik8s.io` CRDs; no medik8s operator CSVs; install namespace absent; Machine API presence recorded |
-| WAO-INST-01 | Catalog (`02-install-wao.sh`) | Apply `dist/wao-poc-catalog.yaml` | CatalogSource `READY` within 180 s; packagemanifest `workload-availability-operator` lists channel `alpha` |
+| WAO-INST-01 | Catalog (`01-catalog.sh`) | Apply `dist/wao-poc-catalog.yaml` | CatalogSource `READY` within 180 s; packagemanifest `workload-availability-operator` lists channel `alpha` |
 | WAO-INST-02 | Install via OLM (`02-install-wao.sh`) | Namespace with `openshift.io/node-selector: ""`; OperatorGroup with empty spec; Subscription with `installPlanApproval: Manual`; approve the InstallPlan | CSV `workload-availability-operator.v0.1.0` `Succeeded` within 300 s; exactly one Deployment in the namespace; all thirteen CRDs present |
 | WAO-INST-03 | Clean-install invariants | Inspect namespace and cluster | No operand Deployment, DaemonSet or Service; no object of any of the twelve component kinds anywhere; no `*.kb.io` webhook configurations; no PVC in the namespace; no `medik8s-leases` namespace created by WAO |
 | WAO-INST-04 | Default config, status and CEL | `get wac cluster -o yaml`; try creating a config named `other` | Config exists without administrator action (D4); six component entries, all `Disabled`; `Available=True` reason `AsExpected`; `Progressing=False`; `Degraded=False`; `releaseSet` equals the seven pinned images; the `other` config is rejected with the singleton message |
 | WAO-INST-05 | Enable NHC (`05-enable-nhc.sh`) | Patch `nodeHealthCheck.state: Enabled` | Manager Available; serving Secret `node-healthcheck-webhook-server-cert` created by service-ca; CA bundle injected; status `Available` with `admissionReady: true`; dry-run NHC with both `minHealthy` and `maxUnhealthy` rejected by `vnodehealthcheck.kb.io` with "cannot be specified at the same time"; aggregation ClusterRole created by NHC; no NHC policy exists. Record whether `ConsolePlugin` and `ServiceMonitor` were created; the upstream bundle ships no console-plugin backend |
-| WAO-INST-06 | Enable SNR (`07-enable-snr.sh`) | Patch `selfNodeRemediation.state: Enabled` | Manager Available; all four webhooks carry CA bundles; status `Available`; SNR itself creates `self-node-remediation-config`, `self-node-remediation-automatic-strategy-template` and Secret `self-node-remediation-certificates`; DaemonSet `self-node-remediation-ds` ready on every scheduled node; dry-run config `second-config` rejected by `vselfnoderemediationconfig.kb.io`; dry-run template returns annotation `remediation.medik8s.io/multiple-templates-support: "true"` |
-| WAO-INST-07 | Enable SBR | Patch `storageBasedRemediation.state: Enabled` | Manager Available; ServiceAccount `sbr-operator-sbr-agent`; ClusterRoleBinding `sbr-operator-sbr-agent-rolebinding` subject namespace is `openshift-workload-availability`; no DaemonSet, PVC or Job; status `Available` with no `admissionReady` field; dry-run `StorageBasedRemediationConfig` create succeeds and is not applied for real |
-| WAO-INST-08 | Enable FAR (`11-enable-far.sh`) | Patch `fenceAgentsRemediation.state: Enabled` | Manager Available; all four FAR webhooks carry CA bundles; status `Available`; the manager ServiceAccount can list and watch Secrets in all namespaces (OLM all-namespaces copy of the CSV `permissions`) and its log has no "secrets is forbidden" error; dry-run template with agent `fence_wao_does_not_exist` rejected with "unsupported fence agent"; dry-run template with agent `fence_ipmilan` returns the multiple-templates annotation; no `FenceAgentsRemediation` exists |
-| WAO-INST-09 | Enable MDR (`12-enable-mdr.sh`) | Patch `machineDeletionRemediation.state: Enabled` | Manager Available; status `Available` with no `admissionReady` field; metrics Service selector carries `workloadavailability.medik8s.io/component=machineDeletionRemediation`; its EndpointSlices contain exactly the MDR pods, although five other `control-plane: controller-manager` managers run in the namespace (D10) |
-| WAO-INST-10 | Enable NMO (`13-enable-nmo.sh`) | Patch `nodeMaintenance.state: Enabled` | Manager Available; CA bundle injected; status `Available`; dry-run `NodeMaintenance` for `wao-node-that-does-not-exist` rejected by `vnodemaintenance.kb.io` with "no node with name"; no `NodeMaintenance` exists. Record whether `medik8s-leases` exists; NHC and NMO share it by default |
+| WAO-INST-06 | Enable SNR (`06-enable-snr.sh`) | Patch `selfNodeRemediation.state: Enabled` | Manager Available; all four webhooks carry CA bundles; status `Available`; SNR itself creates `self-node-remediation-config`, `self-node-remediation-automatic-strategy-template` and Secret `self-node-remediation-certificates`; DaemonSet `self-node-remediation-ds` ready on every scheduled node; dry-run config `second-config` rejected by `vselfnoderemediationconfig.kb.io`; dry-run template returns annotation `remediation.medik8s.io/multiple-templates-support: "true"` |
+| WAO-INST-07 | Enable SBR (`07-enable-sbr.sh`) | Patch `storageBasedRemediation.state: Enabled` | Manager Available; ServiceAccount `sbr-operator-sbr-agent`; ClusterRoleBinding `sbr-operator-sbr-agent-rolebinding` subject namespace is `openshift-workload-availability`; no DaemonSet, PVC or Job; status `Available` with no `admissionReady` field; dry-run `StorageBasedRemediationConfig` create succeeds and is not applied for real |
+| WAO-INST-08 | Enable FAR (`08-enable-far.sh`) | Patch `fenceAgentsRemediation.state: Enabled` | Manager Available; all four FAR webhooks carry CA bundles; status `Available`; the manager ServiceAccount can list and watch Secrets in all namespaces (OLM all-namespaces copy of the CSV `permissions`) and its log has no "secrets is forbidden" error; dry-run template (with one `nodeparameters` entry for a nonexistent node) with agent `fence_wao_does_not_exist` rejected with "unsupported fence agent"; dry-run template with agent `fence_ipmilan` returns the multiple-templates annotation; no `FenceAgentsRemediation` exists |
+| WAO-INST-09 | Enable MDR (`09-enable-mdr.sh`) | Patch `machineDeletionRemediation.state: Enabled` | Manager Available; status `Available` with no `admissionReady` field; metrics Service selector carries `workloadavailability.medik8s.io/component=machineDeletionRemediation`; its EndpointSlices contain exactly the MDR pods, although five other `control-plane: controller-manager` managers run in the namespace (D10) |
+| WAO-INST-10 | Enable NMO (`10-enable-nmo.sh`) | Patch `nodeMaintenance.state: Enabled` | Manager Available; CA bundle injected; status `Available`; dry-run `NodeMaintenance` for `wao-node-that-does-not-exist` rejected by `vnodemaintenance.kb.io` with "no node with name"; no `NodeMaintenance` exists. Record whether `medik8s-leases` exists; NHC and NMO share it by default |
 | WAO-INST-11 | Parity, all six | Run `test/cluster/parity.py --component C` for each of `nhc`, `snr`, `sbr`, `far`, `mdr` and `nmo` | Exit 0 for each (Deployments, `clusterPermissions` ClusterRoles, and each `permissions` Role plus its `<sa>-all-namespaces` ClusterRole and ClusterRoleBinding); SNR agent DaemonSet image equals the pinned SNR digest |
 | WAO-INST-12 | WAO restart idempotence | Record `metadata.generation` and `resourceVersion` of every operand Deployment, the webhook configurations and the config; delete the WAO pod; wait 2 minutes | Generations unchanged; no operand pod restarted; the config's `resourceVersion` changes at most once; all conditions keep their `lastTransitionTime` |
 | WAO-INST-13 | Drift repair and field ownership | Scale `sbr-operator-controller-manager` to 0 | WAO restores 2 replicas within 60 s; `managedFields` shows manager `workload-availability-operator` owning `spec.replicas` |

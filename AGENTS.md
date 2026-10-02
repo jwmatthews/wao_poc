@@ -46,5 +46,5 @@ Still confirm which one to use before running cluster tests.
 
 ## Commits
 
-Small commits per task with a `wao:` prefix. Run `make test` before each commit
-once Task 1 exists.
+Small commits per task with a `wao:` prefix. Run `make test` and `make test-offline`
+before each commit.

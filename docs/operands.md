@@ -35,6 +35,7 @@ Bundle CSV `node-healthcheck-operator.v0.12.0`. Source tag commit
 | CSV namespaced permissions | `node-healthcheck-controller-manager` | configmaps, leases, events |
 | OLM all-namespaces copy | ClusterRole and ClusterRoleBinding `node-healthcheck-controller-manager-all-namespaces` | Same rules as the namespaced permissions, bound to `node-healthcheck-controller-manager`; see below |
 | CSV cluster permissions | `node-healthcheck-controller-manager` | 17 rules: namespaces create/get/patch; nodes and pods read; deployments and replicasets read; OpenShift config read; consoleplugins; leases; machinehealthchecks and machines; servicemonitors; PodDisruptionBudgets read; clusterroles and clusterrolebindings `*`; nodehealthchecks; tokenreviews; subjectaccessreviews |
+| ValidatingWebhookConfiguration | `node-healthcheck-validating-webhook-configuration` | Holds the webhook below; WAO adds the service-ca CA-bundle injection annotation (D1) |
 | Webhook | `vnodehealthcheck.kb.io` | Validating, `Fail`, CREATE/UPDATE/DELETE on `nodehealthchecks`, path `/validate-remediation-medik8s-io-v1alpha1-nodehealthcheck` |
 
 Created by the NHC manager at runtime, not by WAO:
@@ -70,6 +71,7 @@ Bundle CSV `self-node-remediation.v0.13.0`. Source tag commit
 | CSV namespaced permissions | `self-node-remediation-controller-manager` | configmaps, leases, events |
 | OLM all-namespaces copy | ClusterRole and ClusterRoleBinding `self-node-remediation-controller-manager-all-namespaces` | Same rules as the namespaced permissions, bound to `self-node-remediation-controller-manager`; see below |
 | CSV cluster permissions | `self-node-remediation-controller-manager` | 14 rules: namespaces read; nodes and secrets full; pods delete and read; daemonsets full; machines full; SCC `privileged` use; SNR resources full; volumeattachments; tokenreviews; subjectaccessreviews |
+| Webhook configurations | `self-node-remediation-mutating-webhook-configuration`, `self-node-remediation-validating-webhook-configuration` | Hold the webhooks below; WAO adds the service-ca CA-bundle injection annotation (D1) |
 | Webhooks | `mselfnoderemediationtemplate.kb.io` | Mutating, `Fail`, CREATE/UPDATE templates; adds annotation `remediation.medik8s.io/multiple-templates-support: "true"` |
 | | `vselfnoderemediation.kb.io` | Validating, **`Ignore`**, CREATE/UPDATE remediations |
 | | `vselfnoderemediationconfig.kb.io` | Validating, `Fail`, CREATE/UPDATE/DELETE configs |
@@ -101,7 +103,7 @@ Bundle CSV `storage-based-remediation.v0.3.0`. Source tag commit
 | Deployment | `sbr-operator-controller-manager` | 2 replicas; service account `sbr-operator-controller-manager`; image `quay.io/medik8s/storage-based-remediation-operator:v0.3.0`; args `--metrics-bind-address=:8443 --leader-elect --health-probe-bind-address=:8081 --enable-webhooks=false`; env `POD_NAME`, `POD_NAMESPACE`, `RELATED_IMAGE_AGENT=quay.io/medik8s/storage-based-remediation-agent:v0.3.0`; limits 500m CPU, 128Mi memory; selector `app.kubernetes.io/name=sbr-operator, control-plane=controller-manager` |
 | Service | `sbr-operator-controller-manager-metrics-service` | 8443 to 8443 |
 | ServiceAccount | `sbr-operator-sbr-agent` | |
-| ClusterRoles | `sbr-operator-ext-remediation`, `sbr-operator-metrics-reader`, `sbr-operator-sbr-agent-privileged-scc`, `sbr-operator-sbr-agent-role`, and admin/editor/viewer roles for each of the three kinds | |
+| ClusterRoles | `sbr-operator-ext-remediation`, `sbr-operator-metrics-reader`, `sbr-operator-sbr-agent-privileged-scc`, `sbr-operator-sbr-agent-role`, and `sbr-operator-<kind>-admin-role`, `-editor-role` and `-viewer-role` for each of `storagebasedremediation`, `storagebasedremediationconfig` and `storagebasedremediationtemplate` | |
 | ClusterRoleBinding | `sbr-operator-sbr-agent-rolebinding` | Subject namespace is the placeholder `sbr-operator-system`; WAO rewrites it (D9) |
 | CSV namespaced permissions | `sbr-operator-controller-manager` | configmaps, leases, events |
 | OLM all-namespaces copy | ClusterRole and ClusterRoleBinding `sbr-operator-controller-manager-all-namespaces` | Same rules as the namespaced permissions, bound to `sbr-operator-controller-manager`; see below |
@@ -133,7 +135,8 @@ Bundle CSV `fence-agents-remediation.v0.8.0`. Source tag commit
 | ClusterRoles | `fence-agents-remediation-ext-remediation`, `fence-agents-remediation-metrics-reader` | |
 | CSV namespaced permissions | `fence-agents-remediation-controller-manager` | configmaps, leases, events, and Secrets read (fence credentials) |
 | OLM all-namespaces copy | ClusterRole and ClusterRoleBinding `fence-agents-remediation-controller-manager-all-namespaces` | Same rules as the namespaced permissions, bound to `fence-agents-remediation-controller-manager`; see below |
-| CSV cluster permissions | same | 10 rules: namespaces read; nodes; pods delete and `pods/exec` create; FAR resources; volumeattachments; tokenreviews; subjectaccessreviews |
+| CSV cluster permissions | `fence-agents-remediation-controller-manager` | 10 rules: namespaces read; nodes; pods delete and `pods/exec` create; FAR resources; volumeattachments; tokenreviews; subjectaccessreviews |
+| Webhook configurations | `fence-agents-remediation-mutating-webhook-configuration`, `fence-agents-remediation-validating-webhook-configuration` | Hold the webhooks below; WAO adds the service-ca CA-bundle injection annotation (D1) |
 | Webhooks | `mfenceagentsremediation.kb.io`, `mfenceagentsremediationtemplate.kb.io` | Mutating, `Fail`, CREATE/UPDATE; the template mutator adds `remediation.medik8s.io/multiple-templates-support: "true"` |
 | | `vfenceagentsremediation.kb.io`, `vfenceagentsremediationtemplate.kb.io` | Validating, `Fail`, CREATE/UPDATE |
 
@@ -151,13 +154,13 @@ Bundle CSV `machine-deletion-remediation.v0.7.0`. Source tag commit
 | Object | Name | Notes |
 | --- | --- | --- |
 | CRDs | `machinedeletionremediations`, `machinedeletionremediationtemplates` in group `machine-deletion-remediation.medik8s.io` | Namespaced |
-| Deployment | `machine-deletion-remediation-controller-manager` | 1 replica; service account `machine-deletion-remediation-controller-manager`; image `quay.io/medik8s/machine-deletion-remediation-operator:v0.7.0`; args `--health-probe-bind-address=:8081 --metrics-bind-address=:8443 --leader-elect`; no env; selector **`control-plane=controller-manager` only** |
+| Deployment | `machine-deletion-remediation-controller-manager` | 1 replica; service account `machine-deletion-remediation-controller-manager`; image `quay.io/medik8s/machine-deletion-remediation-operator:v0.7.0`; args `--health-probe-bind-address=:8081 --metrics-bind-address=:8443 --leader-elect`; no env; limits 100m CPU, 30Mi memory; selector **`control-plane=controller-manager` only** |
 | Service | `machine-deletion-remediation-controller-manager-metrics-service` | 8443 to `https`; upstream selector `control-plane: controller-manager`, which also matches the FAR, NMO, SBR and SNR manager pods. WAO narrows it (design brief D10) |
 | ConfigMap | `machine-deletion-remediation-manager-config` | Legacy controller-manager config |
 | ClusterRoles | `machine-deletion-remediation-machine-deletion-remediation-ext-remediation`, `machine-deletion-remediation-metrics-reader` | |
 | CSV namespaced permissions | `machine-deletion-remediation-controller-manager` | configmaps, leases, events |
 | OLM all-namespaces copy | ClusterRole and ClusterRoleBinding `machine-deletion-remediation-controller-manager-all-namespaces` | Same rules as the namespaced permissions, bound to `machine-deletion-remediation-controller-manager`; see below |
-| CSV cluster permissions | same | 8 rules: nodes read; MDR resources; machinesets and controlplanemachinesets read; machines full; tokenreviews; subjectaccessreviews |
+| CSV cluster permissions | `machine-deletion-remediation-controller-manager` | 8 rules: nodes read; MDR resources; machinesets and controlplanemachinesets read; machines full; tokenreviews; subjectaccessreviews |
 | Webhooks | none | |
 
 MDR acts through the OpenShift Machine API (`machine.openshift.io`)
@@ -177,7 +180,8 @@ Bundle CSV `node-maintenance-operator.v0.21.0`. Source tag commit
 | ClusterRole | `node-maintenance-operator-metrics-reader` | |
 | CSV namespaced permissions | `node-maintenance-operator-controller-manager` | configmaps, leases, events |
 | OLM all-namespaces copy | ClusterRole and ClusterRoleBinding `node-maintenance-operator-controller-manager-all-namespaces` | Same rules as the namespaced permissions, bound to `node-maintenance-operator-controller-manager`; see below |
-| CSV cluster permissions | same | 14 rules including namespaces create/get; nodes; pods and `pods/eviction`; workload controllers read; leases; servicemonitors; NodeMaintenance resources; `oauth.openshift.io` `*`; PodDisruptionBudgets read |
+| CSV cluster permissions | `node-maintenance-operator-controller-manager` | 14 rules including namespaces create/get; nodes; pods and `pods/eviction`; workload controllers read; leases; servicemonitors; NodeMaintenance resources; `oauth.openshift.io` `*`; PodDisruptionBudgets read |
+| ValidatingWebhookConfiguration | `node-maintenance-operator-validating-webhook-configuration` | Holds the webhook below; WAO adds the service-ca CA-bundle injection annotation (D1) |
 | Webhook | `vnodemaintenance.kb.io` | Validating, `Fail`, CREATE/UPDATE `nodemaintenances` |
 
 NMO uses the same medik8s node-lease library as NHC, with lease namespace
