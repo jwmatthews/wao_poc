@@ -27,7 +27,7 @@ metadata:
       ]
     capabilities: Basic Install
     categories: OpenShift Optional
-    createdAt: "2026-10-02T01:29:30Z"
+    createdAt: "2026-10-02T02:23:59Z"
     description: Proof of concept single operator that installs the six medik8s workload
       availability operators (NHC, SNR, SBR, FAR, MDR, NMO) as managed operands.
     operatorframework.io/suggested-namespace: openshift-workload-availability
@@ -1186,7 +1186,7 @@ spec:
                   value: quay.io/medik8s/machine-deletion-remediation-operator@sha256:0f69367097625d7824d9b5b69de64103e19b612c9833b0b786bb32c9b7efe84d
                 - name: RELATED_IMAGE_NMO_MANAGER
                   value: quay.io/medik8s/node-maintenance-operator@sha256:5b65ec62c58b92fee3389a77ded760ce82a0a6a30f6cf89573f6e97b8f677c74
-                image: image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@sha256:63ab8f4d80431ed10206a0203e690921062e9c6d155414f801846e02554c6fe4
+                image: image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@sha256:a766cd13ae0f2d2b6428c607d4ba0d43347219416191d2793c356b356fd7b6cf
                 livenessProbe:
                   httpGet:
                     path: /healthz
