@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"os"
@@ -26,19 +27,25 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	workloadavailabilityv1alpha1 "github.com/jwmatthews/wao_poc/api/v1alpha1"
 	"github.com/jwmatthews/wao_poc/internal/controller"
+	"github.com/jwmatthews/wao_poc/internal/images"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -88,6 +95,17 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	imgs, err := images.FromEnv(os.LookupEnv)
+	if err != nil {
+		setupLog.Error(err, "operand images are not configured")
+		os.Exit(1)
+	}
+	operatorNamespace := os.Getenv("OPERATOR_NAMESPACE")
+	if operatorNamespace == "" {
+		setupLog.Error(nil, "OPERATOR_NAMESPACE must be set (downward API)")
+		os.Exit(1)
+	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -183,8 +201,16 @@ func main() {
 		Metrics:                metricsServerOptions,
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
-		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "72846991.medik8s.io",
+		// Namespaced operand kinds are cached only in the install namespace. Unstructured
+		// objects are not cached at all (controller-runtime default), so the foreign-object
+		// guard and the retained-resource listing read live from the API server.
+		Cache: cache.Options{ByObject: map[client.Object]cache.ByObject{
+			&appsv1.Deployment{}: {Namespaces: map[string]cache.Config{operatorNamespace: {}}},
+			&appsv1.DaemonSet{}:  {Namespaces: map[string]cache.Config{operatorNamespace: {}}},
+			&corev1.Service{}:    {Namespaces: map[string]cache.Config{operatorNamespace: {}}},
+		}},
+		LeaderElection:   enableLeaderElection,
+		LeaderElectionID: "72846991.medik8s.io",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -202,11 +228,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := (&controller.WorkloadAvailabilityConfigReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+	if err = (&controller.WorkloadAvailabilityConfigReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Namespace: operatorNamespace, Images: imgs,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "WorkloadAvailabilityConfig")
+		os.Exit(1)
+	}
+	// Create the all-Disabled singleton once this replica leads (design brief D4).
+	if err = mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
+		select {
+		case <-mgr.Elected():
+			return controller.EnsureDefaultConfig(ctx, mgr.GetClient())
+		case <-ctx.Done():
+			return nil
+		}
+	})); err != nil {
+		setupLog.Error(err, "unable to add default config bootstrap")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
