@@ -32,7 +32,7 @@ import (
 
 var _ = Describe("WorkloadAvailabilityConfig Controller", func() {
 	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
+		const resourceName = workloadavailabilityv1alpha1.SingletonName
 
 		ctx := context.Background()
 

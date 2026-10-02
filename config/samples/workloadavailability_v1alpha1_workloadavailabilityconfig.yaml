@@ -1,9 +1,12 @@
 apiVersion: workloadavailability.medik8s.io/v1alpha1
 kind: WorkloadAvailabilityConfig
 metadata:
-  labels:
-    app.kubernetes.io/name: workload-availability-operator
-    app.kubernetes.io/managed-by: kustomize
-  name: workloadavailabilityconfig-sample
+  name: cluster
 spec:
-  # TODO(user): Add fields here
+  components:
+    nodeHealthCheck:
+      state: Disabled
+    selfNodeRemediation:
+      state: Disabled
+    storageBasedRemediation:
+      state: Disabled
