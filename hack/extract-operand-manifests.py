@@ -26,6 +26,8 @@ WEBHOOK_CERT_DIR = "/tmp/k8s-webhook-server/serving-certs"  # controller-runtime
 COMPONENT_LABEL = "workloadavailability.medik8s.io/component"
 # Name suffix of the cluster-wide copy of a CSV's namespaced permissions (OLM AllNamespaces behaviour).
 ALL_NAMESPACES_SUFFIX = "-all-namespaces"
+# Rule OLM appends to the cluster-wide copy of a CSV's namespaced permissions for an AllNamespaces OperatorGroup.
+OLM_NAMESPACES_RULE = {"apiGroups": [""], "resources": ["namespaces"], "verbs": ["get", "list", "watch"]}
 SERVING_CERT_ANNOTATION = "service.beta.openshift.io/serving-cert-secret-name"
 INJECT_CABUNDLE_ANNOTATION = "service.beta.openshift.io/inject-cabundle"
 OPTIONAL_WEBHOOK_FIELDS = {
@@ -143,14 +145,17 @@ def rbac(csv, mods):
         # OLM's OperatorGroup controller (ensureSingletonRBAC) also grants a CSV's namespaced permissions
         # cluster-wide when the OperatorGroup targets all namespaces, the only install mode these CSVs
         # support. Reproduce that copy; the suffix keeps it apart from the clusterPermissions role named after the SA.
+        # OLM also appends get/list/watch on namespaces to that copy (NMO needs it to sync its cache for
+        # the medik8s-leases Namespace), so the copy is the CSV rules followed by OLM_NAMESPACES_RULE.
         cluster_name = f"{sa}{ALL_NAMESPACES_SUFFIX}"
         out.append({"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "ClusterRole",
-                    "metadata": {"name": cluster_name}, "rules": copy.deepcopy(p["rules"])})
+                    "metadata": {"name": cluster_name}, "rules": copy.deepcopy(p["rules"]) + [copy.deepcopy(OLM_NAMESPACES_RULE)]})
         out.append({"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "ClusterRoleBinding", "metadata": {"name": cluster_name},
                     "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": cluster_name},
                     "subjects": copy.deepcopy(subjects)})
         mods.append(f"CSV permissions for {sa} also rendered as ClusterRole/ClusterRoleBinding {cluster_name}, "
-                    "as OLM grants them for an AllNamespaces OperatorGroup")
+                    "as OLM grants them for an AllNamespaces OperatorGroup, "
+                    "plus OLM's appended get/list/watch rule on namespaces")
     for p in spec.get("clusterPermissions", []) or []:
         sa = p["serviceAccountName"]; sas.add(sa)
         out.append({"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "ClusterRole", "metadata": {"name": sa}, "rules": p["rules"]})

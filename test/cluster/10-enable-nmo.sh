@@ -10,6 +10,12 @@ expect "status admissionReady true" field_is nodeMaintenance admissionReady true
 expect "every rendered NMO operand object exists" operands_present nmo
 expect "service-ca created the webhook serving Secret with tls.crt and tls.key (key names only)" \
   secret_has_keys "$NS" node-maintenance-operator-webhook-server-cert tls.crt tls.key
+# OLM appends get/list/watch on namespaces to the all-namespaces copy of the CSV permissions. Without it NMO's
+# cache for the medik8s-leases Namespace never syncs and the manager exits every few minutes.
+nmo_sa="system:serviceaccount:${NS}:node-maintenance-operator-controller-manager"
+expect "NMO manager ServiceAccount can list namespaces cluster-wide" k auth can-i list namespaces --as="$nmo_sa" -q
+expect "NMO manager ServiceAccount can watch namespaces cluster-wide" k auth can-i watch namespaces --as="$nmo_sa" -q
+wait_for 120 "medik8s-leases namespace exists" found namespace medik8s-leases
 
 expect "NodeMaintenance for a missing node rejected (dry-run)" dry_run_rejected 10-admission-missing-node create <<'YAML'
 apiVersion: nodemaintenance.medik8s.io/v1beta1
@@ -23,10 +29,5 @@ YAML
 expect "rejection came from vnodemaintenance.kb.io" grep -q "vnodemaintenance.kb.io" <<<"$DRY_RUN_OUT"
 expect "rejection names the missing node" grep -q "no node with name" <<<"$DRY_RUN_OUT"
 expect "no NodeMaintenance objects exist" none_found nodemaintenances
-if found namespace medik8s-leases >/dev/null 2>&1; then
-  echo "note: medik8s-leases namespace exists (shared by NHC and NMO by default)"
-else
-  echo "note: medik8s-leases not created yet (created on first node lease)"
-fi
 record 10-manager-logs logs deployment/node-maintenance-operator-controller-manager -n "$NS" --tail=200 >/dev/null
 snapshot 10

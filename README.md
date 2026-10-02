@@ -32,7 +32,7 @@ component starts **Disabled**. See [docs/design-brief.md](docs/design-brief.md).
 | Design brief | Written |
 | Implementation plan for the install case | Written: [docs/implementation-plan.md](docs/implementation-plan.md) |
 | Implementation | Done: Tasks 1–10 (operator, operand manifests, bundle, image, POC catalog, live-cluster harness, docs) |
-| Live install verification | Run on a disposable OpenShift 4.22 cluster (3 nodes, `HighlyAvailable`): 18 of 19 cases pass. WAO-INST-12 fails because of an upstream NMO issue, see [Known upstream issues](#known-upstream-issues). Raw results are not committed |
+| Live install verification | Run on a disposable OpenShift 4.22 cluster (3 nodes, `HighlyAvailable`): the first run found a WAO RBAC bug that made WAO-INST-12 fail (see [Deviations from the plan](#deviations-from-the-plan), item 8). It is fixed; the final verification run is pending a re-run after this fix. Raw results are not committed |
 | Upgrade scenarios | Future plan |
 
 ## Layout
@@ -82,8 +82,9 @@ union role to `config/rbac/operand_union_role.yaml`:
 | **Total** | **90** | |
 
 Each component's set includes the `<serviceaccount>-all-namespaces` ClusterRole and
-ClusterRoleBinding that copy the CSV's namespaced `permissions` cluster-wide, as OLM
-does for an all-namespaces install (design brief D7). Never hand-edit these files;
+ClusterRoleBinding that copy the CSV's namespaced `permissions` cluster-wide and
+append get/list/watch on `namespaces`, as OLM does for an all-namespaces install
+(design brief D7). Never hand-edit these files;
 regenerate them.
 
 ## Build and test
@@ -224,9 +225,10 @@ removed, the operand objects it renders. Specifically:
   - NMO's `oauth.openshift.io` wildcard;
   - cluster-wide `clusterroles` and `clusterrolebindings` management from NHC and SBR.
 - Each component's namespaced CSV `permissions` are also granted cluster-wide
-  through `<serviceaccount>-all-namespaces`, exactly as OLM does for the
-  all-namespaces install mode these CSVs support. For FAR this means its manager can
-  read Secrets (fence credentials) in every namespace, which upstream FAR requires.
+  through `<serviceaccount>-all-namespaces`, with OLM's get/list/watch rule on
+  `namespaces` appended, exactly as OLM does for the all-namespaces install mode
+  these CSVs support. For FAR this means its manager can read Secrets (fence
+  credentials) in every namespace, which upstream FAR requires.
 - Enabling SNR starts privileged node agents on every eligible node (D3).
 - No API field can override a component image; the pinned digests are reported in
   the config status (`releaseSet`).
@@ -236,13 +238,6 @@ removed, the operand objects it renders. Specifically:
 WAO copies each component's Deployment and RBAC faithfully, by design, so upstream
 defects carry over unchanged.
 
-- **NMO v0.21.0 manager restarts (status: under investigation, suspected upstream
-  defect).** In the live run the NMO manager restarted about every 2.5 minutes. Its
-  CSV RBAC grants only `get` and `create` on `namespaces`, but it reads the
-  `medik8s-leases` Namespace through a cached client, which needs `list` and
-  `watch`, so its caches never sync. This is why WAO-INST-12 (restart idempotence)
-  fails: an operand pod restarts during the observation window. Whether the same
-  happens with a standalone OLM install of NMO is being verified separately.
 - **MDR v0.7.0 memory limit.** The upstream CSV limits the MDR manager to 30Mi of
   memory and the manager runs at about 98% of it, which made MDR fail
   intermittently in one run.
@@ -266,6 +261,14 @@ Bugs in the plan found and fixed during implementation:
 7. The CSV `relatedImages` lists the seven component images but not the WAO image
    itself; operator-sdk builds the list only from `RELATED_IMAGE_*` environment
    variables.
+8. A WAO bug found by the live tests: when OLM copies a CSV's namespaced
+   `permissions` into a cluster-wide ClusterRole for an all-namespaces install, it
+   also appends get/list/watch on `namespaces`. WAO's copy lacked that rule, so the
+   NMO manager could not list or watch namespaces, its cache for the `medik8s-leases`
+   Namespace never synced, and it exited about every 2.5 minutes, which failed
+   WAO-INST-12. A standalone OLM install of the same NMO v0.21.0 bundle had the extra
+   rule and ran without restarts, confirming the cause. WAO now reproduces the rule
+   in every `<serviceaccount>-all-namespaces` ClusterRole, and WAO-INST-10 checks it.
 
 ## License
 

@@ -1,6 +1,7 @@
 package operands_test
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -150,8 +151,15 @@ func TestRenderReplacesEveryUpstreamImage(t *testing.T) {
 	}
 }
 
-// OLM grants a CSV's namespaced permissions cluster-wide for an AllNamespaces OperatorGroup;
-// every component's manager ServiceAccount must get the same ClusterRole and ClusterRoleBinding.
+// olmNamespacesRule is the rule OLM appends to the cluster-wide copy of a CSV's namespaced permissions.
+var olmNamespacesRule = map[string]interface{}{
+	"apiGroups": []interface{}{""},
+	"resources": []interface{}{"namespaces"},
+	"verbs":     []interface{}{"get", "list", "watch"},
+}
+
+// OLM grants a CSV's namespaced permissions cluster-wide for an AllNamespaces OperatorGroup and appends
+// get/list/watch on namespaces; every component's manager ServiceAccount must get the same ClusterRole and binding.
 func TestRenderGrantsCSVNamespacedPermissionsClusterWide(t *testing.T) {
 	for _, def := range components.All() {
 		objs, err := operands.Render(def, "wao-ns", testImages())
@@ -164,8 +172,9 @@ func TestRenderGrantsCSVNamespacedPermissionsClusterWide(t *testing.T) {
 		cr := find(t, objs, "ClusterRole", name)
 		roleRules, _, _ := unstructured.NestedSlice(role.Object, "rules")
 		crRules, _, _ := unstructured.NestedSlice(cr.Object, "rules")
-		if len(crRules) == 0 || len(crRules) != len(roleRules) {
-			t.Errorf("%s: ClusterRole/%s rules %v differ from Role/%s rules %v", def.Key, name, crRules, sa, roleRules)
+		want := append(append([]interface{}{}, roleRules...), olmNamespacesRule)
+		if len(roleRules) == 0 || !reflect.DeepEqual(crRules, want) {
+			t.Errorf("%s: ClusterRole/%s rules %v, want Role/%s rules plus OLM's namespaces rule %v", def.Key, name, crRules, sa, want)
 		}
 		crb := find(t, objs, "ClusterRoleBinding", name)
 		ref, _, _ := unstructured.NestedStringMap(crb.Object, "roleRef")

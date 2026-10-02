@@ -8,7 +8,7 @@ from .cache/bundles/<component>/manifests and maps upstream image tags to pinned
 release-set.yaml before comparing.
 RBAC checked: each clusterPermissions ClusterRole, and for each namespaced `permissions` entry the
 Role plus the ClusterRole and ClusterRoleBinding `<sa>-all-namespaces` that OLM would also create for an
-AllNamespaces OperatorGroup.
+AllNamespaces OperatorGroup (the CSV rules followed by OLM's get/list/watch rule on namespaces).
 Tolerated differences: the WAO-added webhook-server-cert volume and mount (D1), the WAO component
 pod label (D10), and fields the bundle leaves unset that the API server defaults.
 Exit 0 when identical, 1 with a unified diff otherwise.
@@ -91,6 +91,15 @@ def all_namespaces_name(sa):
     return sa + ALL_NAMESPACES_SUFFIX
 
 
+# OLM appends this rule to the cluster-wide copy of a CSV's namespaced permissions (AllNamespaces install).
+OLM_NAMESPACES_RULE = {"apiGroups": [""], "resources": ["namespaces"], "verbs": ["get", "list", "watch"]}
+
+
+def all_namespaces_rules(rules):
+    """Rules OLM puts in the cluster-wide copy of a CSV `permissions` entry."""
+    return list(rules) + [OLM_NAMESPACES_RULE]
+
+
 def compare_rules(name, bundle_rules, live_rules, kind="ClusterRole"):
     key = lambda r: json.dumps(r, sort_keys=True)
     return diff(f"{kind}/{name}", sorted(bundle_rules, key=key), sorted(live_rules or [], key=key))
@@ -130,7 +139,7 @@ def main():
         live = kubectl_json("get", "role", sa, "-n", a.namespace)
         failures += compare_rules(sa, p["rules"], live.get("rules"), kind="Role")
         live = kubectl_json("get", "clusterrole", name)
-        failures += compare_rules(name, p["rules"], live.get("rules"))
+        failures += compare_rules(name, all_namespaces_rules(p["rules"]), live.get("rules"))
         live = kubectl_json("get", "clusterrolebinding", name)
         failures += compare_binding(name, name, sa, a.namespace, live)
     sys.exit(1 if failures else 0)

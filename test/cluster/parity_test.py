@@ -36,7 +36,8 @@ class ParityTest(unittest.TestCase):
                 self.assertEqual(parity.compare_rules(p["serviceAccountName"], p["rules"], live["rules"]), 0, comp)
 
     def test_extracted_namespaced_permissions_are_granted_cluster_wide(self):
-        # OLM copies CSV `permissions` into a ClusterRole/ClusterRoleBinding for an AllNamespaces OperatorGroup.
+        # OLM copies CSV `permissions` into a ClusterRole/ClusterRoleBinding for an AllNamespaces OperatorGroup
+        # and appends get/list/watch on namespaces to the copy.
         for comp in COMPONENTS:
             perms = parity.bundle_csv(comp)["spec"]["install"]["spec"].get("permissions") or []
             self.assertTrue(perms, comp)
@@ -46,7 +47,8 @@ class ParityTest(unittest.TestCase):
                 role = yaml.safe_load((d / f"20-Role-{sa}.yaml").read_text())
                 self.assertEqual(parity.compare_rules(sa, p["rules"], role["rules"], kind="Role"), 0, comp)
                 cr = yaml.safe_load((d / f"10-ClusterRole-{name}.yaml").read_text())
-                self.assertEqual(parity.compare_rules(name, p["rules"], cr["rules"]), 0, comp)
+                self.assertEqual(parity.compare_rules(name, parity.all_namespaces_rules(p["rules"]), cr["rules"]), 0, comp)
+                self.assertEqual(parity.compare_rules(name, p["rules"], cr["rules"]), 1, f"{comp}: OLM namespaces rule missing")
                 crb = yaml.safe_load((d / f"11-ClusterRoleBinding-{name}.yaml").read_text())
                 self.assertEqual(parity.compare_binding(name, name, sa, "__WAO_NAMESPACE__", crb), 0, comp)
 
@@ -54,6 +56,12 @@ class ParityTest(unittest.TestCase):
         live = {"roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": "x-all-namespaces"},
                 "subjects": [{"kind": "ServiceAccount", "name": "x", "namespace": "other"}]}
         self.assertEqual(parity.compare_binding("x-all-namespaces", "x-all-namespaces", "x", "ns", live), 1)
+
+    def test_all_namespaces_rules_append_olm_namespaces_rule(self):
+        rules = [{"apiGroups": [""], "resources": ["configmaps"], "verbs": ["get"]}]
+        self.assertEqual(parity.all_namespaces_rules(rules),
+                         rules + [{"apiGroups": [""], "resources": ["namespaces"], "verbs": ["get", "list", "watch"]}])
+        self.assertEqual(len(rules), 1, "input not mutated")
 
     def test_detects_changed_rules(self):
         p = parity.bundle_csv("nhc")["spec"]["install"]["spec"]["clusterPermissions"][0]

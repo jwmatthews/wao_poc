@@ -8,6 +8,8 @@ REPO = HERE.parent
 SCRIPT = HERE / "extract-operand-manifests.py"
 CACHE = REPO / ".cache/bundles"
 RELEASE_SET = REPO / "release-set.yaml"
+# The rule OLM appends to each cluster-wide copy of a CSV's namespaced permissions (AllNamespaces install).
+OLM_NAMESPACES_RULE = {"apiGroups": [""], "resources": ["namespaces"], "verbs": ["get", "list", "watch"]}
 
 
 def run(out, crd_out, rbac_out, *extra):
@@ -113,8 +115,27 @@ class ExtractionTest(unittest.TestCase):
                           if b["subjects"] == [{"kind": "ServiceAccount", "name": sa, "namespace": "__WAO_NAMESPACE__"}]
                           and b["roleRef"]["kind"] == "ClusterRole"
                           and b["roleRef"]["name"] in cluster_roles
-                          and cluster_roles[b["roleRef"]["name"]]["rules"] == p["rules"]]
+                          and cluster_roles[b["roleRef"]["name"]]["rules"] == p["rules"] + [OLM_NAMESPACES_RULE]]
                 self.assertEqual(len(copies), 1, f"{comp}: no cluster-wide copy of the CSV permissions for {sa}")
+
+    def test_all_namespaces_cluster_roles_append_olm_namespaces_rule(self):
+        # OLM appends get/list/watch on namespaces to every cluster-wide copy it makes of a CSV's `permissions`.
+        # Without it NMO cannot sync its cache for the medik8s-leases Namespace and exits (live case WAO-INST-12).
+        for comp, docs in self.docs.items():
+            cluster_roles = {d["metadata"]["name"]: d for d in self.kinds(docs, "ClusterRole")}
+            for p in self.csv(comp)["spec"]["install"]["spec"].get("permissions") or []:
+                name = p["serviceAccountName"] + "-all-namespaces"
+                self.assertIn(name, cluster_roles, comp)
+                self.assertEqual(cluster_roles[name]["rules"], p["rules"] + [OLM_NAMESPACES_RULE], f"{comp} ClusterRole/{name}")
+
+    def test_nmo_manager_can_list_and_watch_namespaces_cluster_wide(self):
+        sa = "node-maintenance-operator-controller-manager"
+        roles = {d["metadata"]["name"]: d for d in self.kinds(self.nmo, "ClusterRole")}
+        granted = [roles[b["roleRef"]["name"]] for b in self.kinds(self.nmo, "ClusterRoleBinding")
+                   if {"kind": "ServiceAccount", "name": sa, "namespace": "__WAO_NAMESPACE__"} in b["subjects"]
+                   and b["roleRef"]["name"] in roles]
+        self.assertTrue(any("" in r["apiGroups"] and "namespaces" in r["resources"] and {"list", "watch"} <= set(r["verbs"])
+                            for role in granted for r in role["rules"]), "NMO manager lacks cluster-wide list/watch on namespaces")
 
     def test_far_manager_can_list_secrets_cluster_wide(self):
         sa = "fence-agents-remediation-controller-manager"
