@@ -109,6 +109,10 @@ operand-manifests: ## Regenerate operand manifests, component CRDs and the union
 operand-manifests-check: ## Verify the committed operand manifests, CRDs and union role are current.
 	$(EXTRACT) --check
 
+.PHONY: bundle-check
+bundle-check: ## Verify the generated bundle against the POC contract and release-set.yaml.
+	$(PYTHON) hack/check-bundle.py bundle release-set.yaml
+
 ##@ Development
 
 .PHONY: manifests
@@ -328,6 +332,7 @@ endif
 bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
+	rm -rf bundle/manifests # generate bundle --overwrite never removes stale objects
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
 	$(OPERATOR_SDK) bundle validate ./bundle
 

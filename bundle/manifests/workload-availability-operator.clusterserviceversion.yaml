@@ -1,0 +1,1288 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: |-
+      [
+        {
+          "apiVersion": "workloadavailability.medik8s.io/v1alpha1",
+          "kind": "WorkloadAvailabilityConfig",
+          "metadata": {
+            "name": "cluster"
+          },
+          "spec": {
+            "components": {
+              "nodeHealthCheck": {
+                "state": "Disabled"
+              },
+              "selfNodeRemediation": {
+                "state": "Disabled"
+              },
+              "storageBasedRemediation": {
+                "state": "Disabled"
+              }
+            }
+          }
+        }
+      ]
+    capabilities: Basic Install
+    categories: OpenShift Optional
+    createdAt: "2026-10-02T00:49:21Z"
+    description: Proof of concept single operator that installs the six medik8s workload
+      availability operators (NHC, SNR, SBR, FAR, MDR, NMO) as managed operands.
+    operatorframework.io/suggested-namespace: openshift-workload-availability
+    operatorframework.io/suggested-namespace-template: '{"kind":"Namespace","apiVersion":"v1","metadata":{"name":"openshift-workload-availability","annotations":{"openshift.io/node-selector":""}}}'
+    operators.operatorframework.io/builder: operator-sdk-v1.42.3
+    operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
+    repository: https://github.com/jwmatthews/wao_poc
+    support: Proof of concept, unsupported
+  name: workload-availability-operator.v0.1.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: Owned by WAO; served by the FAR operand when enabled.
+      displayName: Fence Agents Remediation
+      kind: FenceAgentsRemediation
+      name: fenceagentsremediations.fence-agents-remediation.medik8s.io
+      version: v1alpha1
+    - description: Owned by WAO; served by the FAR operand when enabled.
+      displayName: Fence Agents Remediation Template
+      kind: FenceAgentsRemediationTemplate
+      name: fenceagentsremediationtemplates.fence-agents-remediation.medik8s.io
+      version: v1alpha1
+    - description: Owned by WAO; served by the MDR operand when enabled.
+      displayName: Machine Deletion Remediation
+      kind: MachineDeletionRemediation
+      name: machinedeletionremediations.machine-deletion-remediation.medik8s.io
+      version: v1alpha1
+    - description: Owned by WAO; served by the MDR operand when enabled.
+      displayName: Machine Deletion Remediation Template
+      kind: MachineDeletionRemediationTemplate
+      name: machinedeletionremediationtemplates.machine-deletion-remediation.medik8s.io
+      version: v1alpha1
+    - description: Owned by WAO; served by the NHC operand when enabled.
+      displayName: Node Health Check
+      kind: NodeHealthCheck
+      name: nodehealthchecks.remediation.medik8s.io
+      version: v1alpha1
+    - description: Owned by WAO; served by the NMO operand when enabled.
+      displayName: Node Maintenance
+      kind: NodeMaintenance
+      name: nodemaintenances.nodemaintenance.medik8s.io
+      version: v1beta1
+    - description: Owned by WAO; served by the SNR operand when enabled.
+      displayName: Self Node Remediation Config
+      kind: SelfNodeRemediationConfig
+      name: selfnoderemediationconfigs.self-node-remediation.medik8s.io
+      version: v1alpha1
+    - description: Owned by WAO; served by the SNR operand when enabled.
+      displayName: Self Node Remediation
+      kind: SelfNodeRemediation
+      name: selfnoderemediations.self-node-remediation.medik8s.io
+      version: v1alpha1
+    - description: Owned by WAO; served by the SNR operand when enabled.
+      displayName: Self Node Remediation Template
+      kind: SelfNodeRemediationTemplate
+      name: selfnoderemediationtemplates.self-node-remediation.medik8s.io
+      version: v1alpha1
+    - description: Owned by WAO; served by the SBR operand when enabled.
+      displayName: Storage Based Remediation Config
+      kind: StorageBasedRemediationConfig
+      name: storagebasedremediationconfigs.storage-based-remediation.medik8s.io
+      version: v1alpha1
+    - description: Owned by WAO; served by the SBR operand when enabled.
+      displayName: Storage Based Remediation
+      kind: StorageBasedRemediation
+      name: storagebasedremediations.storage-based-remediation.medik8s.io
+      version: v1alpha1
+    - description: Owned by WAO; served by the SBR operand when enabled.
+      displayName: Storage Based Remediation Template
+      kind: StorageBasedRemediationTemplate
+      name: storagebasedremediationtemplates.storage-based-remediation.medik8s.io
+      version: v1alpha1
+    - description: WorkloadAvailabilityConfig is the cluster-scoped singleton entry
+        point.
+      displayName: Workload Availability Config
+      kind: WorkloadAvailabilityConfig
+      name: workloadavailabilityconfigs.workloadavailability.medik8s.io
+      version: v1alpha1
+  description: |
+    Proof of concept. One package owning the NHC, SNR, SBR, FAR, MDR and NMO APIs plus a
+    cluster-scoped WorkloadAvailabilityConfig. Component operators run unchanged from their
+    upstream images.
+    Every component is Disabled after installation. Enabling selfNodeRemediation starts node
+    agents exactly as a standalone SNR installation does.
+  displayName: Workload Availability Operator (POC)
+  install:
+    spec:
+      clusterPermissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          - serviceaccounts
+          - services
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+        - apiGroups:
+          - admissionregistration.k8s.io
+          resources:
+          - mutatingwebhookconfigurations
+          - validatingwebhookconfigurations
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - daemonsets
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - fence-agents-remediation.medik8s.io
+          resources:
+          - fenceagentsremediations
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - machine-deletion-remediation.medik8s.io
+          resources:
+          - machinedeletionremediations
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - nodemaintenance.medik8s.io
+          resources:
+          - nodemaintenances
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterrolebindings
+          - clusterroles
+          - rolebindings
+          - roles
+          verbs:
+          - bind
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - remediation.medik8s.io
+          resources:
+          - nodehealthchecks
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - self-node-remediation.medik8s.io
+          resources:
+          - selfnoderemediationconfigs
+          - selfnoderemediations
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - storage-based-remediation.medik8s.io
+          resources:
+          - storagebasedremediationconfigs
+          - storagebasedremediations
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - workloadavailability.medik8s.io
+          resources:
+          - workloadavailabilityconfigs
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - workloadavailability.medik8s.io
+          resources:
+          - workloadavailabilityconfigs/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - workloadavailability.medik8s.io
+          resources:
+          - workloadavailabilityconfigs/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - ""
+          - coordination.k8s.io
+          resources:
+          - configmaps
+          - leases
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - list
+          - patch
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+        - apiGroups:
+          - ""
+          resources:
+          - namespaces
+          verbs:
+          - create
+          - get
+          - patch
+        - apiGroups:
+          - ""
+          resources:
+          - namespaces
+          verbs:
+          - create
+          - get
+        - apiGroups:
+          - ""
+          resources:
+          - namespaces
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - nodes
+          - pods
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - nodes
+          - secrets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - nodes
+          verbs:
+          - delete
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - nodes
+          verbs:
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - nodes
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - nodes/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - ""
+          resources:
+          - persistentvolumeclaims
+          - serviceaccounts
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - delete
+          - deletecollection
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - get
+          - list
+        - apiGroups:
+          - ""
+          resources:
+          - pods/eviction
+          verbs:
+          - create
+        - apiGroups:
+          - ""
+          resources:
+          - pods/exec
+          verbs:
+          - create
+        - apiGroups:
+          - ""
+          resources:
+          - secrets
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - services
+          - serviceaccounts
+          - configmaps
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - admissionregistration.k8s.io
+          resources:
+          - validatingwebhookconfigurations
+          - mutatingwebhookconfigurations
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - daemonsets
+          - deployments
+          - replicasets
+          - statefulsets
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - daemonsets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - daemonsets
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - daemonsets/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          - replicasets
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - authentication.k8s.io
+          resources:
+          - tokenreviews
+          verbs:
+          - create
+        - apiGroups:
+          - authorization.k8s.io
+          resources:
+          - subjectaccessreviews
+          verbs:
+          - create
+        - apiGroups:
+          - batch
+          resources:
+          - jobs
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - clusterversions
+          - featuregates
+          - infrastructures
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - console.openshift.io
+          resources:
+          - consoleplugins
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - fence-agents-remediation.medik8s.io
+          resources:
+          - fenceagentsremediations
+          - fenceagentsremediationtemplates
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - fence-agents-remediation.medik8s.io
+          resources:
+          - fenceagentsremediations
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - fence-agents-remediation.medik8s.io
+          resources:
+          - fenceagentsremediations/finalizers
+          - fenceagentsremediationtemplates/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - fence-agents-remediation.medik8s.io
+          resources:
+          - fenceagentsremediations/status
+          - fenceagentsremediationtemplates/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - fence-agents-remediation.medik8s.io
+          resources:
+          - fenceagentsremediationtemplates
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - machine-deletion-remediation.medik8s.io
+          resources:
+          - machinedeletionremediations
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - machine-deletion-remediation.medik8s.io
+          resources:
+          - machinedeletionremediations
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - machine-deletion-remediation.medik8s.io
+          resources:
+          - machinedeletionremediations/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - machine-deletion-remediation.medik8s.io
+          resources:
+          - machinedeletionremediations/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - machine-deletion-remediation.medik8s.io
+          resources:
+          - machinedeletionremediationtemplates
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - machine.openshift.io
+          resources:
+          - controlplanemachinesets
+          - machinesets
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - machine.openshift.io
+          resources:
+          - machinehealthchecks
+          verbs:
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - machine.openshift.io
+          resources:
+          - machinehealthchecks/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - machine.openshift.io
+          resources:
+          - machines
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - machine.openshift.io
+          resources:
+          - machines
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - machine.openshift.io
+          resources:
+          - machines/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          verbs:
+          - create
+          - get
+          - list
+          - update
+        - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          verbs:
+          - create
+          - get
+        - apiGroups:
+          - nodemaintenance.medik8s.io
+          resources:
+          - nodemaintenances
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - nodemaintenance.medik8s.io
+          resources:
+          - nodemaintenances/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - nodemaintenance.medik8s.io
+          resources:
+          - nodemaintenances/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - oauth.openshift.io
+          resources:
+          - '*'
+          verbs:
+          - '*'
+        - apiGroups:
+          - policy
+          resources:
+          - poddisruptionbudgets
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterrolebindings
+          - clusterroles
+          verbs:
+          - '*'
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterrolebindings
+          - clusterroles
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - roles
+          - rolebindings
+          - clusterroles
+          - clusterrolebindings
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+          - bind
+        - apiGroups:
+          - remediation.medik8s.io
+          resources:
+          - nodehealthchecks
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - remediation.medik8s.io
+          resources:
+          - nodehealthchecks/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - remediation.medik8s.io
+          resources:
+          - nodehealthchecks/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - security.openshift.io
+          resourceNames:
+          - privileged
+          resources:
+          - securitycontextconstraints
+          verbs:
+          - use
+        - apiGroups:
+          - security.openshift.io
+          resources:
+          - securitycontextconstraints
+          verbs:
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - self-node-remediation.medik8s.io
+          resources:
+          - selfnoderemediationconfigs
+          - selfnoderemediations
+          - selfnoderemediationtemplates
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - self-node-remediation.medik8s.io
+          resources:
+          - selfnoderemediationconfigs/finalizers
+          - selfnoderemediations/finalizers
+          - selfnoderemediationtemplates/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - self-node-remediation.medik8s.io
+          resources:
+          - selfnoderemediationconfigs/status
+          - selfnoderemediations/status
+          - selfnoderemediationtemplates/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - self-node-remediation.medik8s.io
+          resources:
+          - selfnoderemediations
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - self-node-remediation.medik8s.io
+          resources:
+          - selfnoderemediationtemplates
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - storage-based-remediation.medik8s.io
+          resources:
+          - storagebasedremediationconfigs
+          - storagebasedremediations
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - storage-based-remediation.medik8s.io
+          resources:
+          - storagebasedremediationconfigs
+          verbs:
+          - '*'
+        - apiGroups:
+          - storage-based-remediation.medik8s.io
+          resources:
+          - storagebasedremediationconfigs
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - storage-based-remediation.medik8s.io
+          resources:
+          - storagebasedremediationconfigs
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - storage-based-remediation.medik8s.io
+          resources:
+          - storagebasedremediationconfigs/finalizers
+          - storagebasedremediations/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - storage-based-remediation.medik8s.io
+          resources:
+          - storagebasedremediationconfigs/status
+          - storagebasedremediations/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - storage-based-remediation.medik8s.io
+          resources:
+          - storagebasedremediationconfigs/status
+          verbs:
+          - get
+        - apiGroups:
+          - storage-based-remediation.medik8s.io
+          resources:
+          - storagebasedremediations
+          verbs:
+          - '*'
+        - apiGroups:
+          - storage-based-remediation.medik8s.io
+          resources:
+          - storagebasedremediations
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - storage-based-remediation.medik8s.io
+          resources:
+          - storagebasedremediations
+          verbs:
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - storage-based-remediation.medik8s.io
+          resources:
+          - storagebasedremediations
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - storage-based-remediation.medik8s.io
+          resources:
+          - storagebasedremediations
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - storage-based-remediation.medik8s.io
+          resources:
+          - storagebasedremediations/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - storage-based-remediation.medik8s.io
+          resources:
+          - storagebasedremediations/status
+          verbs:
+          - get
+        - apiGroups:
+          - storage-based-remediation.medik8s.io
+          resources:
+          - storagebasedremediationtemplates
+          verbs:
+          - '*'
+        - apiGroups:
+          - storage-based-remediation.medik8s.io
+          resources:
+          - storagebasedremediationtemplates
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - storage-based-remediation.medik8s.io
+          resources:
+          - storagebasedremediationtemplates
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - storage-based-remediation.medik8s.io
+          resources:
+          - storagebasedremediationtemplates/status
+          verbs:
+          - get
+        - apiGroups:
+          - storage.k8s.io
+          resources:
+          - storageclasses
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - storage.k8s.io
+          resources:
+          - volumeattachments
+          verbs:
+          - delete
+          - deletecollection
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - storage.k8s.io
+          resources:
+          - volumeattachments
+          verbs:
+          - delete
+          - get
+          - list
+          - watch
+        - nonResourceURLs:
+          - /metrics
+          verbs:
+          - get
+        serviceAccountName: workload-availability-operator-controller-manager
+      deployments:
+      - label:
+          app.kubernetes.io/managed-by: kustomize
+          app.kubernetes.io/name: workload-availability-operator
+          control-plane: controller-manager
+        name: workload-availability-operator-controller-manager
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app.kubernetes.io/name: workload-availability-operator
+              control-plane: controller-manager
+          strategy: {}
+          template:
+            metadata:
+              annotations:
+                kubectl.kubernetes.io/default-container: manager
+              labels:
+                app.kubernetes.io/name: workload-availability-operator
+                control-plane: controller-manager
+            spec:
+              containers:
+              - args:
+                - --leader-elect
+                - --health-probe-bind-address=:8081
+                - --metrics-bind-address=0
+                command:
+                - /manager
+                env:
+                - name: OPERATOR_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: RELATED_IMAGE_NHC_MANAGER
+                  value: quay.io/medik8s/node-healthcheck-operator@sha256:5b048ad5d2b8578d2120989a5a822a041d65c985f9ac88d50b000427b32b5391
+                - name: RELATED_IMAGE_SNR_MANAGER
+                  value: quay.io/medik8s/self-node-remediation-operator@sha256:9ad002dca9ea183c72e350f72e47aff7020397fd476b4a3ac4ebc3627412a5b0
+                - name: RELATED_IMAGE_SBR_MANAGER
+                  value: quay.io/medik8s/storage-based-remediation-operator@sha256:c390b6b011458985823829049afd47f4a85b90cbc020d8527803cce58da8bd04
+                - name: RELATED_IMAGE_SBR_AGENT
+                  value: quay.io/medik8s/storage-based-remediation-agent@sha256:c9fba79e070fdcb5595994d4daab5051c54088bd7565a34b2d19775016db6421
+                - name: RELATED_IMAGE_FAR_MANAGER
+                  value: quay.io/medik8s/fence-agents-remediation-operator@sha256:fab0089a9d656a21c8d0a43622ebe0d6b64a6a76e586d6cb4a06f5ce21c0b583
+                - name: RELATED_IMAGE_MDR_MANAGER
+                  value: quay.io/medik8s/machine-deletion-remediation-operator@sha256:0f69367097625d7824d9b5b69de64103e19b612c9833b0b786bb32c9b7efe84d
+                - name: RELATED_IMAGE_NMO_MANAGER
+                  value: quay.io/medik8s/node-maintenance-operator@sha256:5b65ec62c58b92fee3389a77ded760ce82a0a6a30f6cf89573f6e97b8f677c74
+                image: quay.io/example/workload-availability-operator:dev
+                livenessProbe:
+                  httpGet:
+                    path: /healthz
+                    port: 8081
+                  initialDelaySeconds: 15
+                  periodSeconds: 20
+                name: manager
+                readinessProbe:
+                  httpGet:
+                    path: /readyz
+                    port: 8081
+                  initialDelaySeconds: 5
+                  periodSeconds: 10
+                resources:
+                  limits:
+                    cpu: 500m
+                    memory: 128Mi
+                  requests:
+                    cpu: 10m
+                    memory: 64Mi
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
+              securityContext:
+                runAsNonRoot: true
+                seccompProfile:
+                  type: RuntimeDefault
+              serviceAccountName: workload-availability-operator-controller-manager
+              terminationGracePeriodSeconds: 10
+      permissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+        serviceAccountName: workload-availability-operator-controller-manager
+    strategy: deployment
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - remediation
+  - node
+  - availability
+  - medik8s
+  maturity: alpha
+  provider:
+    name: wao_poc
+  relatedImages:
+  - image: quay.io/medik8s/node-healthcheck-operator@sha256:5b048ad5d2b8578d2120989a5a822a041d65c985f9ac88d50b000427b32b5391
+    name: nhc-manager
+  - image: quay.io/medik8s/self-node-remediation-operator@sha256:9ad002dca9ea183c72e350f72e47aff7020397fd476b4a3ac4ebc3627412a5b0
+    name: snr-manager
+  - image: quay.io/medik8s/storage-based-remediation-operator@sha256:c390b6b011458985823829049afd47f4a85b90cbc020d8527803cce58da8bd04
+    name: sbr-manager
+  - image: quay.io/medik8s/storage-based-remediation-agent@sha256:c9fba79e070fdcb5595994d4daab5051c54088bd7565a34b2d19775016db6421
+    name: sbr-agent
+  - image: quay.io/medik8s/fence-agents-remediation-operator@sha256:fab0089a9d656a21c8d0a43622ebe0d6b64a6a76e586d6cb4a06f5ce21c0b583
+    name: far-manager
+  - image: quay.io/medik8s/machine-deletion-remediation-operator@sha256:0f69367097625d7824d9b5b69de64103e19b612c9833b0b786bb32c9b7efe84d
+    name: mdr-manager
+  - image: quay.io/medik8s/node-maintenance-operator@sha256:5b65ec62c58b92fee3389a77ded760ce82a0a6a30f6cf89573f6e97b8f677c74
+    name: nmo-manager
+  version: 0.1.0

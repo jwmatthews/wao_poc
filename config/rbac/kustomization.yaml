@@ -15,9 +15,10 @@ resources:
 # metrics disabled (--metrics-bind-address=0).
 # For each CRD, "Admin", "Editor" and "Viewer" roles are scaffolded by
 # default, aiding admins in cluster management. Those roles are
-# not used by the workload-availability-operator itself. You can comment the following lines
-# if you do not want those helpers be installed with your Project.
-- workloadavailabilityconfig_admin_role.yaml
-- workloadavailabilityconfig_editor_role.yaml
-- workloadavailabilityconfig_viewer_role.yaml
+# not used by the workload-availability-operator itself. They are left out for the POC:
+# operator-sdk would emit them as standalone bundle objects, which the ConfigMap catalog
+# (design brief D6) cannot carry and hack/check-bundle.py rejects.
+#- workloadavailabilityconfig_admin_role.yaml
+#- workloadavailabilityconfig_editor_role.yaml
+#- workloadavailabilityconfig_viewer_role.yaml
 
