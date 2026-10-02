@@ -119,6 +119,13 @@ catalog-configmap: bundle-check ## Render the POC ConfigMap-backed CatalogSource
 	mkdir -p dist
 	$(PYTHON) hack/configmap-catalog.py --bundle bundle --package workload-availability-operator --channel $(or $(DEFAULT_CHANNEL),alpha) --name wao-poc-catalog --namespace $(CATALOG_NS) > dist/wao-poc-catalog.yaml
 
+.PHONY: test-offline
+test-offline: ## Run every offline Python test and syntax-check the live-cluster scripts (no cluster needed).
+	$(PYTHON) -m unittest hack/extract_operand_manifests_test.py hack/configmap_catalog_test.py
+	$(PYTHON) -m unittest discover -s test/cluster -p 'parity_test.py'
+	$(PYTHON) -m unittest discover -s test/cluster -p 'results_test.py'
+	for f in test/cluster/*.sh; do bash -n "$$f" || exit 1; done
+
 ##@ Development
 
 .PHONY: manifests
