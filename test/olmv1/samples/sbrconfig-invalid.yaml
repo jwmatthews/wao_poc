@@ -1,0 +1,18 @@
+# exp0001 CONTROL: DRY-RUN ONLY. sharedStorageClass has no CRD pattern (v0.3.0 bundle CRD
+# storagebasedremediationconfigs.yaml:88-94), so this is schema-valid. IF the webhook were enabled it
+# would reject with
+#   storagebasedremediationconfig_types.go:295 "shared storage class name must contain only lowercase
+#   letters, numbers, hyphens, and dots", wrapped by :305 "shared storage PVC validation failed: ..." and
+#   storagebasedremediationconfig_webhook.go:42 "StorageBasedRemediationConfig spec validation failed: ..."
+# On the shipped bundle (--enable-webhooks=false) the dry-run is ADMITTED; that admission is the
+# control result proving no SBR webhook is wired in.
+apiVersion: storage-based-remediation.medik8s.io/v1alpha1
+kind: StorageBasedRemediationConfig
+metadata:
+  name: exp0001-sbr-config
+  namespace: openshift-workload-availability
+spec:
+  detectOnlyMode: Enabled
+  nodeSelector:
+    exp0001.example.com/never-matches: "true"
+  sharedStorageClass: Exp0001_INVALID

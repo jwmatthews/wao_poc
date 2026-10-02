@@ -1,0 +1,26 @@
+# exp0001: FenceAgentsRemediationTemplate. Templates never fence, so a real create is inert.
+# Shape from wao_poc test/cluster/08-enable-far.sh:31-45 (FAR v0.8.0 rejects a template with no
+# parameters: "invalid spec: mandatory parameters are missing",
+# fence-agents-remediation/api/v1alpha1/fenceagentsremediation_params.go:46,199-203).
+# Lower-case keys (nodeparameters/sharedparameters) are the CRD field names; camelCase is pruned.
+# fence_ipmilan exists in the FAR image (validateAgentName os.Stat, params.go:154-166).
+# Mutating webhook mfenceagentsremediationtemplate.kb.io adds
+#   remediation.medik8s.io/multiple-templates-support: "true"
+# (internal/webhook/v1alpha1/fenceagentsremediationtemplate_webhook.go:61-74).
+apiVersion: fence-agents-remediation.medik8s.io/v1alpha1
+kind: FenceAgentsRemediationTemplate
+metadata:
+  name: exp0001-far-template
+  namespace: openshift-workload-availability
+spec:
+  template:
+    spec:
+      agent: fence_ipmilan
+      remediationStrategy: ResourceDeletion
+      sharedparameters:
+        --ip: "192.0.2.1"
+        --lanplus: ""
+        --action: reboot
+      nodeparameters:
+        --ipport:
+          exp0001-no-such-node: "6230"

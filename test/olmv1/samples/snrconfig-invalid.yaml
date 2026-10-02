@@ -1,0 +1,15 @@
+# exp0001: canonical name/namespace, but apiServerTimeout below the webhook minimum.
+# The CRD only has a duration-format pattern (bundle CRD selfnoderemediationconfigs.yaml:62), so "1ms"
+# is schema-valid; the webhook rejects it on CREATE and UPDATE:
+#   self-node-remediation/internal/webhook/v1alpha1/selfnoderemediationconfig_webhook.go:48
+#     minDurApiServerTimeout = 10 * time.Millisecond
+#   :152  fmt.Errorf("%s cannot be less than %s", f.name, f.minDurationValue.String())
+#   => "ApiServerTimeout cannot be less than 10ms"
+# Using the canonical name keeps validateSingleton (:294) quiet so the timing error is the only error.
+apiVersion: self-node-remediation.medik8s.io/v1alpha1
+kind: SelfNodeRemediationConfig
+metadata:
+  name: self-node-remediation-config
+  namespace: openshift-workload-availability
+spec:
+  apiServerTimeout: 1ms

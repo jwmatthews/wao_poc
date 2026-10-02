@@ -1,0 +1,13 @@
+# exp0001: DRY-RUN ONLY. Same version-gated check as snrtemplate-invalid.yaml
+# (selfnoderemediation_webhook.go:48 -> selfnoderemediationtemplate_webhook.go:88-93):
+# rejected only on k8s < 1.26; ADMITTED on the target cluster. failurePolicy is Ignore, so this
+# webhook cannot be proven by rejection at all; the only evidence is the manager log line
+#   logger "selfnoderemediation-resource" msg "validate create" name=exp0001-no-such-node
+# (selfnoderemediation_webhook.go:30,47).
+apiVersion: self-node-remediation.medik8s.io/v1alpha1
+kind: SelfNodeRemediation
+metadata:
+  name: exp0001-no-such-node
+  namespace: openshift-workload-availability
+spec:
+  remediationStrategy: OutOfServiceTaint
