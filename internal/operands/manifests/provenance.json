@@ -1,0 +1,250 @@
+{
+  "bundles": {
+    "far": {
+      "bundle": "quay.io/medik8s/fence-agents-remediation-operator-bundle@sha256:5416db1ecf65b67256db6d03878c150acf576d8bad11ef5b210c9e34ce175b40",
+      "crds": [
+        "fence-agents-remediation.medik8s.io_fenceagentsremediations.yaml",
+        "fence-agents-remediation.medik8s.io_fenceagentsremediationtemplates.yaml"
+      ],
+      "csv": "fence-agents-remediation.v0.8.0",
+      "inputs": {
+        "fence-agents-remediation-controller-manager-metrics-service_v1_service.yaml": "e3e3d795a863a8ace13324c80d66e1c75c495ed5ff635fc5afeda3bb199d2e97",
+        "fence-agents-remediation-ext-remediation_rbac.authorization.k8s.io_v1_clusterrole.yaml": "5431685b3d459da9a0cdd32390d3b1c44fa20bf1799f1e11b0c008f1189ea86e",
+        "fence-agents-remediation-manager-config_v1_configmap.yaml": "19ff3d5fbaae87c9ef3de4f22dde2ab4ef5f397df0513ed3a468195f4f11a9e9",
+        "fence-agents-remediation-metrics-reader_rbac.authorization.k8s.io_v1_clusterrole.yaml": "70446c2449575125488bda207b51dc3744c018f5bfe60530b4e2b52274c29eba",
+        "fence-agents-remediation-webhook-service_v1_service.yaml": "d7b85fe35949b56ad02173772c900aa445e53733a2f4eab014a4639e9c1adc05",
+        "fence-agents-remediation.clusterserviceversion.yaml": "f477690e152a9bf99ca8341694871f202a90a3d5c9d4a54a15724942e0a01fce",
+        "fence-agents-remediation.medik8s.io_fenceagentsremediations.yaml": "757b5e92a1d5796385c56515f65f10d620e3babb7f3992f8e1771493955a222b",
+        "fence-agents-remediation.medik8s.io_fenceagentsremediationtemplates.yaml": "3c895d7c6d68774dad8d78eaa3279ed73110421576c4c9e6662fcf3e095f55e9"
+      },
+      "outputs": {
+        "far/00-ServiceAccount-fence-agents-remediation-controller-manager.yaml": "33f994f37c5596aa29d844da342ef3aab73363a6f93bffef0d24b6ca7e10d49b",
+        "far/10-ClusterRole-fence-agents-remediation-controller-manager.yaml": "d21b5fbabce229bcff2c925e85683875e9670d6692afed2f3da00f4f07c61fd3",
+        "far/10-ClusterRole-fence-agents-remediation-ext-remediation.yaml": "541b503a2b942599c5d874e57c452587544f0f8a0c63b4b4b6cd7c6f0def2a7b",
+        "far/10-ClusterRole-fence-agents-remediation-metrics-reader.yaml": "0621046914984d7f645410aab247d143fec6608d5843261def02760182e909f1",
+        "far/11-ClusterRoleBinding-fence-agents-remediation-controller-manager.yaml": "1d0707a662a003383b9d56b7e72cf7c7541e941b1fa3d7e3c4c782bb402912c0",
+        "far/20-Role-fence-agents-remediation-controller-manager.yaml": "32b74536d82e5cd762693dc7ade33086695f201b6fb2ab12de83b63cef6593ce",
+        "far/21-RoleBinding-fence-agents-remediation-controller-manager.yaml": "03f5913e7ca4963a8e80bcd1b1ed00304748a92fc4dc1228d839631880a8f252",
+        "far/30-ConfigMap-fence-agents-remediation-manager-config.yaml": "c29c4a76d3c4aa66082b9a7ea99bf3be133b736ee495d33218b6c6a867694f3f",
+        "far/40-Service-fence-agents-remediation-controller-manager-metrics-service.yaml": "4de00feeae566d7966bfaf73a6f3d212b7053582a37b41cc3c241ec472412525",
+        "far/40-Service-fence-agents-remediation-webhook-service.yaml": "102b5d7d9acd5fa8870828e0e4d0c6179264191f092060afc3a386c2dca85585",
+        "far/50-Deployment-fence-agents-remediation-controller-manager.yaml": "67e09a5877123561a1a9b744a61de2fed2dfc3c0709fcd364e190c9ab1ade289",
+        "far/60-ValidatingWebhookConfiguration-fence-agents-remediation-validating-webhook-configuration.yaml": "a7dbdfc0a71a1f2244d85079e4047b651d15453e25653f5db9a38f82597eeb4b",
+        "far/61-MutatingWebhookConfiguration-fence-agents-remediation-mutating-webhook-configuration.yaml": "c8087c9a2fbae66c99e8b9d2ff7fa7512251ecd2a6d1eca559b8427ea1e9433e"
+      },
+      "wao_modifications": [
+        "CSV permissions/clusterPermissions rendered as Role/RoleBinding/ClusterRole/ClusterRoleBinding named after each ServiceAccount",
+        "Deployment/fence-agents-remediation-controller-manager: added service-ca webhook certificate volume fence-agents-remediation-webhook-server-cert at /tmp/k8s-webhook-server/serving-certs",
+        "Deployment/fence-agents-remediation-controller-manager: pod template labeled workloadavailability.medik8s.io/component=fenceAgentsRemediation",
+        "MutatingWebhookConfiguration: generated from CSV webhookdefinitions with service-ca CA bundle injection",
+        "Service/fence-agents-remediation-webhook-service: added service.beta.openshift.io/serving-cert-secret-name",
+        "ValidatingWebhookConfiguration: generated from CSV webhookdefinitions with service-ca CA bundle injection"
+      ]
+    },
+    "mdr": {
+      "bundle": "quay.io/medik8s/machine-deletion-remediation-operator-bundle@sha256:b95a8e63056912168383bacdc13fd20a1df62d1ac9808978b127cf14871cf393",
+      "crds": [
+        "machine-deletion-remediation.medik8s.io_machinedeletionremediations.yaml",
+        "machine-deletion-remediation.medik8s.io_machinedeletionremediationtemplates.yaml"
+      ],
+      "csv": "machine-deletion-remediation.v0.7.0",
+      "inputs": {
+        "machine-deletion-remediation-controller-manager-metrics-service_v1_service.yaml": "aae5a5171cf6753a444aefdd87ca7781126a02d3667d89f702f4222f29a5fc22",
+        "machine-deletion-remediation-machine-deletion-remediation-ext-remediation_rbac.authorization.k8s.io_v1_clusterrole.yaml": "8a0e6dd534d9465115163a1c318b85e55af28d0f2a5b7a01cba7e2f61c2c1dcd",
+        "machine-deletion-remediation-manager-config_v1_configmap.yaml": "8b4df9911647f287447904cec93f29f80a8435d9bdcc940dc95d57ca84e58946",
+        "machine-deletion-remediation-metrics-reader_rbac.authorization.k8s.io_v1_clusterrole.yaml": "64bdd54980685bfb5dff5a322d9a7bf954aa29524df1530f892ab1c2f06094a4",
+        "machine-deletion-remediation.clusterserviceversion.yaml": "19c5ab98bff135a830be4fd3a96e7e26a14b48cfce03e4a6abcc80ffd3d76a85",
+        "machine-deletion-remediation.medik8s.io_machinedeletionremediations.yaml": "6f59bf7285288f582716c5ff68ac430f6d08d8fdf5173048408a0030182c3430",
+        "machine-deletion-remediation.medik8s.io_machinedeletionremediationtemplates.yaml": "e3a597db8d8ec1d89eb60aada735018e27f2438058ac8b51211c3fc9a2dda85d"
+      },
+      "outputs": {
+        "mdr/00-ServiceAccount-machine-deletion-remediation-controller-manager.yaml": "2f943f32c9d4e06fd10f4b2693ea905845f2e4fdedf91e10ddd6fd44427a403e",
+        "mdr/10-ClusterRole-machine-deletion-remediation-controller-manager.yaml": "2a5091835ad90034e4fa507ae2db3f3bc6d9e3a1e7d30ffd13b6b2f08f51d097",
+        "mdr/10-ClusterRole-machine-deletion-remediation-machine-deletion-remediation-ext-remediation.yaml": "824200ed3a602b6ceb4a7aaa68d664be2321b8f57605ce5675d1a70954a65326",
+        "mdr/10-ClusterRole-machine-deletion-remediation-metrics-reader.yaml": "9b905e9af077b8afa687c7d6aee47922c51e5e370b2ce9b8514f50e6767601b9",
+        "mdr/11-ClusterRoleBinding-machine-deletion-remediation-controller-manager.yaml": "f056e0465be4f63b476f114e0d6e073b8dd38444614319124a4e4226dc41d6b7",
+        "mdr/20-Role-machine-deletion-remediation-controller-manager.yaml": "7a6a23c93185f8b86ee55207e2dd832bac25a33b10719d212e488f504faeade4",
+        "mdr/21-RoleBinding-machine-deletion-remediation-controller-manager.yaml": "49fd3b849b56a8058d9b1da5b28a5aceed6708b07b548269a7bb036097171b7d",
+        "mdr/30-ConfigMap-machine-deletion-remediation-manager-config.yaml": "025882d8e1abf7ad20d1c22732e8d7ca7c86fae9c7c05db802439c349d5a9574",
+        "mdr/40-Service-machine-deletion-remediation-controller-manager-metrics-service.yaml": "47a2662d07114ec1af374cab97430b4073183dcebfeb17b2831e2d9967f378eb",
+        "mdr/50-Deployment-machine-deletion-remediation-controller-manager.yaml": "c84a6762b2aa75a8e1c3a833e2bfc22134361885490ca7b0577497670f14e55c"
+      },
+      "wao_modifications": [
+        "CSV permissions/clusterPermissions rendered as Role/RoleBinding/ClusterRole/ClusterRoleBinding named after each ServiceAccount",
+        "Deployment/machine-deletion-remediation-controller-manager: pod template labeled workloadavailability.medik8s.io/component=machineDeletionRemediation",
+        "Service/machine-deletion-remediation-controller-manager-metrics-service: selector narrowed with workloadavailability.medik8s.io/component=machineDeletionRemediation; it also matched far, nmo, sbr, snr pods"
+      ]
+    },
+    "nhc": {
+      "bundle": "quay.io/medik8s/node-healthcheck-operator-bundle@sha256:2a2ad916a9f827015474b4220b089ba61313112e697d45a50610186b620e1dba",
+      "crds": [
+        "remediation.medik8s.io_nodehealthchecks.yaml"
+      ],
+      "csv": "node-healthcheck-operator.v0.12.0",
+      "inputs": {
+        "node-healthcheck-controller-manager-metrics-service_v1_service.yaml": "37ed8f32f02b76ca0a25df29355978a0f1f4606417f7d3152c09f3fc24391478",
+        "node-healthcheck-metrics-reader_rbac.authorization.k8s.io_v1_clusterrole.yaml": "6c91b6472af813bc89ce61c1abdb328763cbf860be2bb969b9466f44ed4a1a52",
+        "node-healthcheck-operator.clusterserviceversion.yaml": "370c38adc266c00d5f99acc8368e5b0d4679c11a337ca32e10740f8ce2c5c76c",
+        "node-healthcheck-webhook-service_v1_service.yaml": "2f64090c6cf057b5af6ddab6ded693849e03ef5a4c88b38dda29d6867edf7eef",
+        "remediation.medik8s.io_nodehealthchecks.yaml": "794c3c9af727f829fc9b8bc4fa22b63260e984199a037bd985110bd91937201b"
+      },
+      "outputs": {
+        "nhc/00-ServiceAccount-node-healthcheck-controller-manager.yaml": "3da42c6d60e6a99d8f25815e2c6940e0ee727020348deef644e75651cb98a872",
+        "nhc/10-ClusterRole-node-healthcheck-controller-manager.yaml": "3501f21df24ed312105400b863a00c669e0ca4e31371bd8ec42a09a9558b9434",
+        "nhc/10-ClusterRole-node-healthcheck-metrics-reader.yaml": "bf5d9360d45f49169a4b52e0c3da5766ed91b3ef012da7daea30fac25b5b114f",
+        "nhc/11-ClusterRoleBinding-node-healthcheck-controller-manager.yaml": "aeb21d9b91f11813a5d165356622852beca956a8e05d093b20f9924d823a3395",
+        "nhc/20-Role-node-healthcheck-controller-manager.yaml": "6892fd3c6e2b4f4ab0e7f8bb0798e294ff9e2b359498deb0a507b267017c7ff4",
+        "nhc/21-RoleBinding-node-healthcheck-controller-manager.yaml": "9997d7d9eed0e9258427e217c38653403077dca94b47d3cadab6b983bc14aed0",
+        "nhc/40-Service-node-healthcheck-controller-manager-metrics-service.yaml": "d09653e14ea55b4571236ab7ee73105ca4981a2ea8714671b8618969e06e5f8a",
+        "nhc/40-Service-node-healthcheck-webhook-service.yaml": "cd2b3fd83be0c232d489b4aa2fa67fcee965d2b319624334cd1f5d788c1e74d6",
+        "nhc/50-Deployment-node-healthcheck-controller-manager.yaml": "0f170521dc5f350f009192e3890f46dd777bd4c78111a7fa696455158f4a465a",
+        "nhc/60-ValidatingWebhookConfiguration-node-healthcheck-validating-webhook-configuration.yaml": "a20d2901420f6d0de879abedebff203a46ccdd7eed2615ad1ca62292c3bcfd1e"
+      },
+      "wao_modifications": [
+        "CSV permissions/clusterPermissions rendered as Role/RoleBinding/ClusterRole/ClusterRoleBinding named after each ServiceAccount",
+        "Deployment/node-healthcheck-controller-manager: added service-ca webhook certificate volume node-healthcheck-webhook-server-cert at /tmp/k8s-webhook-server/serving-certs",
+        "Deployment/node-healthcheck-controller-manager: pod template labeled workloadavailability.medik8s.io/component=nodeHealthCheck",
+        "Service/node-healthcheck-webhook-service: added service.beta.openshift.io/serving-cert-secret-name",
+        "ValidatingWebhookConfiguration: generated from CSV webhookdefinitions with service-ca CA bundle injection"
+      ]
+    },
+    "nmo": {
+      "bundle": "quay.io/medik8s/node-maintenance-operator-bundle@sha256:abef83d093c2aef4bf1915d52d5bee18d7a44173b8c6fc77972b21e2c573bd41",
+      "crds": [
+        "nodemaintenance.medik8s.io_nodemaintenances.yaml"
+      ],
+      "csv": "node-maintenance-operator.v0.21.0",
+      "inputs": {
+        "node-maintenance-operator-controller-manager-metrics-service_v1_service.yaml": "5c45024b79c1c5e09393d93b9043511b935037a597d65b49681db36ab157f0df",
+        "node-maintenance-operator-metrics-reader_rbac.authorization.k8s.io_v1_clusterrole.yaml": "93ff2b4f251cdc96ba91cdb97a738362fd5fc6f4745543ac1c750d328c97b12d",
+        "node-maintenance-operator-webhook-service_v1_service.yaml": "de4895bc70467a1595cbf99b1b1cac0688e0b804d6ea6623196660bd3aea641a",
+        "node-maintenance-operator.clusterserviceversion.yaml": "2fa7f7260f6f7ddb81accdcc8d321dd62e6e628199f0aa1683c63e89c3f1ba30",
+        "nodemaintenance.medik8s.io_nodemaintenances.yaml": "a9509038602e862a4a39db3c5658e501af760bfd9a66ca0cbd1b831a27e62d5c"
+      },
+      "outputs": {
+        "nmo/00-ServiceAccount-node-maintenance-operator-controller-manager.yaml": "92d24870ff62d244081132fac08a4f935353b81838ac617fa4098ad5dd2dcff6",
+        "nmo/10-ClusterRole-node-maintenance-operator-controller-manager.yaml": "3b1c29a436c5db138b4c87d23baf14be9ed4730b2e973acd420115251d146926",
+        "nmo/10-ClusterRole-node-maintenance-operator-metrics-reader.yaml": "fe8b5148cffba93e067f88a9186893568a59886aad94519617b0654f8b8ab13c",
+        "nmo/11-ClusterRoleBinding-node-maintenance-operator-controller-manager.yaml": "7403d748fd7b48c8b6999a018d616700540ced96901f86659a40662b149fda1b",
+        "nmo/20-Role-node-maintenance-operator-controller-manager.yaml": "c4ae505d944067ed611b89f30ba96895a2eb76d68ce44eb02f7e302701f63814",
+        "nmo/21-RoleBinding-node-maintenance-operator-controller-manager.yaml": "9e8229feada63add19c4e380dcbd5f0da33d7124672032941f07b0f660a75bb6",
+        "nmo/40-Service-node-maintenance-operator-controller-manager-metrics-service.yaml": "0696e034af80d4ccf61392f3aedb23b510447b084968f6aa46e43b71f6df393c",
+        "nmo/40-Service-node-maintenance-operator-webhook-service.yaml": "5af6cfd1e7485a42a2390d013f4bf98006ab7560798cb8806ce442bb5601a4d6",
+        "nmo/50-Deployment-node-maintenance-operator-controller-manager.yaml": "de246c1e1dcdd6fbadff7f50c06021275deb9e588163fbe5ce19162c5f04eb86",
+        "nmo/60-ValidatingWebhookConfiguration-node-maintenance-operator-validating-webhook-configuration.yaml": "1133ab3ec785450067a5239e29f3c13e7bfcf2a1f3181ae91ab22c036bf7451e"
+      },
+      "wao_modifications": [
+        "CSV permissions/clusterPermissions rendered as Role/RoleBinding/ClusterRole/ClusterRoleBinding named after each ServiceAccount",
+        "Deployment/node-maintenance-operator-controller-manager: added service-ca webhook certificate volume node-maintenance-operator-webhook-server-cert at /tmp/k8s-webhook-server/serving-certs",
+        "Deployment/node-maintenance-operator-controller-manager: pod template labeled workloadavailability.medik8s.io/component=nodeMaintenance",
+        "Service/node-maintenance-operator-webhook-service: added service.beta.openshift.io/serving-cert-secret-name",
+        "ValidatingWebhookConfiguration: generated from CSV webhookdefinitions with service-ca CA bundle injection"
+      ]
+    },
+    "sbr": {
+      "bundle": "quay.io/medik8s/storage-based-remediation-operator-bundle@sha256:1f5c5b0d9dbb62b877109fae2dea021425419ae6ed0141295cab3f6dab236d3b",
+      "crds": [
+        "storage-based-remediation.medik8s.io_storagebasedremediationconfigs.yaml",
+        "storage-based-remediation.medik8s.io_storagebasedremediations.yaml",
+        "storage-based-remediation.medik8s.io_storagebasedremediationtemplates.yaml"
+      ],
+      "csv": "storage-based-remediation.v0.3.0",
+      "inputs": {
+        "sbr-operator-controller-manager-metrics-service_v1_service.yaml": "dc8b31e6af68114e0a067cd944ce310c6f61695c77198131ea8d08cc8ed95727",
+        "sbr-operator-ext-remediation_rbac.authorization.k8s.io_v1_clusterrole.yaml": "028d90d6f415edde4b3c2c7eae25dca6abfecc06b6594218f284d1fd622c62f1",
+        "sbr-operator-metrics-reader_rbac.authorization.k8s.io_v1_clusterrole.yaml": "44ac256c4a05310eb0292e21d79d2a49983c481135404164cb18ad155da95175",
+        "sbr-operator-sbr-agent-privileged-scc_rbac.authorization.k8s.io_v1_clusterrole.yaml": "365763ef3b0ab70b920a90c256ad5ecc707624c6cfa520c001d3c59699279558",
+        "sbr-operator-sbr-agent-role_rbac.authorization.k8s.io_v1_clusterrole.yaml": "c8e699add9c3d3002d712961e55e61abdf23fed3696d4b51b32970a000d83f57",
+        "sbr-operator-sbr-agent-rolebinding_rbac.authorization.k8s.io_v1_clusterrolebinding.yaml": "cb412ada238cc5f2ac4dc3b3f8cc2ffe7633d401b92033f07e09de7e21d237d7",
+        "sbr-operator-sbr-agent_v1_serviceaccount.yaml": "144f8b107755dde4b4eca869709dcc8bb8bd1bc8c1dfc2dbd64ce0658335e287",
+        "sbr-operator-storagebasedremediation-admin-role_rbac.authorization.k8s.io_v1_clusterrole.yaml": "01a7869947ce1545338a8d209fae34b142686b8aa7dd9ec9439bd6f1b122aac9",
+        "sbr-operator-storagebasedremediation-editor-role_rbac.authorization.k8s.io_v1_clusterrole.yaml": "0ee84dab5df13c02eefd4173e572825133063fc864b464dbe93813fe64582e24",
+        "sbr-operator-storagebasedremediation-viewer-role_rbac.authorization.k8s.io_v1_clusterrole.yaml": "d3224c412c6aa5dccf1468d3acf872600577a09f097601c9cad77089bb7d3d49",
+        "sbr-operator-storagebasedremediationconfig-admin-role_rbac.authorization.k8s.io_v1_clusterrole.yaml": "a25f107fed9604c49406bc799725bb78bc55d409b105a51770e8ac7d60129aaf",
+        "sbr-operator-storagebasedremediationconfig-editor-role_rbac.authorization.k8s.io_v1_clusterrole.yaml": "f907905ed713fc42d4b6d049d37f39bbca1365ede1e6b2d5f42928148d9e9dbe",
+        "sbr-operator-storagebasedremediationconfig-viewer-role_rbac.authorization.k8s.io_v1_clusterrole.yaml": "aec04bb5f66287aeb049acf8c7d8e91892ef87220f538e304f5be693dbd0daa9",
+        "sbr-operator-storagebasedremediationtemplate-admin-role_rbac.authorization.k8s.io_v1_clusterrole.yaml": "e04fb5a5225bd4674afd8ca1d580b5ccbdc954c07ae1d0b7e2ae792084742fc8",
+        "sbr-operator-storagebasedremediationtemplate-editor-role_rbac.authorization.k8s.io_v1_clusterrole.yaml": "ca46fedd8ca41c9107cd743882434203382f3d23e966c9ad52adef7273f9ad55",
+        "sbr-operator-storagebasedremediationtemplate-viewer-role_rbac.authorization.k8s.io_v1_clusterrole.yaml": "a09e382e3ba2631a281d24866b2cd9528cee6cd40d1345ab10408405d250068f",
+        "storage-based-remediation.clusterserviceversion.yaml": "a7bef4625a5a31bb2bf4a5c23caa3dd12fe87650457669293f76f0d22605615b",
+        "storage-based-remediation.medik8s.io_storagebasedremediationconfigs.yaml": "53a17fe220ccd392f90ac0b2234a9e5fad329545355edc1780800e784799d83f",
+        "storage-based-remediation.medik8s.io_storagebasedremediations.yaml": "6e2ec2dccf613080b8ad6f49b4cb746c858b44c620002674e6f4d1b1d6d74f51",
+        "storage-based-remediation.medik8s.io_storagebasedremediationtemplates.yaml": "46216d8f08d78dca52b12f256952015960498f1040eaa6525b23222020a0cd26"
+      },
+      "outputs": {
+        "sbr/00-ServiceAccount-sbr-operator-controller-manager.yaml": "de34745c87b4de993522bbf5c296c864adbc1ac6995c0ad2f5ff564b7a51dae5",
+        "sbr/00-ServiceAccount-sbr-operator-sbr-agent.yaml": "de3908ba5e77943e08f9fccc3ee297899d821be60a5f84684db308d58bab167a",
+        "sbr/10-ClusterRole-sbr-operator-controller-manager.yaml": "e43c5e0b53a2df32601e1a35bb93d15b6da3fc1ad9c79f340197a9ec9f46308b",
+        "sbr/10-ClusterRole-sbr-operator-ext-remediation.yaml": "2086fad8459343e4b49800f2f857fdd4d356a84e374786db89a7641965ca59aa",
+        "sbr/10-ClusterRole-sbr-operator-metrics-reader.yaml": "e840758b092dd0796ef01f369e8f8ddf8bff048af08b845c2511d602a8392469",
+        "sbr/10-ClusterRole-sbr-operator-sbr-agent-privileged-scc.yaml": "5d3c9f8738cb3bbec98af406f9f28ce273cafe5d838b237d76f6d5349975ab6c",
+        "sbr/10-ClusterRole-sbr-operator-sbr-agent-role.yaml": "c2fc321985174879de7c15a6b602d92e4b670de672f9a2d789be923413f96244",
+        "sbr/10-ClusterRole-sbr-operator-storagebasedremediation-admin-role.yaml": "f5490e269727ded8492dbf29940dc353a9af99642632cc00acdeba6b44d282fb",
+        "sbr/10-ClusterRole-sbr-operator-storagebasedremediation-editor-role.yaml": "58783e5836c2132b1703c6f64bf85f7c5d6e40bb3dcb3e47a914fd1596e8742c",
+        "sbr/10-ClusterRole-sbr-operator-storagebasedremediation-viewer-role.yaml": "4b0caef968d6c04714542839484c7f02c3d6c5c191e6a3648e0bc72a1fe0be2f",
+        "sbr/10-ClusterRole-sbr-operator-storagebasedremediationconfig-admin-role.yaml": "c18efea1c9a8850857f6c8b95ee119e04a941f9b17f9bc25746842b511cd06c5",
+        "sbr/10-ClusterRole-sbr-operator-storagebasedremediationconfig-editor-role.yaml": "8c466afb940cb1ee0e51280cab931810cdc3829daca2b24cfead86f8fc01e525",
+        "sbr/10-ClusterRole-sbr-operator-storagebasedremediationconfig-viewer-role.yaml": "26d088f88006d86b0a3b92819b8a5bfcf2146d7482bb92d957f43dd7a2e3c672",
+        "sbr/10-ClusterRole-sbr-operator-storagebasedremediationtemplate-admin-role.yaml": "8e266a587b054195be20ba36f88c6144bd56f60d174803d31305d7721e363775",
+        "sbr/10-ClusterRole-sbr-operator-storagebasedremediationtemplate-editor-role.yaml": "ad13db66bae20203b9253fca98a5294066fc145b404ed17046feab312bc05248",
+        "sbr/10-ClusterRole-sbr-operator-storagebasedremediationtemplate-viewer-role.yaml": "38985e29303491e9d7cac56476af941f74168c65caab15da4798a471c3bf0741",
+        "sbr/11-ClusterRoleBinding-sbr-operator-controller-manager.yaml": "561b653c83e844a479657a1a9e838e8626a42b500e9ad4107f7b7d886ab9d7e8",
+        "sbr/11-ClusterRoleBinding-sbr-operator-sbr-agent-rolebinding.yaml": "eacfd1785227149cde1d70bd3954ff0acf39a3367c69bb8116e6bdb3d2fa9e7f",
+        "sbr/20-Role-sbr-operator-controller-manager.yaml": "bbd1e3f997b7f23a794f7f360f04c36ae8587ef60117114143df99c299cf9cb7",
+        "sbr/21-RoleBinding-sbr-operator-controller-manager.yaml": "cdafe18418c11248f8cef34c39b99b499da8189eb9d916f68e5762a595797734",
+        "sbr/40-Service-sbr-operator-controller-manager-metrics-service.yaml": "cf18eaefe732b26ef490c9c96d5b9779e00e4736410cfc6a47d8d0eb3b010132",
+        "sbr/50-Deployment-sbr-operator-controller-manager.yaml": "e9b848f5002f937bd33c641b8869c3118bdff33779ad24d00ccd8804c9886904"
+      },
+      "wao_modifications": [
+        "CSV permissions/clusterPermissions rendered as Role/RoleBinding/ClusterRole/ClusterRoleBinding named after each ServiceAccount",
+        "ClusterRoleBinding/sbr-operator-sbr-agent-rolebinding: subject namespace sbr-operator-system -> install namespace",
+        "Deployment/sbr-operator-controller-manager: pod template labeled workloadavailability.medik8s.io/component=storageBasedRemediation"
+      ]
+    },
+    "snr": {
+      "bundle": "quay.io/medik8s/self-node-remediation-operator-bundle@sha256:2e6692be63341d74a8f74b6716b017d419100074920179fdef14868e839eb456",
+      "crds": [
+        "self-node-remediation.medik8s.io_selfnoderemediationconfigs.yaml",
+        "self-node-remediation.medik8s.io_selfnoderemediations.yaml",
+        "self-node-remediation.medik8s.io_selfnoderemediationtemplates.yaml"
+      ],
+      "csv": "self-node-remediation.v0.13.0",
+      "inputs": {
+        "self-node-remediation-controller-manager-metrics-service_v1_service.yaml": "0109c3422e6855e0f87cdce43f635ee6b2f6a258d9516cab6779114935cc6e0e",
+        "self-node-remediation-ext-remediation_rbac.authorization.k8s.io_v1_clusterrole.yaml": "077199c84b3c5a55c23214f4f9000e431ae72a1c25f6bc8f155a2c2131ca511c",
+        "self-node-remediation-manager-config_v1_configmap.yaml": "a2bffda21f75f8acd7f4e68574ed527cdd8a2a0dbbee1f4c44dc619970acd585",
+        "self-node-remediation-metrics-reader_rbac.authorization.k8s.io_v1_clusterrole.yaml": "09f82b3c30fa5b3aa74d94a56a7c2a060a0ee5163cf7463c0b7eb4047b504fff",
+        "self-node-remediation-webhook-service_v1_service.yaml": "fe47bdf695b99853284d1b0ed89db9050117920c308392592408b4fc6dfaee2b",
+        "self-node-remediation.clusterserviceversion.yaml": "f18ba44710663717cd97a2cd423857bf3f3080ad84fb36ec1a22fac04d369843",
+        "self-node-remediation.medik8s.io_selfnoderemediationconfigs.yaml": "b695a05d162ff17926ddcdbbabfef93bae2267310926a10052c56bc69c365489",
+        "self-node-remediation.medik8s.io_selfnoderemediations.yaml": "e77f8792a195462f335557e342665bf96bbf4d51497b447719791e14c9979430",
+        "self-node-remediation.medik8s.io_selfnoderemediationtemplates.yaml": "7ed6ab6072c870e6c3cdde2fc8a4713831de4b6d190240ca61a91afa18b9d636"
+      },
+      "outputs": {
+        "snr/00-ServiceAccount-self-node-remediation-controller-manager.yaml": "fb058f91feeb5f0d91b5b4d40f6c0671607378d33a80912622f0a566b4c45077",
+        "snr/10-ClusterRole-self-node-remediation-controller-manager.yaml": "10a3e70f922f628b54728a0c0c0ac2708e700868dc52f8740ec73908e0471510",
+        "snr/10-ClusterRole-self-node-remediation-ext-remediation.yaml": "3c04ae23e16215f25ac0f630e6b740c26953dbbd5d625cf43d3205dcbc0dc131",
+        "snr/10-ClusterRole-self-node-remediation-metrics-reader.yaml": "b2b51dea0ea16a283536f59fb05f6dae4c22fa8df51662303719d441ede69cf1",
+        "snr/11-ClusterRoleBinding-self-node-remediation-controller-manager.yaml": "ac8ebe88f15e821e7d14a8d1abe7616bce1cb30975364b4244cccdb945659ea6",
+        "snr/20-Role-self-node-remediation-controller-manager.yaml": "06e12f6b68d8ab67b07dbd65037ca944c6df9f977532f0e43bb8c13cb3ef452b",
+        "snr/21-RoleBinding-self-node-remediation-controller-manager.yaml": "bf3c90bf02bcfead427ae3f5bf320f115826cf27c1b1e9d88b291095cb9dc04e",
+        "snr/30-ConfigMap-self-node-remediation-manager-config.yaml": "3d50f637c9a1deecdbb00da9545e7d7360571431fa12786f3d6ffde253c5d338",
+        "snr/40-Service-self-node-remediation-controller-manager-metrics-service.yaml": "0d51c8257e376d38081c4f46c7b2aeb05b4345dae745191491bcb10813effbec",
+        "snr/40-Service-self-node-remediation-webhook-service.yaml": "b790afc96646b33f7cc416ed95ca53974497210c0d667272cdb51d57ce9f713b",
+        "snr/50-Deployment-self-node-remediation-controller-manager.yaml": "3207cca88a12c12410b5df999dcc37370324da629f1e99743ec026b5ece3d0df",
+        "snr/60-ValidatingWebhookConfiguration-self-node-remediation-validating-webhook-configuration.yaml": "80279a0ab083c0af12ebeb40a00978c06b5201836910b2a393fac87d8a5f1864",
+        "snr/61-MutatingWebhookConfiguration-self-node-remediation-mutating-webhook-configuration.yaml": "35fee11c0ef04f0737aa53b6faaf769644418766c46fa1ae3b0688c1a908f2b5"
+      },
+      "wao_modifications": [
+        "CSV permissions/clusterPermissions rendered as Role/RoleBinding/ClusterRole/ClusterRoleBinding named after each ServiceAccount",
+        "Deployment/self-node-remediation-controller-manager: added service-ca webhook certificate volume self-node-remediation-webhook-server-cert at /tmp/k8s-webhook-server/serving-certs",
+        "Deployment/self-node-remediation-controller-manager: pod template labeled workloadavailability.medik8s.io/component=selfNodeRemediation",
+        "MutatingWebhookConfiguration: generated from CSV webhookdefinitions with service-ca CA bundle injection",
+        "Service/self-node-remediation-webhook-service: added service.beta.openshift.io/serving-cert-secret-name",
+        "ValidatingWebhookConfiguration: generated from CSV webhookdefinitions with service-ca CA bundle injection"
+      ]
+    }
+  },
+  "generator": "hack/extract-operand-manifests.py",
+  "namespace_placeholder": "__WAO_NAMESPACE__"
+}

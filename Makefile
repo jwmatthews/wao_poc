@@ -90,6 +90,22 @@ all: build
 help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
+##@ Operands
+
+PYTHON ?= .venv/bin/python
+BUNDLE_CACHE ?= .cache/bundles
+
+.PHONY: bundles
+bundles: ## Fetch the pinned upstream bundles from release-set.yaml into .cache/bundles.
+	$(PYTHON) hack/fetch-bundles.py --release-set release-set.yaml --out $(BUNDLE_CACHE)
+
+EXTRACT = $(PYTHON) hack/extract-operand-manifests.py --bundles $(BUNDLE_CACHE) --release-set release-set.yaml --out internal/operands/manifests --crd-out config/crd/bases --rbac-out config/rbac/operand_union_role.yaml
+.PHONY: operand-manifests operand-manifests-check
+operand-manifests: ## Regenerate operand manifests, component CRDs and the union role from the fetched bundles.
+	$(EXTRACT)
+operand-manifests-check: ## Verify the committed operand manifests, CRDs and union role are current.
+	$(EXTRACT) --check
+
 ##@ Development
 
 .PHONY: manifests

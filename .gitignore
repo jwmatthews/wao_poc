@@ -72,3 +72,4 @@ evidence/
 dist/
 bin/
 kubeconfig*
+__pycache__/
