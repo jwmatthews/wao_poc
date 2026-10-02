@@ -47,3 +47,26 @@ that from each CSV following the OCP 4.22 "Creating a cluster role for an extens
 procedure. The result is deliberately broad in places (names OLM generates cannot be
 predicted); it is an experiment input, not product RBAC. Measuring how much RBAC this takes
 per operator is one of the experiment's outputs.
+
+## Experiment 0002: release a ClusterExtension's CRD without losing its CRs
+
+`exp0002.sh STEP` (1 baseline, 2 same-package collision, 3 naive delete, 4 MODE protection variants
+with `CASCADE=orphan|background`, 5 restore-then-install, 6 verify, cleanup). Run 2026-10-02:
+normal deletion removes CRDs and CRs (ownerReference garbage collection); metadata protection is
+undone by reconcile; `--cascade=orphan` preserves every rendered object; a pre-existing object is
+adopted when it carries `meta.helm.sh/release-name=<extension>`, `meta.helm.sh/release-namespace`
+and `app.kubernetes.io/managed-by=Helm`. See the sanitized `RESULTS.md` kept with the run.
+
+## Experiment 0003: WAO adopts the twelve CRDs from six installed extensions
+
+`exp0003.sh STEP` (1 baseline, 2 orphan-delete the six, 3 delete old managers/webhooks/RBAC by
+owner-name label, 4 re-annotate the CRDs for WAO's release, 5 install WAO, 6 enable NHC and SNR,
+7 verify UIDs and admission). Needs the WAO bundle as an OLM v1 catalog: build `bundle.Dockerfile`
+as a binary build in `wao-poc-build`, write an FBC (`olm.package`, `olm.channel`, `olm.bundle` with
+`olm.package` and `olm.gvk` properties and the bundle image digest) under `configs/`, build a
+`FROM scratch` catalog image with `LABEL operators.operatorframework.io.index.configs.v1=/configs`,
+grant `system:image-puller` on the build namespace to `system:serviceaccounts:openshift-catalogd`
+and `system:serviceaccounts:openshift-operator-controller`, and create a `ClusterCatalog` named
+`wao-poc` (the name `gen-installer-rbac.py` pins in the `wao` ClusterExtension selector). Run
+2026-10-02: pass; all twelve CRDs and CRs preserved; the SNR agent DaemonSet was rolled because
+the operand image differed from the installed one.

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Generate OLM v1 installer RBAC and ClusterExtension manifests for the six RHWA operators.
+"""Generate OLM v1 installer RBAC and ClusterExtension manifests for the six RHWA operators
+and for the Workload Availability Operator POC bundle (key `wao`, built from ../../bundle/).
 
-For each operator (nhc, snr, far, mdr, nmo, sbr) this script reads the shipped CSV
+For each operator (nhc, snr, far, mdr, nmo, sbr, wao) this script reads the shipped CSV
 (plus the other objects in the bundle, when a bundle directory is available) and emits:
 
     rbac/<key>/00-serviceaccount.yaml      ServiceAccount <key>-installer
@@ -45,10 +46,25 @@ CATALOG_NAME = "openshift-redhat-operators"
 CHANNEL = "stable"
 DEFAULT_OUT = os.path.join(HERE, "rbac")
 
+# Name of the ClusterCatalog that the WAO POC experiment creates for its own FBC image. The
+# `wao` ClusterExtension pins resolution to it through spec.source.catalog.selector so the
+# POC package can never be resolved from (or shadowed by) openshift-redhat-operators.
+WAO_CATALOG_NAME = "wao-poc"
+
 CSV_DIR = os.path.join(REPO, "evidence", "2026-10-02-olmv1-0001", "csv-downstream")
 BUNDLES_DIR = os.path.join(REPO, ".cache", "bundles")
+WAO_BUNDLE_DIR = os.path.join(REPO, "bundle")  # the POC's own generated registry+v1 bundle
+
+ANN_PACKAGE = "operators.operatorframework.io.bundle.package.v1"
+ANN_DEFAULT_CHANNEL = "operators.operatorframework.io.bundle.channel.default.v1"
 
 # Catalog facts (openshift-redhat-operators, channel stable, heads as of 2026-10-02).
+# Every entry may also carry (defaults in parentheses, filled in by resolve_operator()):
+#   package   ClusterExtension name and catalog packageName (required unless "annotations" is set)
+#   head      exact version to pin (CSV spec.version)
+#   channel   catalog channel (CHANNEL)
+#   catalog   ClusterCatalog name used in the selector (CATALOG_NAME)
+#   annotations  bundle/metadata/annotations.yaml; supplies package + default channel
 OPERATORS: list[dict[str, Any]] = [
     {
         "key": "nhc",
@@ -99,6 +115,18 @@ OPERATORS: list[dict[str, Any]] = [
         # the same RBAC shape (only image references differ).
         "csv": os.path.join(BUNDLES_DIR, "sbr", "manifests", "storage-based-remediation.clusterserviceversion.yaml"),
         "bundle": os.path.join(BUNDLES_DIR, "sbr", "manifests"),
+    },
+    {
+        # The Workload Availability Operator POC: one CSV carrying the union of the six
+        # operators' permissions and all thirteen CRDs. package/channel come from the bundle
+        # annotations, the version from the CSV, and the catalog is the experiment's own.
+        "key": "wao",
+        "csv": os.path.join(WAO_BUNDLE_DIR, "manifests", "workload-availability-operator.clusterserviceversion.yaml"),
+        "bundle": os.path.join(WAO_BUNDLE_DIR, "manifests"),
+        "annotations": os.path.join(WAO_BUNDLE_DIR, "metadata", "annotations.yaml"),
+        "catalog": WAO_CATALOG_NAME,
+        "head_source": "bundle CSV spec.version",
+        "install_mode_note": "No spec.config: the POC CSV is AllNamespaces-only (spec.installModes); no watchNamespace is configured.",
     },
 ]
 
@@ -198,7 +226,9 @@ def parse_csv(csv: dict[str, Any]) -> dict[str, Any]:
             service_accounts.append(sa)
     return {
         "name": csv["metadata"]["name"],
+        "version": str(spec.get("version") or ""),
         "owned_crds": owned_crds,
+        "crds": list(owned_crds),  # union with the bundle CRD objects, see generate()
         "deployments": deployments,
         "permissions": permissions,
         "cluster_permissions": cluster_permissions,
@@ -222,6 +252,42 @@ def load_bundle_objects(bundle_dir: str | None) -> list[dict[str, Any]]:
                 continue
             objs.append(doc)
     return objs
+
+
+def load_bundle_crd_names(bundle_dir: str | None) -> list[str]:
+    """Names of every CustomResourceDefinition object in the bundle manifests dir.
+
+    OLM v1 renders every CRD in the bundle (BundleCRDGenerator), whether or not the CSV lists
+    it under customresourcedefinitions.owned, so the installer must be able to manage them all.
+    """
+    names: set[str] = set()
+    if not bundle_dir or not os.path.isdir(bundle_dir):
+        return []
+    for fn in sorted(os.listdir(bundle_dir)):
+        if not fn.endswith((".yaml", ".yml", ".json")):
+            continue
+        with open(os.path.join(bundle_dir, fn), encoding="utf-8") as fh:
+            for doc in yaml.safe_load_all(fh):
+                if doc and doc.get("kind") == "CustomResourceDefinition":
+                    names.add(doc["metadata"]["name"])
+    return sorted(names)
+
+
+def resolve_operator(op: dict[str, Any], csv: dict[str, Any]) -> dict[str, Any]:
+    """Fill in package/head/channel/catalog from the bundle annotations and CSV where not given."""
+    out = dict(op)
+    if out.get("annotations"):
+        ann = load_yaml_or_json(out["annotations"])["annotations"]
+        out.setdefault("package", ann[ANN_PACKAGE])
+        out.setdefault("channel", ann[ANN_DEFAULT_CHANNEL])
+    out.setdefault("head", str(csv["spec"]["version"]))
+    out.setdefault("channel", CHANNEL)
+    out.setdefault("catalog", CATALOG_NAME)
+    out.setdefault("head_source", "catalog head")
+    out.setdefault("install_mode_note", "No spec.config: all six operators are AllNamespaces-only; no watchNamespace is configured.")
+    if not out.get("package"):
+        raise SystemExit(f"{out['key']}: no package name (set 'package' or 'annotations')")
+    return out
 
 
 def webhook_service_name(deployment_name: str) -> str:
@@ -284,14 +350,16 @@ def build_groups(op: dict[str, Any], info: dict[str, Any], others: list[dict[str
         ],
     ))
 
-    # 3. CRDs.
+    # 3. CRDs (CSV owned list unioned with every CRD object shipped in the bundle).
+    bundle_only_crds = sorted(set(info["crds"]) - set(info["owned_crds"]))
     groups.append(Group(
         "Custom resource definitions of the extension",
         "docs: olmv1-creating-a-cluster-role.adoc step 4; CSV spec.customresourcedefinitions.owned",
         [
             rule(["apiextensions.k8s.io"], ["customresourcedefinitions"], CREATE_VERBS),
-            rule(["apiextensions.k8s.io"], ["customresourcedefinitions"], MANAGE_VERBS, info["owned_crds"]),
+            rule(["apiextensions.k8s.io"], ["customresourcedefinitions"], MANAGE_VERBS, info["crds"]),
         ],
+        notes=["CRDs shipped in the bundle but not listed as owned in the CSV: " + ", ".join(bundle_only_crds)] if bundle_only_crds else [],
     ))
 
     # 4. Union of permissions + clusterPermissions (+ bundle Role/ClusterRole rules).
@@ -476,7 +544,7 @@ def dump(obj: Any) -> str:
 def render_clusterrole(op: dict[str, Any], info: dict[str, Any], groups: list[Group], csv_path: str, bundle_dir: str) -> str:
     out = [
         "# Generated by test/olmv1/gen-installer-rbac.py -- DO NOT EDIT BY HAND; regenerate instead.",
-        f"# Operator: {op['key']} (package {op['package']}, CSV {info['name']}, catalog head {op['head']})",
+        f"# Operator: {op['key']} (package {op['package']}, CSV {info['name']}, {op['head_source']} {op['head']})",
         f"# CSV input: {os.path.relpath(csv_path, REPO)}",
         f"# Bundle objects input: {os.path.relpath(bundle_dir, REPO) if bundle_dir else '(none)'}",
         "# Experiment input only: deliberately broad in the places marked UNSCOPED. Not product RBAC.",
@@ -528,10 +596,10 @@ def clusterextension_object(op: dict[str, Any]) -> dict[str, Any]:
                 "sourceType": "Catalog",
                 "catalog": {
                     "packageName": op["package"],
-                    "channels": [CHANNEL],
+                    "channels": [op["channel"]],
                     "version": op["head"],
                     "upgradeConstraintPolicy": "CatalogProvided",
-                    "selector": {"matchLabels": {"olm.operatorframework.io/metadata.name": CATALOG_NAME}},
+                    "selector": {"matchLabels": {"olm.operatorframework.io/metadata.name": op["catalog"]}},
                 },
             },
         },
@@ -544,15 +612,15 @@ def render_clusterextension(op: dict[str, Any]) -> str:
         "# Fields per OpenShift 4.22 docs olmv1-installing-an-operator.adoc and olmv1-clusterextension-api.adoc:",
         "#   spec.namespace, spec.serviceAccount.name, spec.source.sourceType=Catalog,",
         "#   spec.source.catalog.{packageName,channels,version,upgradeConstraintPolicy}.",
-        f"# version is pinned to the exact catalog head ({op['head']}); no range, so nothing auto-updates during the experiment.",
+        f"# version is pinned to the exact {op['head_source']} ({op['head']}); no range, so nothing auto-updates during the experiment.",
         "# upgradeConstraintPolicy: CatalogProvided is the documented default, written out explicitly.",
         "# spec.source.catalog.selector: NOT in the two local doc snippets above (they only show channels/version),",
         "#   but it is part of the olm.operatorframework.io/v1 ClusterExtension API (CatalogFilter.selector, a",
         "#   LabelSelector over ClusterCatalog labels; catalogd labels every ClusterCatalog with",
         "#   olm.operatorframework.io/metadata.name=<catalog name>) and is documented in the OCP 'Catalog content",
-        "#   resolution' page. It pins resolution to the openshift-redhat-operators ClusterCatalog so a same-named",
+        f"#   resolution' page. It pins resolution to the {op['catalog']} ClusterCatalog so a same-named",
         "#   package in another catalog cannot win. If a 4.22 cluster rejected the field, drop the selector block.",
-        "# No spec.config: all six operators are AllNamespaces-only; no watchNamespace is configured.",
+        f"# {op['install_mode_note']}",
     ])
     body = dump(clusterextension_object(op))
     # Quote the version so YAML never reads e.g. 5.7 as a float.
@@ -572,7 +640,9 @@ def render_kustomization(op: dict[str, Any]) -> str:
 def generate(op: dict[str, Any]) -> dict[str, Any]:
     """Build everything for one operator; returns manifests (as strings) plus a summary."""
     csv = load_yaml_or_json(op["csv"])
+    op = resolve_operator(op, csv)
     info = parse_csv(csv)
+    info["crds"] = sorted(set(info["owned_crds"]) | set(load_bundle_crd_names(op.get("bundle"))))
     others = load_bundle_objects(op.get("bundle"))
     groups = build_groups(op, info, others)
     manifests = {

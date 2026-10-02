@@ -22,8 +22,11 @@ Inputs (all offline, nothing touches a cluster):
 | mdr | machine-deletion-remediation | 0.7.1 | same | `.cache/bundles/mdr/manifests` |
 | nmo | node-maintenance-operator | 5.7.1 | same | `.cache/bundles/nmo/manifests` |
 | sbr | storage-based-remediation | 0.3.1 | `.cache/bundles/sbr/manifests/*.clusterserviceversion.yaml` (upstream 0.3.0; same RBAC shape as downstream 0.3.1) | `.cache/bundles/sbr/manifests` |
+| wao | workload-availability-operator | 0.1.0 (CSV `spec.version`) | `bundle/manifests/workload-availability-operator.clusterserviceversion.yaml` (the POC's own bundle) | `bundle/manifests` (13 CRDs, nothing else); package/channel from `bundle/metadata/annotations.yaml` |
 
-Install namespace for all six: `openshift-workload-availability`. Catalog: `openshift-redhat-operators`, channel `stable`.
+Install namespace for all seven: `openshift-workload-availability`. Catalog for the six RHWA operators:
+`openshift-redhat-operators`, channel `stable`. The `wao` key uses the experiment's own ClusterCatalog
+`wao-poc` (constant `WAO_CATALOG_NAME` in the generator), channel `alpha`; see below.
 
 Per operator the generator writes `00-serviceaccount.yaml`, `10-clusterrole.yaml`,
 `20-clusterrolebinding.yaml`, `30-clusterextension.yaml` and a `kustomization.yaml`
@@ -67,6 +70,33 @@ input that produced it:
 Everything scoped by `resourceNames` is only as good as the name prediction: the first install's
 preflight report (`oc describe clusterextension <name>`, condition `Progressing`) is the authority. If
 it lists a missing permission, add it to the generator, not to the YAML.
+
+## The `wao` key: the POC bundle
+
+`rbac/wao/` is built from the POC's own generated registry+v1 bundle (`bundle/`) rather than from a
+catalog CSV. Same template, same namespace, same installer naming (`wao-installer`,
+`wao-installer-clusterrole`, `wao-installer-binding`); the differences are in the inputs:
+
+- `packageName` and `channels` come from `bundle/metadata/annotations.yaml`
+  (`operators.operatorframework.io.bundle.package.v1` = `workload-availability-operator`,
+  `...bundle.channel.default.v1` = `alpha`); `version` is the CSV `spec.version` (`0.1.0`), pinned exactly.
+- `spec.source.catalog.selector` pins resolution to the ClusterCatalog `wao-poc`, the catalog the experiment
+  creates for the POC FBC image. Change `WAO_CATALOG_NAME` at the top of the generator if that name changes.
+- The CRD manage rule is scoped to all thirteen CRDs in `bundle/manifests` (the generator unions the CSV
+  `owned` list with the CRD objects in the bundle, because OLM v1 renders every bundle CRD regardless of the
+  CSV); today the two lists agree for every key.
+- The CSV carries the union of the six operators' `permissions`/`clusterPermissions` (3 + 109 rules, three of
+  them exact duplicates), so the ClusterRole is large (120 rules). Rules are deduplicated across the whole
+  ClusterRole. The CSV already contains `namespaces get,list,watch`, so the AllNamespaces promotion rule
+  is folded into the clusterPermissions excerpt.
+- Things worth knowing about the POC CSV: wildcard-verb rules (`oauth.openshift.io/*` with `verbs: ["*"]`,
+  `rbac.authorization.k8s.io` clusterroles/clusterrolebindings with `verbs: ["*"]`, the three
+  `storage-based-remediation.medik8s.io` resources with `verbs: ["*"]`), `use` on the built-in `privileged`
+  SCC plus `get,list,patch,update,watch` on SCCs, a `/metrics` `nonResourceURLs` rule, and no
+  `webhookdefinitions` (so, like `mdr`, no webhook-configuration rules are generated). The bundle ships no
+  Role/ClusterRole/Service/ConfigMap objects, so Services and ConfigMaps are unscoped for this key.
+  `spec.relatedImages` lists the seven upstream quay.io medik8s images while the Deployment itself runs the
+  in-cluster `image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao` image.
 
 ## Known caveats found while generating
 
