@@ -43,7 +43,9 @@ fi
 # stream image must exist (the build namespace is deliberately kept between runs).
 wao_image=$(grep -m1 -Eo 'image: image-registry\.openshift-image-registry\.svc:5000/[^ ]+' \
   "${REPO_ROOT}/bundle/manifests/workload-availability-operator.clusterserviceversion.yaml" | sed 's/^image: //' || true)
-if [ -n "$wao_image" ]; then
+if [ "${SKIP_IMAGE_CHECK:-0}" = 1 ]; then
+  echo "note: SKIP_IMAGE_CHECK=1, the WAO image check is skipped (full-run.sh builds the image after preflight)"
+elif [ -n "$wao_image" ]; then
   path="${wao_image#image-registry.openshift-image-registry.svc:5000/}"   # <ns>/<name>@sha256:...
   img_ns="${path%%/*}"; img_ref="${path#*/}"
   expect "WAO image $img_ref exists in the internal registry (namespace $img_ns)" found imagestreamimage "$img_ref" -n "$img_ns"

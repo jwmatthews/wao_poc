@@ -63,6 +63,22 @@ for inspection, then run `run-all.sh 18` later). Running a subset keeps earlier 
 
 Cleanup keeps the image build namespace `wao-poc-build` on purpose and reports it as a `LEFTOVER`.
 
+## Full run on a new cluster
+
+`full-run.sh` does everything above end to end on a cluster that has never had WAO built on it:
+confirm the cluster, workstation checks, preflight with the image check skipped
+(`SKIP_IMAGE_CHECK=1`), on-cluster image build from `git archive HEAD` into `wao-poc-build`,
+`make bundle` pointed at the new digest (it also updates the digest quoted in `README.md`),
+`make catalog-configmap`, `run-all.sh`, then a `REPORT.md` skeleton beside `results.json` with a
+sanitization grep. It never commits or pushes. See [docs/agent-test-run.md](../../docs/agent-test-run.md).
+
+```sh
+CONFIRM=yes KUBECONFIG=/path/to/disposable.kubeconfig bash test/cluster/full-run.sh
+```
+
+Options: `SKIP_PREREQS=1`, `SKIP_BUILD=1` (reuse `istag wao:latest`), `ALLOW_DIRTY=1`, `WAO_VERSION`,
+plus `STOP_ON_FAIL`, `SKIP_CLEANUP` and `RUN_DIR` from `run-all.sh`. Without `CONFIRM=yes` it prompts.
+
 ## Safety
 
 - Admission is only ever probed with `--dry-run=server`. No `NodeHealthCheck`,
