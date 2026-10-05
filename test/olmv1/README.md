@@ -57,6 +57,23 @@ undone by reconcile; `--cascade=orphan` preserves every rendered object; a pre-e
 adopted when it carries `meta.helm.sh/release-name=<extension>`, `meta.helm.sh/release-namespace`
 and `app.kubernetes.io/managed-by=Helm`. See the sanitized `RESULTS.md` kept with the run.
 
+## OCP 5.0+: no installer RBAC
+
+On OCP 5.0.0-ec.5 `ClusterExtension.spec.serviceAccount` is deprecated and ignored (a warn-only
+admission policy says so) and operator-controller runs as cluster-admin. Set `SKIP_INSTALLER_RBAC=1`
+to skip the installer SA/ClusterRole/Binding and strip `spec.serviceAccount` from every
+`ClusterExtension` the scripts apply (`apply_ce` in `lib.sh`; the stripped manifest is kept in the run
+dir). Set `OCP_VERSION_GLOB='5.0.*'` for the preflight. Set `EXP` explicitly so the run directory is
+not another experiment's. Experiment 0004 (2026-10-02) ran 0001 and 0003 this way on 5.0.0-ec.5:
+both passed.
+
+```sh
+export KUBECONFIG=/path/to/ocp5.kubeconfig EXP=0004 SKIP_INSTALLER_RBAC=1 OCP_VERSION_GLOB='5.0.*'
+bash test/olmv1/00-preflight.sh && bash test/olmv1/01-namespace.sh
+for k in nhc nmo mdr far sbr snr; do bash test/olmv1/02-install.sh $k && bash test/olmv1/03-webhooks.sh $k && bash test/olmv1/04-restart.sh $k; done
+for s in 1 2 3 4 5 6 7; do bash test/olmv1/exp0003.sh $s; done
+```
+
 ## Experiment 0003: WAO adopts the twelve CRDs from six installed extensions
 
 `exp0003.sh STEP` (1 baseline, 2 orphan-delete the six, 3 delete old managers/webhooks/RBAC by
@@ -70,3 +87,16 @@ and `system:serviceaccounts:openshift-operator-controller`, and create a `Cluste
 `wao-poc` (the name `gen-installer-rbac.py` pins in the `wao` ClusterExtension selector). Run
 2026-10-02: pass; all twelve CRDs and CRs preserved; the SNR agent DaemonSet was rolled because
 the operand image differed from the installed one.
+
+## Experiment 0005: Classic six (Subscriptions) to one WAO ClusterExtension
+
+`exp0005.sh STEP` (1 reset incl. the WAO-finalizer workaround, 2 Classic install via Subscriptions with
+pinned `startingCSV`, 3 webhook control matrix, 4 baseline, 5 delete Subscriptions and CSVs, 6 annotate
+CRDs, 7 install WAO, 8 enable NHC and SNR and verify incl. the SNR namespace check, 9 enable the rest).
+Env: `CLASSIC_NS` (default `openshift-operators`), `OPERATORS` (space-separated keys; five on a cluster
+without SBR), `RUN_DIR` (set it per variant), `SKIP_INSTALLER_RBAC=1` on 5.0. Run 2026-10-03 on 4.22.1 and
+5.0.0-ec.5: Classic uninstall keeps CRDs and CRs (no ownerReferences to release) and WAO adopts them; two
+manual steps were needed and are recorded but not yet scripted: delete the Classic static leftovers
+(cluster-scoped RBAC labeled `olm.owner=<csv>`, NHC's Prometheus Role, SBR's agent SA, SNR's cert Secret)
+before enabling components, and delete the old `SelfNodeRemediationConfig` when Classic lived in another
+namespace.

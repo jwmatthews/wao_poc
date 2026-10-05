@@ -13,12 +13,16 @@ echo "== 0001-02 install $pkg $ver via ClusterExtension"
 
 # Installer RBAC first, then the extension. Keep the exact manifests applied in the run dir.
 cp "$rbac_dir"/*.yaml "${RUN_DIR}/raw/" 2>/dev/null || true
-for f in 00-serviceaccount 10-clusterrole 20-clusterrolebinding; do
-  record "02-$key-apply-$f" apply -f "$rbac_dir/$f.yaml" >/dev/null
-done
-rules=$(python3 -c 'import yaml,sys; print(len(yaml.safe_load(open(sys.argv[1]))["rules"]))' "$rbac_dir/10-clusterrole.yaml" 2>/dev/null || echo "?")
-echo "installer ClusterRole rules: $rules"
-record "02-$key-apply-ce" apply -f "$rbac_dir/30-clusterextension.yaml" >/dev/null
+if [ "${SKIP_INSTALLER_RBAC:-0}" = 1 ]; then
+  echo "SKIP_INSTALLER_RBAC=1: no installer SA/ClusterRole applied; spec.serviceAccount stripped from the ClusterExtension"
+else
+  for f in 00-serviceaccount 10-clusterrole 20-clusterrolebinding; do
+    record "02-$key-apply-$f" apply -f "$rbac_dir/$f.yaml" >/dev/null
+  done
+  rules=$(python3 -c 'import yaml,sys; print(len(yaml.safe_load(open(sys.argv[1]))["rules"]))' "$rbac_dir/10-clusterrole.yaml" 2>/dev/null || echo "?")
+  echo "installer ClusterRole rules: $rules"
+fi
+apply_ce "02-$key-apply-ce" "$rbac_dir/30-clusterextension.yaml" >/dev/null
 
 # Wait for Installed=True/Succeeded. Fail fast if operator-controller reports an installer-RBAC
 # "forbidden" (the retry backoff grows long; after fixing the ClusterRole, annotate the extension to

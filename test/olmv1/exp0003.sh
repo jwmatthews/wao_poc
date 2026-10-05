@@ -4,7 +4,7 @@
 # release. Uses the release-and-adopt sequence from experiment 0002. Run one step at a time, in order.
 # Destructive to the six test installs (disposable cluster); never touches nodes directly. SNR's node
 # agents keep running throughout (their DaemonSet is owned by the SNR Config, not by any extension).
-EXP=0003 source "$(dirname "$0")/lib.sh"
+EXP="${EXP:-0003}" source "$(dirname "$0")/lib.sh"   # EXP=0004 for the 5.0 re-run; the run dir follows it
 WAO_CE=workload-availability-operator
 WAO_RELEASE_NS="$NS"
 ALL_CRDS="$(for k in nhc snr far mdr nmo sbr; do op_crds "$k"; done | tr ' ' '\n')"
@@ -88,8 +88,12 @@ for c in json.load(sys.stdin)["items"]:
   echo "== 0003-5 install the WAO ClusterExtension over the re-annotated CRDs"
   rbac_dir="$(dirname "$0")/rbac/wao"
   [ -d "$rbac_dir" ] || { echo "missing $rbac_dir" >&2; exit 2; }
-  for f in 00-serviceaccount 10-clusterrole 20-clusterrolebinding; do record "5-apply-$f" apply -f "$rbac_dir/$f.yaml" >/dev/null; done
-  record 5-apply-ce apply -f "$rbac_dir/30-clusterextension.yaml" >/dev/null
+  if [ "${SKIP_INSTALLER_RBAC:-0}" = 1 ]; then
+    echo "SKIP_INSTALLER_RBAC=1: no installer SA/ClusterRole applied; spec.serviceAccount stripped from the ClusterExtension"
+  else
+    for f in 00-serviceaccount 10-clusterrole 20-clusterrolebinding; do record "5-apply-$f" apply -f "$rbac_dir/$f.yaml" >/dev/null; done
+  fi
+  apply_ce 5-apply-ce "$rbac_dir/30-clusterextension.yaml" >/dev/null
   start=$(date +%s)
   while ! ce_installed "$WAO_CE"; do
     msg=$(k get clusterextension "$WAO_CE" -o jsonpath='{range .status.conditions[?(@.type=="Progressing")]}{.reason}: {.message}{end}' 2>/dev/null | cut -c1-300)

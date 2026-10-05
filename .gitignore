@@ -36,6 +36,9 @@ go.work.sum
 # Local pointers to disposable test clusters (cluster-identifying)
 DISPOSABLE_OPENSHIFT_CLUSTERS.md
 
+# MacOS specifics
+.DS_store
+
 # operator-sdk / kubebuilder scaffold
 # Binaries for programs and plugins
 *.exe

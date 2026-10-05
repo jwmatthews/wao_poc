@@ -55,6 +55,24 @@ sys.exit(0 if eval("(" + sys.argv[1] + "\n)") else 1)' "$expr"
 absent() { local out; out=$(k get "$@" --ignore-not-found -o name) || return 1; [ -z "$out" ]; }
 found() { local out; out=$(k get "$@" -o name) || return 1; [ -n "$out" ]; }
 
+# apply_ce LABEL FILE : apply a ClusterExtension manifest. With SKIP_INSTALLER_RBAC=1 (OCP 5.0+, where
+# spec.serviceAccount is deprecated and ignored and operator-controller runs as cluster-admin), strip
+# spec.serviceAccount first and keep the stripped manifest in the run dir. `record` keeps the apply's
+# stderr, so any deprecation warning the API server emits is in the raw evidence.
+apply_ce() {
+  local label="$1" file="$2"
+  if [ "${SKIP_INSTALLER_RBAC:-0}" = 1 ]; then
+    local stripped="${RUN_DIR}/raw/$(basename "$file" .yaml)-nosa.yaml"
+    "$PYTHON" - "$file" "$stripped" <<'PY'
+import sys, yaml
+o = yaml.safe_load(open(sys.argv[1])); o["spec"].pop("serviceAccount", None)
+yaml.safe_dump(o, open(sys.argv[2], "w"), sort_keys=False)
+PY
+    file="$stripped"
+  fi
+  record "$label" apply -f "$file"
+}
+
 # ce_condition NAME TYPE : print "status/reason" of a ClusterExtension condition.
 ce_condition() {
   k get clusterextension "$1" -o json | python3 -c '

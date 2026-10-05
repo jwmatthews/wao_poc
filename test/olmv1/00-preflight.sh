@@ -7,7 +7,8 @@ echo "== 0001-00 preflight (read-only) on $(k whoami --show-server 2>/dev/null |
 
 record 00-version get clusterversion version -o jsonpath='{.status.desired.version}' >/dev/null
 ver=$(k get clusterversion version -o jsonpath='{.status.desired.version}')
-expect "cluster is 4.22.x (got $ver)" bash -c "case '$ver' in 4.22.*) exit 0;; *) exit 1;; esac"
+glob="${OCP_VERSION_GLOB:-4.22.*}"   # set OCP_VERSION_GLOB='5.0.*' for the 5.0 re-run (experiment 0004)
+expect "cluster version matches $glob (got $ver)" bash -c "case '$ver' in $glob) exit 0;; *) exit 1;; esac"
 
 expect "operator-controller is available" k wait deployment/operator-controller-controller-manager \
   -n openshift-operator-controller --for=condition=Available --timeout=10s
@@ -28,5 +29,5 @@ echo "operator-controller image: $(k get deployment operator-controller-controll
 nodes=$(k get nodes -o name | wc -l | tr -d ' ')
 cp=$(k get nodes -l node-role.kubernetes.io/control-plane -o name | wc -l | tr -d ' ')
 echo "nodes: $nodes, of which control-plane: $cp (every node reboot in this experiment hits a control-plane node)"
-outcome 0001-00 PASS "4.22 ($ver), OLM v1 serving, clean of RHWA"
+outcome 0001-00 PASS "$ver, OLM v1 serving, clean of RHWA"
 echo "== preflight passed"
