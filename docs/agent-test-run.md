@@ -8,15 +8,19 @@ every step here. Facts about the harness itself live in
 
 ## Scripted path
 
-Sections 1 through 7 are automated by `test/cluster/full-run.sh`. After section 0, run:
+Sections 1 through 7 are automated by `test/cluster/full-run.sh`, in phases. After section 0, run:
 
 ```sh
-CONFIRM=yes KUBECONFIG=/path/to/disposable.kubeconfig bash test/cluster/full-run.sh
+CONFIRM=yes KUBECONFIG=/path/to/disposable.kubeconfig bash test/cluster/full-run.sh build    # sections 1-4
+CONFIRM=yes KUBECONFIG=/path/to/disposable.kubeconfig bash test/cluster/full-run.sh run      # sections 5-7
+CONFIRM=yes KUBECONFIG=/path/to/disposable.kubeconfig bash test/cluster/full-run.sh          # both
 ```
 
-It stops at the first failed phase, writes everything to `evidence/<UTC-date>-wao-poc/`, and ends
-with a `REPORT.md` skeleton and the suggested commit command. The sections below explain what it
-does and what to do when a phase fails. Section 0 and section 8 remain the agent's job.
+`full-run.sh install` runs only cases 00 to 02 and leaves WAO installed for manual work; clean up
+with `bash test/cluster/run-all.sh 18`. Each phase stops at its first failure and writes everything
+to `evidence/<UTC-date>-wao-poc/`; `run` ends with a `REPORT.md` skeleton, `build` with the
+suggested commit command. The sections below explain what the phases do and what to do when one
+fails. Section 0 and section 8 remain the agent's job.
 
 ## 0. Before touching any cluster
 

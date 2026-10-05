@@ -51,7 +51,7 @@ component starts **Disabled**. See [docs/design-brief.md](docs/design-brief.md).
 | `hack/check-bundle.py` | Checks the generated bundle against the POC contract and `release-set.yaml` |
 | `hack/configmap-catalog.py` | Renders the POC ConfigMap-backed CatalogSource from `bundle/` |
 | `bundle/` | The generated OLM bundle (one CSV, thirteen CRDs) |
-| `test/cluster/` | Live-cluster install verification harness, see its [README](test/cluster/README.md) |
+| `test/cluster/` | Live-cluster harness: `full-run.sh` (build, install, run) and the per-case scripts, see its [README](test/cluster/README.md) |
 | `AGENTS.md` | Instructions for coding agents working in this repository |
 
 ## Toolchain
@@ -144,9 +144,37 @@ The committed bundle currently references
 `openshift-marketplace` (design brief D6). It is for the POC install case only. The
 upgrade case needs an FBC catalog image (`make catalog-build catalog-push`).
 
-## Install
+## Run the POC on a cluster
 
-On a disposable cluster with no medik8s operators or CRDs installed:
+`test/cluster/full-run.sh` runs the POC on a **disposable** OpenShift cluster with classic OLM
+that you are authorized to modify. Pass the kubeconfig explicitly; the current context is never
+used. Without `CONFIRM=yes` it shows the cluster and asks before changing anything.
+
+```sh
+export KUBECONFIG=/path/to/disposable.kubeconfig
+bash test/cluster/full-run.sh build      # build the WAO image on the cluster, point the bundle at it, render the catalog
+bash test/cluster/full-run.sh install    # install WAO through OLM; leaves it installed, every component Disabled
+bash test/cluster/full-run.sh run        # the full verification, WAO-INST-00..18, ending with uninstall and a report
+bash test/cluster/full-run.sh            # build, then run
+```
+
+| Phase | What it does | Mutates |
+| --- | --- | --- |
+| `build` | Workstation checks (`make bundles operand-manifests-check test test-offline`), read-only preflight, on-cluster image build from `git archive HEAD` into `wao-poc-build`, `make bundle` pointed at the new digest, `make catalog-configmap` | namespace `wao-poc-build`; tracked files `README.md`, the bundle CSV and `config/manager/kustomization.yaml` (review and commit them) |
+| `install` | Cases 00–02: catalog, OLM install, InstallPlan approval. Prints the CSV and component phases and the `oc patch` to enable a component | CatalogSource in `openshift-marketplace`; namespace `openshift-workload-availability` |
+| `run` | Cases 00–18: install, enable all six components, parity, restart, drift, disable, delete config, uninstall. Writes `REPORT.md` beside `results.json` | everything above, then removes it; case 06 starts SNR agents on every node |
+
+`install` and `run` need a prior `build` on that cluster (the image in its internal registry and
+`dist/wao-poc-catalog.yaml`). After `install`, continue with single cases such as
+`bash test/cluster/run-all.sh 05` and clean up with `bash test/cluster/run-all.sh 18`.
+Options: `SKIP_BUILD=1` reuses the image already on the cluster, `SKIP_PREREQS=1` skips the
+workstation checks, `ALLOW_DIRTY=1` permits uncommitted changes. Raw output goes only to the
+git-ignored `evidence/`. See [test/cluster/README.md](test/cluster/README.md) and
+[docs/agent-test-run.md](docs/agent-test-run.md).
+
+## Install by hand
+
+What `full-run.sh install` does, on a disposable cluster with no medik8s operators or CRDs installed:
 
 1. `oc apply -f dist/wao-poc-catalog.yaml` and wait for the CatalogSource to be `READY`.
 2. Create the namespace `openshift-workload-availability` with the annotation

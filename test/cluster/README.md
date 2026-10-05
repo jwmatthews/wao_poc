@@ -63,21 +63,28 @@ for inspection, then run `run-all.sh 18` later). Running a subset keeps earlier 
 
 Cleanup keeps the image build namespace `wao-poc-build` on purpose and reports it as a `LEFTOVER`.
 
-## Full run on a new cluster
+## full-run.sh: build, install, run
 
-`full-run.sh` does everything above end to end on a cluster that has never had WAO built on it:
-confirm the cluster, workstation checks, preflight with the image check skipped
-(`SKIP_IMAGE_CHECK=1`), on-cluster image build from `git archive HEAD` into `wao-poc-build`,
-`make bundle` pointed at the new digest (it also updates the digest quoted in `README.md`),
-`make catalog-configmap`, `run-all.sh`, then a `REPORT.md` skeleton beside `results.json` with a
-sanitization grep. It never commits or pushes. See [docs/agent-test-run.md](../../docs/agent-test-run.md).
+`full-run.sh [build|install|run|all]` wraps the cases for a cluster that has never had WAO built on it.
+Every phase confirms the cluster first (`CONFIRM=yes` skips the prompt) and logs to `RUN_DIR/full-run.log`.
+
+- `build`: workstation checks, preflight with the image check skipped (`SKIP_IMAGE_CHECK=1`), on-cluster
+  image build from `git archive HEAD` into `wao-poc-build`, `make bundle` pointed at the new digest (it
+  also updates the digest quoted in `README.md`), a guard that only those three tracked files changed,
+  `make catalog-configmap`.
+- `install`: `run-all.sh 00 01 02`. Leaves WAO installed with every component Disabled and prints the
+  next commands. Clean up with `run-all.sh 18`.
+- `run`: `run-all.sh` (00..18), then a `REPORT.md` skeleton beside `results.json` with a sanitization grep.
+- `all` (default): `build` then `run`.
 
 ```sh
-CONFIRM=yes KUBECONFIG=/path/to/disposable.kubeconfig bash test/cluster/full-run.sh
+CONFIRM=yes KUBECONFIG=/path/to/disposable.kubeconfig bash test/cluster/full-run.sh build
+CONFIRM=yes KUBECONFIG=/path/to/disposable.kubeconfig bash test/cluster/full-run.sh install
 ```
 
 Options: `SKIP_PREREQS=1`, `SKIP_BUILD=1` (reuse `istag wao:latest`), `ALLOW_DIRTY=1`, `WAO_VERSION`,
-plus `STOP_ON_FAIL`, `SKIP_CLEANUP` and `RUN_DIR` from `run-all.sh`. Without `CONFIRM=yes` it prompts.
+plus `STOP_ON_FAIL`, `SKIP_CLEANUP` and `RUN_DIR` from `run-all.sh`. It never commits or pushes.
+See [docs/agent-test-run.md](../../docs/agent-test-run.md).
 
 ## Safety
 
