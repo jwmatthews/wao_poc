@@ -1,0 +1,24 @@
+resources:
+# All RBAC will be applied under this service account in
+# the deployment namespace. You may comment out this resource
+# if your manager will use a service account that exists at
+# runtime. Be sure to update RoleBinding and ClusterRoleBinding
+# subjects if changing service account names.
+- service_account.yaml
+- role.yaml
+- role_binding.yaml
+# Union of every rule in the component RBAC WAO renders, so WAO can create it (design brief D7).
+- operand_union_role.yaml
+- leader_election_role.yaml
+- leader_election_role_binding.yaml
+# The scaffolded metrics authn/authz roles are not used: the POC manager runs with
+# metrics disabled (--metrics-bind-address=0).
+# For each CRD, "Admin", "Editor" and "Viewer" roles are scaffolded by
+# default, aiding admins in cluster management. Those roles are
+# not used by the workload-availability-operator itself. They are left out for the POC:
+# operator-sdk would emit them as standalone bundle objects, which the ConfigMap catalog
+# (design brief D6) cannot carry and hack/check-bundle.py rejects.
+#- workloadavailabilityconfig_admin_role.yaml
+#- workloadavailabilityconfig_editor_role.yaml
+#- workloadavailabilityconfig_viewer_role.yaml
+

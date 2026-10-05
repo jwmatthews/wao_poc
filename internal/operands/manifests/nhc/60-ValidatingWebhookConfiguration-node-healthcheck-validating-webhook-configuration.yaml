@@ -1,0 +1,29 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  annotations:
+    service.beta.openshift.io/inject-cabundle: 'true'
+  name: node-healthcheck-validating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: node-healthcheck-webhook-service
+      namespace: __WAO_NAMESPACE__
+      path: /validate-remediation-medik8s-io-v1alpha1-nodehealthcheck
+      port: 443
+  failurePolicy: Fail
+  name: vnodehealthcheck.kb.io
+  rules:
+  - apiGroups:
+    - remediation.medik8s.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    - DELETE
+    resources:
+    - nodehealthchecks
+  sideEffects: None

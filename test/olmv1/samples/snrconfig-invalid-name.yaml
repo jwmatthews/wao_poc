@@ -1,0 +1,12 @@
+# exp0001: second config with a non-canonical name (shape of wao_poc test/cluster/06-enable-snr.sh:35-44).
+# CREATE only: validateSingleton runs in ValidateCreate (selfnoderemediationconfig_webhook.go:90) but
+# not in ValidateUpdate (:101-105).
+#   selfnoderemediationconfig_webhook.go:295-296
+#   "to enforce only one SelfNodeRemediationConfig in the cluster, a name other than
+#    self-node-remediation-config is not allowed"
+apiVersion: self-node-remediation.medik8s.io/v1alpha1
+kind: SelfNodeRemediationConfig
+metadata:
+  name: exp0001-second-config
+  namespace: openshift-workload-availability
+spec: {}

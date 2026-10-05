@@ -1,0 +1,468 @@
+# exp0001 admission-webhook expectation matrix.
+# One row per (operator, crd, verb, sample). All commands are run with --dry-run=server and never
+# persist anything. See README.md for derivation and caveats.
+#
+# Fields
+#   expected            admit | reject | skip  (skip = precondition cannot be met under the experiment's
+#                       no-real-object policy; row kept for completeness)
+#   expected_substring  must appear in stderr when expected=reject; for admit rows an optional signal
+#   webhook             webhook that handles the request (name from the CSV webhookdefinitions);
+#                       "none" = no webhook registered for this resource/verb on the target cluster
+#   failure_policy      the webhook's failurePolicy (what happens if the webhook server is unreachable)
+#   precondition        what must be true before the command is meaningful
+#
+# Verb commands (NS=openshift-workload-availability; cluster-scoped kinds ignore -n):
+#   create: oc create --dry-run=server -f <sample>
+#   update: oc apply  --dry-run=server -f <sample>     # object MUST already exist; apply on a missing
+#                                                      # object becomes CREATE. Do not use `oc replace`
+#                                                      # for CRs without resourceVersion (storage rejects
+#                                                      # before admission: "must be specified for an update").
+#   delete: oc delete --dry-run=server -f <sample>     # object MUST already exist
+# A webhook rejection is always of the form:
+#   admission webhook "<webhook>" denied the request: <expected_substring>
+
+namespace: openshift-workload-availability
+rows:
+
+# ---------------------------------------------------------------- NHC
+- operator: nhc
+  crd: nodehealthchecks.remediation.medik8s.io
+  verb: create
+  sample: nhc-valid.yaml
+  expected: admit
+  expected_substring: ""
+  webhook: vnodehealthcheck.kb.io
+  failure_policy: Fail
+  precondition: NHC manager running; cluster topology is HA/SNO/Arbiter/External (nodehealthcheck_webhook.go:115-120)
+  notes: selector matches no node so the object is inert even if created for real.
+- operator: nhc
+  crd: nodehealthchecks.remediation.medik8s.io
+  verb: create
+  sample: nhc-invalid.yaml
+  expected: reject
+  expected_substring: "minHealthy and maxUnhealthy cannot be specified at the same time"
+  webhook: vnodehealthcheck.kb.io
+  failure_policy: Fail
+  precondition: NHC manager running
+  notes: api/v1alpha1/validation.go:34; no CRD/CEL rule covers this (proven in wao_poc 05-enable-nhc.sh).
+- operator: nhc
+  crd: nodehealthchecks.remediation.medik8s.io
+  verb: update
+  sample: nhc-valid.yaml
+  expected: admit
+  expected_substring: ""
+  webhook: vnodehealthcheck.kb.io
+  failure_policy: Fail
+  precondition: exp0001-nhc exists (create nhc-valid.yaml for real; inert)
+  notes: ValidateUpdate re-runs validate() (nodehealthcheck_webhook.go:74-89); not remediating so no restricted-field check.
+- operator: nhc
+  crd: nodehealthchecks.remediation.medik8s.io
+  verb: update
+  sample: nhc-invalid.yaml
+  expected: reject
+  expected_substring: "minHealthy and maxUnhealthy cannot be specified at the same time"
+  webhook: vnodehealthcheck.kb.io
+  failure_policy: Fail
+  precondition: exp0001-nhc exists
+  notes: apply merges maxUnhealthy onto the existing minHealthy -> both set -> validation.go:34.
+- operator: nhc
+  crd: nodehealthchecks.remediation.medik8s.io
+  verb: delete
+  sample: nhc-valid.yaml
+  expected: admit
+  expected_substring: ""
+  webhook: vnodehealthcheck.kb.io
+  failure_policy: Fail
+  precondition: exp0001-nhc exists
+  notes: ValidateDelete only rejects while remediating (nodehealthcheck_webhook.go:92-98, "deletion prohibited due to running remediation"); exp0001-nhc never remediates.
+
+# ---------------------------------------------------------------- SNR config
+- operator: snr
+  crd: selfnoderemediationconfigs.self-node-remediation.medik8s.io
+  verb: create
+  sample: snrconfig-valid.yaml
+  expected: admit
+  expected_substring: ""
+  webhook: vselfnoderemediationconfig.kb.io
+  failure_policy: Fail
+  precondition: SNR manager running with DEPLOYMENT_NAMESPACE=openshift-workload-availability (CSV env fieldRef)
+  notes: >-
+    SNR auto-creates self-node-remediation-config, so after the webhook ADMITS, storage returns
+    `AlreadyExists` (409). Treat `selfnoderemediationconfigs.self-node-remediation.medik8s.io
+    "self-node-remediation-config" already exists` as admit-by-webhook; a webhook denial would instead
+    read `admission webhook "vselfnoderemediationconfig.kb.io" denied the request`. If the default config
+    is absent (manager never ran), the dry-run create succeeds outright.
+- operator: snr
+  crd: selfnoderemediationconfigs.self-node-remediation.medik8s.io
+  verb: create
+  sample: snrconfig-invalid.yaml
+  expected: reject
+  expected_substring: "ApiServerTimeout cannot be less than 10ms"
+  webhook: vselfnoderemediationconfig.kb.io
+  failure_policy: Fail
+  precondition: SNR manager running
+  notes: selfnoderemediationconfig_webhook.go:48,152. Admission runs before the storage AlreadyExists check, so the webhook denial is what you see.
+- operator: snr
+  crd: selfnoderemediationconfigs.self-node-remediation.medik8s.io
+  verb: create
+  sample: snrconfig-invalid-name.yaml
+  expected: reject
+  expected_substring: "a name other than self-node-remediation-config is not allowed"
+  webhook: vselfnoderemediationconfig.kb.io
+  failure_policy: Fail
+  precondition: SNR manager running
+  notes: selfnoderemediationconfig_webhook.go:295-296 validateSingleton (create only). Shape of wao_poc 06-enable-snr.sh:35-44.
+- operator: snr
+  crd: selfnoderemediationconfigs.self-node-remediation.medik8s.io
+  verb: update
+  sample: snrconfig-valid.yaml
+  expected: admit
+  expected_substring: ""
+  webhook: vselfnoderemediationconfig.kb.io
+  failure_policy: Fail
+  precondition: default config self-node-remediation-config exists in the namespace (created by SNR)
+  notes: Values equal CRD defaults; a dry-run apply changes nothing. May warn "PeerRequestTimeout ..." only if values violate the 2s buffer (they do not; 7s >= 5s+2s).
+- operator: snr
+  crd: selfnoderemediationconfigs.self-node-remediation.medik8s.io
+  verb: update
+  sample: snrconfig-invalid.yaml
+  expected: reject
+  expected_substring: "ApiServerTimeout cannot be less than 10ms"
+  webhook: vselfnoderemediationconfig.kb.io
+  failure_policy: Fail
+  precondition: default config exists
+  notes: ValidateUpdate runs validateTimes (selfnoderemediationconfig_webhook.go:96-106). No PeerRequestTimeout warning is expected (the merged peerRequestTimeout 7s >= 1ms + 2s buffer).
+- operator: snr
+  crd: selfnoderemediationconfigs.self-node-remediation.medik8s.io
+  verb: delete
+  sample: snrconfig-valid.yaml
+  expected: admit
+  expected_substring: "The default configuration is deleted, Self Node Remediation is now disabled"
+  webhook: vselfnoderemediationconfig.kb.io
+  failure_policy: Fail
+  precondition: default config exists
+  notes: >-
+    Admitted WITH an admission warning (selfnoderemediationconfig_webhook.go:109-120); oc prints it as
+    `Warning: The default configuration is deleted, ...`. The warning is the positive proof the DELETE
+    webhook answered. Dry-run, nothing is deleted. The only operator registering DELETE besides NHC.
+
+# ---------------------------------------------------------------- SNR template
+- operator: snr
+  crd: selfnoderemediationtemplates.self-node-remediation.medik8s.io
+  verb: create
+  sample: snrtemplate-valid.yaml
+  expected: admit
+  expected_substring: "remediation.medik8s.io/multiple-templates-support: \"true\""
+  webhook: mselfnoderemediationtemplate.kb.io, vselfnoderemediationtemplate.kb.io
+  failure_policy: Fail
+  precondition: SNR manager running
+  notes: >-
+    Run with `-o yaml`; the annotation added by the mutating webhook
+    (selfnoderemediationtemplate_webhook.go:52-60) is the proof both webhooks answered (wao_poc
+    06-enable-snr.sh:58-59 uses the same signal).
+- operator: snr
+  crd: selfnoderemediationtemplates.self-node-remediation.medik8s.io
+  verb: create
+  sample: snrtemplate-invalid.yaml
+  expected: admit
+  expected_substring: ""
+  webhook: mselfnoderemediationtemplate.kb.io, vselfnoderemediationtemplate.kb.io
+  failure_policy: Fail
+  precondition: SNR manager running; k8s >= 1.26 (any supported OCP)
+  notes: >-
+    NO constructible webhook-level rejection: validateStrategy (selfnoderemediationtemplate_webhook.go:88-93)
+    only rejects OutOfServiceTaint on k8s < 1.26 ("OutOfServiceTaint remediation strategy is not supported
+    at kubernetes version lower than 1.26, please use a different remediation strategy"); any other
+    strategy string is a CRD enum error. Use the mutating annotation as the signal instead.
+- operator: snr
+  crd: selfnoderemediationtemplates.self-node-remediation.medik8s.io
+  verb: update
+  sample: snrtemplate-valid.yaml
+  expected: admit
+  expected_substring: "remediation.medik8s.io/multiple-templates-support: \"true\""
+  webhook: mselfnoderemediationtemplate.kb.io, vselfnoderemediationtemplate.kb.io
+  failure_policy: Fail
+  precondition: exp0001-snr-template exists (create for real; templates are inert)
+  notes: Mutating webhook also runs on UPDATE (CSV rules CREATE/UPDATE).
+- operator: snr
+  crd: selfnoderemediationtemplates.self-node-remediation.medik8s.io
+  verb: update
+  sample: snrtemplate-invalid.yaml
+  expected: admit
+  expected_substring: ""
+  webhook: mselfnoderemediationtemplate.kb.io, vselfnoderemediationtemplate.kb.io
+  failure_policy: Fail
+  precondition: exp0001-snr-template exists
+  notes: Same version gate as the create row; admitted on the target cluster.
+
+# ---------------------------------------------------------------- SNR CR
+- operator: snr
+  crd: selfnoderemediations.self-node-remediation.medik8s.io
+  verb: create
+  sample: snr-valid.yaml
+  expected: admit
+  expected_substring: ""
+  webhook: vselfnoderemediation.kb.io
+  failure_policy: Ignore
+  precondition: SNR manager running
+  notes: >-
+    failurePolicy Ignore: an unreachable webhook ALSO admits, so admission alone proves nothing. Evidence
+    the webhook answered is the manager log: logger "selfnoderemediation-resource" msg "validate create"
+    name "exp0001-no-such-node" (selfnoderemediation_webhook.go:30,47). DRY-RUN ONLY.
+- operator: snr
+  crd: selfnoderemediations.self-node-remediation.medik8s.io
+  verb: create
+  sample: snr-invalid.yaml
+  expected: admit
+  expected_substring: ""
+  webhook: vselfnoderemediation.kb.io
+  failure_policy: Ignore
+  precondition: SNR manager running; k8s >= 1.26
+  notes: NO constructible rejection (same version-gated validateStrategy). Check the manager log line as above.
+- operator: snr
+  crd: selfnoderemediations.self-node-remediation.medik8s.io
+  verb: update
+  sample: snr-valid.yaml
+  expected: skip
+  expected_substring: ""
+  webhook: vselfnoderemediation.kb.io
+  failure_policy: Ignore
+  precondition: UNMET -- a SelfNodeRemediation must exist for an UPDATE, and these are dry-run only by policy
+  notes: Would be admit; no rejection path exists anyway.
+- operator: snr
+  crd: selfnoderemediations.self-node-remediation.medik8s.io
+  verb: update
+  sample: snr-invalid.yaml
+  expected: skip
+  expected_substring: ""
+  webhook: vselfnoderemediation.kb.io
+  failure_policy: Ignore
+  precondition: UNMET -- dry-run only by policy
+  notes: Would be admit (version gate).
+
+# ---------------------------------------------------------------- FAR template
+- operator: far
+  crd: fenceagentsremediationtemplates.fence-agents-remediation.medik8s.io
+  verb: create
+  sample: fartemplate-valid.yaml
+  expected: admit
+  expected_substring: "remediation.medik8s.io/multiple-templates-support: \"true\""
+  webhook: mfenceagentsremediationtemplate.kb.io, vfenceagentsremediationtemplate.kb.io
+  failure_policy: Fail
+  precondition: FAR manager running and able to GET Secrets in the namespace (mutating webhook looks up fence-agents-credentials-shared, fenceagentsremediationtemplate_webhook.go:99-126)
+  notes: Run with `-o yaml` and check the annotation (wao_poc 08-enable-far.sh:49-50). If a Secret named fence-agents-credentials-shared exists, spec.template.spec.sharedSecretName is also defaulted to it.
+- operator: far
+  crd: fenceagentsremediationtemplates.fence-agents-remediation.medik8s.io
+  verb: create
+  sample: fartemplate-invalid.yaml
+  expected: reject
+  expected_substring: "unsupported fence agent: fence_exp0001_does_not_exist"
+  webhook: vfenceagentsremediationtemplate.kb.io
+  failure_policy: Fail
+  precondition: FAR manager running
+  notes: fenceagentsremediation_params.go:163 (os.Stat of the agent binary in the manager image). Proven shape in wao_poc 08-enable-far.sh:47-48.
+- operator: far
+  crd: fenceagentsremediationtemplates.fence-agents-remediation.medik8s.io
+  verb: update
+  sample: fartemplate-valid.yaml
+  expected: admit
+  expected_substring: "remediation.medik8s.io/multiple-templates-support: \"true\""
+  webhook: mfenceagentsremediationtemplate.kb.io, vfenceagentsremediationtemplate.kb.io
+  failure_policy: Fail
+  precondition: exp0001-far-template exists (create for real; templates are inert)
+  notes: ValidateUpdate = validateSpec + shared-secret-default-name check (params.go:108-115); the latter is a no-op because the old object has no sharedSecretName.
+- operator: far
+  crd: fenceagentsremediationtemplates.fence-agents-remediation.medik8s.io
+  verb: update
+  sample: fartemplate-invalid.yaml
+  expected: reject
+  expected_substring: "unsupported fence agent: fence_exp0001_does_not_exist"
+  webhook: vfenceagentsremediationtemplate.kb.io
+  failure_policy: Fail
+  precondition: exp0001-far-template exists
+  notes: params.go:108-115 -> validateSpec -> validateAgentName :163.
+
+# ---------------------------------------------------------------- FAR CR
+- operator: far
+  crd: fenceagentsremediations.fence-agents-remediation.medik8s.io
+  verb: create
+  sample: far-valid.yaml
+  expected: admit
+  expected_substring: ""
+  webhook: mfenceagentsremediation.kb.io, vfenceagentsremediation.kb.io
+  failure_policy: Fail
+  precondition: FAR manager running
+  notes: DRY-RUN ONLY; node exp0001-no-such-node does not exist. Validator finds --ipport for the node named in nodeparameters (params.go:191-232).
+- operator: far
+  crd: fenceagentsremediations.fence-agents-remediation.medik8s.io
+  verb: create
+  sample: far-invalid.yaml
+  expected: reject
+  expected_substring: "FAR doesn't support any other action than `reboot` or `off`"
+  webhook: vfenceagentsremediation.kb.io
+  failure_policy: Fail
+  precondition: FAR manager running
+  notes: params.go:48 ErrorUnsupportedAction, raised at :319-328 via validateFenceAgentParams :257. DRY-RUN ONLY.
+- operator: far
+  crd: fenceagentsremediations.fence-agents-remediation.medik8s.io
+  verb: update
+  sample: far-valid.yaml
+  expected: skip
+  expected_substring: ""
+  webhook: mfenceagentsremediation.kb.io, vfenceagentsremediation.kb.io
+  failure_policy: Fail
+  precondition: UNMET -- a FenceAgentsRemediation must exist for an UPDATE; dry-run only by policy
+  notes: Would be admit (ValidateUpdate = validateSpec, params.go:87-89).
+- operator: far
+  crd: fenceagentsremediations.fence-agents-remediation.medik8s.io
+  verb: update
+  sample: far-invalid.yaml
+  expected: skip
+  expected_substring: "FAR doesn't support any other action than `reboot` or `off`"
+  webhook: vfenceagentsremediation.kb.io
+  failure_policy: Fail
+  precondition: UNMET -- dry-run only by policy
+  notes: Would be reject with the listed substring.
+
+# ---------------------------------------------------------------- NMO
+- operator: nmo
+  crd: nodemaintenances.nodemaintenance.medik8s.io
+  verb: create
+  sample: nm-valid.yaml
+  expected: reject
+  expected_substring: "invalid nodeName, no node with name exp0001-no-such-node found"
+  webhook: vnodemaintenance.kb.io
+  failure_policy: Fail
+  precondition: NMO manager running
+  notes: >-
+    By design the "valid" sample is REJECTED: the webhook's first check is node existence
+    (nodemaintenance_webhook.go:78-83,116-123, const :38). A real node name is forbidden, so this
+    rejection string is the proof the webhook answered (same probe as wao_poc 10-enable-nmo.sh:20-30).
+    A true admit for NMO is not constructible without naming a real node.
+- operator: nmo
+  crd: nodemaintenances.nodemaintenance.medik8s.io
+  verb: create
+  sample: nm-invalid.yaml
+  expected: reject
+  expected_substring: "invalid nodeName, no node with name exp0001-no-such-node-invalid found"
+  webhook: vnodemaintenance.kb.io
+  failure_policy: Fail
+  precondition: NMO manager running
+  notes: Same check as nm-valid; the duplicate-NM (:125-138) and etcd-quorum (:140-167) checks need a real node.
+- operator: nmo
+  crd: nodemaintenances.nodemaintenance.medik8s.io
+  verb: update
+  sample: nm-valid.yaml
+  expected: skip
+  expected_substring: ""
+  webhook: vnodemaintenance.kb.io
+  failure_policy: Fail
+  precondition: UNMET -- a NodeMaintenance can only exist for a real node (the webhook blocks fake ones); forbidden
+  notes: ValidateUpdate only rejects nodeName changes ("updating spec.NodeName isn't allowed", :41,:103-106).
+- operator: nmo
+  crd: nodemaintenances.nodemaintenance.medik8s.io
+  verb: update
+  sample: nm-invalid.yaml
+  expected: skip
+  expected_substring: "updating spec.NodeName isn't allowed"
+  webhook: vnodemaintenance.kb.io
+  failure_policy: Fail
+  precondition: UNMET -- see above
+  notes: Would be reject (nodeName differs from nm-valid) if an exp0001-nm object could exist.
+
+# ---------------------------------------------------------------- MDR (control: no webhook)
+- operator: mdr
+  crd: machinedeletionremediations.machine-deletion-remediation.medik8s.io
+  verb: create
+  sample: mdr-valid.yaml
+  expected: admit
+  expected_substring: ""
+  webhook: none
+  failure_policy: n/a
+  precondition: MDR CRD installed
+  notes: CONTROL. DRY-RUN ONLY. Admitted regardless of whether the MDR manager is running.
+- operator: mdr
+  crd: machinedeletionremediations.machine-deletion-remediation.medik8s.io
+  verb: create
+  sample: mdr-invalid.yaml
+  expected: reject
+  expected_substring: "unknown field \"spec.exp0001UnknownField\""
+  webhook: none
+  failure_policy: n/a
+  precondition: MDR CRD installed; oc default --validate=strict (server-side field validation)
+  notes: CONTROL. Rejection comes from the API server, NOT an `admission webhook ... denied` message. With --validate=ignore the field is pruned and the request is admitted.
+- operator: mdr
+  crd: machinedeletionremediations.machine-deletion-remediation.medik8s.io
+  verb: update
+  sample: mdr-valid.yaml
+  expected: skip
+  expected_substring: ""
+  webhook: none
+  failure_policy: n/a
+  precondition: UNMET -- dry-run only by policy (a real MDR CR would be reconciled)
+  notes: CONTROL.
+- operator: mdr
+  crd: machinedeletionremediationtemplates.machine-deletion-remediation.medik8s.io
+  verb: create
+  sample: mdrtemplate-valid.yaml
+  expected: admit
+  expected_substring: ""
+  webhook: none
+  failure_policy: n/a
+  precondition: MDR CRD installed
+  notes: CONTROL. Templates are inert; may be created for real.
+- operator: mdr
+  crd: machinedeletionremediationtemplates.machine-deletion-remediation.medik8s.io
+  verb: create
+  sample: mdrtemplate-invalid.yaml
+  expected: reject
+  expected_substring: "spec.template: Required value"
+  webhook: none
+  failure_policy: n/a
+  precondition: MDR CRD installed
+  notes: "CONTROL. CRD schema `required: [template]` (bundle CRD :57-58), API server error, no webhook."
+- operator: mdr
+  crd: machinedeletionremediationtemplates.machine-deletion-remediation.medik8s.io
+  verb: update
+  sample: mdrtemplate-valid.yaml
+  expected: admit
+  expected_substring: ""
+  webhook: none
+  failure_policy: n/a
+  precondition: exp0001-mdr-template exists (create for real; inert)
+  notes: CONTROL.
+
+# ---------------------------------------------------------------- SBR config (control: webhook disabled in bundle)
+- operator: sbr
+  crd: storagebasedremediationconfigs.storage-based-remediation.medik8s.io
+  verb: create
+  sample: sbrconfig-valid.yaml
+  expected: admit
+  expected_substring: ""
+  webhook: none
+  failure_policy: n/a
+  precondition: SBR CRD installed
+  notes: CONTROL. DRY-RUN ONLY, NEVER create for real. Bundle passes --enable-webhooks=false (CSV :330); no ValidatingWebhookConfiguration for SBR should exist (wao_poc 07-enable-sbr.sh:31-34 observed admit).
+- operator: sbr
+  crd: storagebasedremediationconfigs.storage-based-remediation.medik8s.io
+  verb: create
+  sample: sbrconfig-invalid.yaml
+  expected: admit
+  expected_substring: ""
+  webhook: none
+  failure_policy: n/a
+  precondition: SBR CRD installed; shipped bundle (webhooks disabled)
+  notes: >-
+    CONTROL. Would be rejected with "shared storage class name must contain only lowercase letters,
+    numbers, hyphens, and dots" (storagebasedremediationconfig_types.go:295 via _webhook.go:42) ONLY if
+    someone enabled the webhook; on the shipped bundle it is admitted, which proves the webhook is absent.
+- operator: sbr
+  crd: storagebasedremediationconfigs.storage-based-remediation.medik8s.io
+  verb: update
+  sample: sbrconfig-valid.yaml
+  expected: skip
+  expected_substring: ""
+  webhook: none
+  failure_policy: n/a
+  precondition: UNMET -- never create a StorageBasedRemediationConfig for real
+  notes: CONTROL.

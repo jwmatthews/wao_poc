@@ -1,0 +1,10 @@
+# exp0001 CONTROL: no webhook can reject this; the rejection (if any) comes from API server strict
+# field validation ("unknown field"), i.e. NOT an `admission webhook ... denied the request` error.
+# Use it to confirm the error-source fingerprint differs from a webhook rejection.
+apiVersion: machine-deletion-remediation.medik8s.io/v1alpha1
+kind: MachineDeletionRemediation
+metadata:
+  name: exp0001-no-such-node
+  namespace: openshift-workload-availability
+spec:
+  exp0001UnknownField: true

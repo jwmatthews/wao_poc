@@ -1,0 +1,13 @@
+# More info: https://docs.docker.com/engine/reference/builder/#dockerignore-file
+# Ignore build and test binaries.
+bin/
+# Keep local state and anything cluster-identifying out of the build context.
+.cache/
+evidence/
+.venv/
+dist/
+__pycache__/
+*.kubeconfig
+kubeconfig*
+DISPOSABLE_OPENSHIFT_CLUSTERS.md
+.env

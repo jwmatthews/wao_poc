@@ -1,0 +1,14 @@
+# exp0001: NodeMaintenance for a node that does not exist. DRY-RUN ONLY. NEVER name a real node.
+# Schema-valid, but vnodemaintenance.kb.io REJECTS it by design: ValidateCreate first checks the node
+# exists (node-maintenance-operator/internal/webhook/v1beta1/nodemaintenance_webhook.go:78-83,116-123):
+#   :38  errorNodeNotExists = "invalid nodeName, no node with name %s found"
+#   => "invalid nodeName, no node with name exp0001-no-such-node found"
+# That rejection string IS the proof the webhook server answered (same probe as wao_poc
+# test/cluster/10-enable-nmo.sh:20-30).
+apiVersion: nodemaintenance.medik8s.io/v1beta1
+kind: NodeMaintenance
+metadata:
+  name: exp0001-nm
+spec:
+  nodeName: exp0001-no-such-node
+  reason: exp0001 admission probe (dry-run only)

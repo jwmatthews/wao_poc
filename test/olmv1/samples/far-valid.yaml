@@ -1,0 +1,20 @@
+# exp0001: FenceAgentsRemediation for a node that does not exist. DRY-RUN ONLY (--dry-run=server).
+# The node name is metadata.name (params.go:359-368 GetNodeName); the validator builds parameters for
+# every node named in nodeparameters/nodeSecretNames (params.go:191-232, 234-246) and finds --ipport
+# for exp0001-no-such-node, so vfenceagentsremediation.kb.io admits. No secrets are referenced, so
+# collectAllSecretParams (:371-411) makes no Secret lookups.
+apiVersion: fence-agents-remediation.medik8s.io/v1alpha1
+kind: FenceAgentsRemediation
+metadata:
+  name: exp0001-no-such-node
+  namespace: openshift-workload-availability
+spec:
+  agent: fence_ipmilan
+  remediationStrategy: ResourceDeletion
+  sharedparameters:
+    --ip: "192.0.2.1"
+    --lanplus: ""
+    --action: reboot
+  nodeparameters:
+    --ipport:
+      exp0001-no-such-node: "6230"

@@ -1,0 +1,28 @@
+# This kustomization.yaml is not intended to be run by itself,
+# since it depends on service name and namespace that are out of this kustomize package.
+# It should be run by config/default
+resources:
+- bases/workloadavailability.medik8s.io_workloadavailabilityconfigs.yaml
+- bases/remediation.medik8s.io_nodehealthchecks.yaml
+- bases/self-node-remediation.medik8s.io_selfnoderemediationconfigs.yaml
+- bases/self-node-remediation.medik8s.io_selfnoderemediations.yaml
+- bases/self-node-remediation.medik8s.io_selfnoderemediationtemplates.yaml
+- bases/storage-based-remediation.medik8s.io_storagebasedremediationconfigs.yaml
+- bases/storage-based-remediation.medik8s.io_storagebasedremediations.yaml
+- bases/storage-based-remediation.medik8s.io_storagebasedremediationtemplates.yaml
+- bases/fence-agents-remediation.medik8s.io_fenceagentsremediations.yaml
+- bases/fence-agents-remediation.medik8s.io_fenceagentsremediationtemplates.yaml
+- bases/machine-deletion-remediation.medik8s.io_machinedeletionremediations.yaml
+- bases/machine-deletion-remediation.medik8s.io_machinedeletionremediationtemplates.yaml
+- bases/nodemaintenance.medik8s.io_nodemaintenances.yaml
+# +kubebuilder:scaffold:crdkustomizeresource
+
+patches:
+# [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix.
+# patches here are for enabling the conversion webhook for each CRD
+# +kubebuilder:scaffold:crdkustomizewebhookpatch
+
+# [WEBHOOK] To enable webhook, uncomment the following section
+# the following config is for teaching kustomize how to do kustomization for CRDs.
+#configurations:
+#- kustomizeconfig.yaml

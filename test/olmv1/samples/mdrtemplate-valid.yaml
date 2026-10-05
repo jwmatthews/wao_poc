@@ -1,0 +1,10 @@
+# exp0001 CONTROL: MachineDeletionRemediationTemplate (no webhook). Templates are inert.
+# CRD requires spec.template.spec (bundle CRD machinedeletionremediationtemplates.yaml:54-58).
+apiVersion: machine-deletion-remediation.medik8s.io/v1alpha1
+kind: MachineDeletionRemediationTemplate
+metadata:
+  name: exp0001-mdr-template
+  namespace: openshift-workload-availability
+spec:
+  template:
+    spec: {}

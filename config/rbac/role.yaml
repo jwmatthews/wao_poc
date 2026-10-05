@@ -1,0 +1,152 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - serviceaccounts
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - mutatingwebhookconfigurations
+  - validatingwebhookconfigurations
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - fence-agents-remediation.medik8s.io
+  resources:
+  - fenceagentsremediations
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - machine-deletion-remediation.medik8s.io
+  resources:
+  - machinedeletionremediations
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - nodemaintenance.medik8s.io
+  resources:
+  - nodemaintenances
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterrolebindings
+  - clusterroles
+  - rolebindings
+  - roles
+  verbs:
+  - bind
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - remediation.medik8s.io
+  resources:
+  - nodehealthchecks
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - self-node-remediation.medik8s.io
+  resources:
+  - selfnoderemediationconfigs
+  - selfnoderemediations
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - storage-based-remediation.medik8s.io
+  resources:
+  - storagebasedremediationconfigs
+  - storagebasedremediations
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - workloadavailability.medik8s.io
+  resources:
+  - workloadavailabilityconfigs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - workloadavailability.medik8s.io
+  resources:
+  - workloadavailabilityconfigs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - workloadavailability.medik8s.io
+  resources:
+  - workloadavailabilityconfigs/status
+  verbs:
+  - get
+  - patch
+  - update

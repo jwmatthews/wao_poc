@@ -1,0 +1,12 @@
+apiVersion: workloadavailability.medik8s.io/v1alpha1
+kind: WorkloadAvailabilityConfig
+metadata:
+  name: cluster
+spec:
+  components:
+    nodeHealthCheck:
+      state: Disabled
+    selfNodeRemediation:
+      state: Disabled
+    storageBasedRemediation:
+      state: Disabled

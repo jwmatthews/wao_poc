@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sbr-operator-controller-manager
+  namespace: __WAO_NAMESPACE__
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: sbr-operator-controller-manager
+subjects:
+- kind: ServiceAccount
+  name: sbr-operator-controller-manager
+  namespace: __WAO_NAMESPACE__

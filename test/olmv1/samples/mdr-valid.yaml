@@ -1,0 +1,9 @@
+# exp0001 CONTROL: MDR ships no admission webhook (CSV has no spec.webhookdefinitions; no
+# config/webhook/). DRY-RUN ONLY. metadata.name is the node name; exp0001-no-such-node has no Machine.
+# Spec is empty by API (machine-deletion-remediation/api/v1alpha1/machinedeletionremediation_types.go:33-37).
+apiVersion: machine-deletion-remediation.medik8s.io/v1alpha1
+kind: MachineDeletionRemediation
+metadata:
+  name: exp0001-no-such-node
+  namespace: openshift-workload-availability
+spec: {}
