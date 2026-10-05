@@ -32,7 +32,7 @@ component starts **Disabled**. See [docs/design-brief.md](docs/design-brief.md).
 | Design brief | Written |
 | Implementation plan for the install case | Written: [docs/implementation-plan.md](docs/implementation-plan.md) |
 | Implementation | Done: Tasks 1–10 (operator, operand manifests, bundle, image, POC catalog, live-cluster harness, docs) |
-| Live install verification | Run on a disposable OpenShift 4.22 cluster (3 nodes, `HighlyAvailable`): four full runs of 19 cases. Runs found two WAO RBAC bugs, both fixed (see [Deviations from the plan](#deviations-from-the-plan), items 3 and 8). The final run passed 17 of 19: WAO-INST-09 and WAO-INST-12 failed only because the upstream MDR manager could not start under its 30Mi memory limit, which reproduces without WAO (see [Known upstream issues](#known-upstream-issues)). Every other case passed. Raw results are not committed |
+| Live install verification | Run on a disposable OpenShift 4.22 cluster (3 nodes, `HighlyAvailable`): four full runs of 19 cases. Runs found two WAO RBAC bugs, both fixed (see [Deviations from the plan](#deviations-from-the-plan), items 3 and 8). The final run passed 17 of 19: WAO-INST-09 and WAO-INST-12 failed only because the upstream MDR manager could not start under its 30Mi memory limit, which reproduces without WAO (see [Known upstream issues](#known-upstream-issues)). Every other case passed. A fifth run on 2026-10-05 against a fresh OpenShift 5.0.0-rc.5 cluster (3 nodes, `HighlyAvailable`, classic OLM) through `test/cluster/full-run.sh` passed all 19 cases, including MDR, which started with a warm page cache that time. Raw results are not committed |
 | Upgrade scenarios | Future plan |
 
 ## Layout
@@ -136,7 +136,7 @@ make catalog-configmap DEFAULT_CHANNEL=alpha   # writes dist/wao-poc-catalog.yam
 ```
 
 The committed bundle currently references
-`image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@sha256:a766cd13ae0f2d2b6428c607d4ba0d43347219416191d2793c356b356fd7b6cf`
+`image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@sha256:6077f4265aaf49de3e445e07bd7ee1750171951cdc2d7de4a11f7d8f63328671`
 (linux/amd64). A different cluster needs its own build and a regenerated bundle.
 
 `dist/wao-poc-catalog.yaml` holds a ConfigMap with the CSV and thirteen CRDs and a
