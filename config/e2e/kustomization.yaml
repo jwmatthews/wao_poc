@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- ../default
+# Only WAO uses a locally built image. Operand digest pins remain unchanged.
+patches:
+- target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: workload-availability-operator-controller-manager
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/image
+      value: example.com/workload-availability-operator:v0.0.1
