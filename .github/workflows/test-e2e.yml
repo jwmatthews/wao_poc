@@ -8,6 +8,7 @@ jobs:
   test-e2e:
     name: Run on Ubuntu
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - name: Clone the code
         uses: actions/checkout@v4
@@ -30,3 +31,13 @@ jobs:
         run: |
           go mod tidy
           make test-e2e
+
+      - name: Save E2E diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kind-e2e-logs
+          # Never upload the kubeconfig stored alongside this log.
+          path: evidence/*/e2e.log
+          if-no-files-found: ignore
+          retention-days: 7

@@ -17,73 +17,87 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/jwmatthews/wao_poc/test/utils"
 )
 
-var (
-	// Optional Environment Variables:
-	// - CERT_MANAGER_INSTALL_SKIP=true: Skips CertManager installation during test setup.
-	// These variables are useful if CertManager is already installed, avoiding
-	// re-installation and conflicts.
-	skipCertManagerInstall = os.Getenv("CERT_MANAGER_INSTALL_SKIP") == "true"
-	// isCertManagerAlreadyInstalled will be set true when CertManager CRDs be found on the cluster
-	isCertManagerAlreadyInstalled = false
-
-	// projectImage is the name of the image which will be build and loaded
-	// with the code source changes to be tested.
+const (
+	namespace    = "openshift-workload-availability"
+	managerName  = "workload-availability-operator-controller-manager"
 	projectImage = "example.com/workload-availability-operator:v0.0.1"
 )
 
-// TestE2E runs the end-to-end (e2e) test suite for the project. These tests execute in an isolated,
-// temporary environment to validate project changes with the purposed to be used in CI jobs.
-// The default setup requires Kind, builds/loads the Manager Docker image locally, and installs
-// CertManager.
+var projectDir, manifestPath string
+
+// TestE2E tests a fresh Kind cluster created by run.py. Full operand installation
+// and OpenShift admission are covered separately by test/cluster.
 func TestE2E(t *testing.T) {
+	for _, key := range []string{"KUBECONFIG", "KIND_CLUSTER", "RUN_DIR"} {
+		if os.Getenv(key) == "" {
+			t.Fatalf("%s is required; use make test-e2e to create an isolated Kind cluster", key)
+		}
+	}
+	var err error
+	projectDir, err = filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestPath = filepath.Join(os.Getenv("RUN_DIR"), "install.yaml")
 	RegisterFailHandler(Fail)
-	_, _ = fmt.Fprintf(GinkgoWriter, "Starting workload-availability-operator integration test suite\n")
-	RunSpecs(t, "e2e suite")
+	RunSpecs(t, "WAO all-Disabled install")
 }
 
 var _ = BeforeSuite(func() {
-	By("building the manager(Operator) image")
-	cmd := exec.Command("make", "docker-build", fmt.Sprintf("IMG=%s", projectImage))
-	_, err := utils.Run(cmd)
-	ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to build the manager(Operator) image")
+	By("checking the explicit kubeconfig selects the dedicated Kind cluster")
+	output, err := kubectl("config", "current-context")
+	Expect(err).NotTo(HaveOccurred())
+	Expect(output).To(Equal("kind-" + os.Getenv("KIND_CLUSTER") + "\n"))
 
-	// TODO(user): If you want to change the e2e test vendor from Kind, ensure the image is
-	// built and available before running the tests. Also, remove the following block.
-	By("loading the manager(Operator) image on Kind")
-	err = utils.LoadImageToKindClusterWithName(projectImage)
-	ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to load the manager(Operator) image into Kind")
+	By("rendering the test overlay without modifying the committed image pin")
+	output, err = runCommand(time.Minute, tool("KUSTOMIZE", "bin/kustomize"), "build", "config/e2e")
+	Expect(err).NotTo(HaveOccurred())
+	Expect(os.WriteFile(manifestPath, []byte(output), 0o600)).To(Succeed())
 
-	// The tests-e2e are intended to run on a temporary cluster that is created and destroyed for testing.
-	// To prevent errors when tests run in environments with CertManager already installed,
-	// we check for its presence before execution.
-	// Setup CertManager before the suite if not skipped and if not already installed
-	if !skipCertManagerInstall {
-		By("checking if cert manager is installed already")
-		isCertManagerAlreadyInstalled = utils.IsCertManagerCRDsInstalled()
-		if !isCertManagerAlreadyInstalled {
-			_, _ = fmt.Fprintf(GinkgoWriter, "Installing CertManager...\n")
-			Expect(utils.InstallCertManager()).To(Succeed(), "Failed to install CertManager")
-		} else {
-			_, _ = fmt.Fprintf(GinkgoWriter, "WARNING: CertManager is already installed. Skipping installation...\n")
-		}
-	}
+	By("building and loading the WAO image")
+	_, err = runCommand(10*time.Minute, "make", "docker-build", "IMG="+projectImage)
+	Expect(err).NotTo(HaveOccurred())
+	_, err = runCommand(2*time.Minute, tool("KIND", "kind"),
+		"load", "docker-image", projectImage, "--name", os.Getenv("KIND_CLUSTER"))
+	Expect(err).NotTo(HaveOccurred())
 })
 
-var _ = AfterSuite(func() {
-	// Teardown CertManager after the suite if not skipped and if it was not already installed
-	if !skipCertManagerInstall && !isCertManagerAlreadyInstalled {
-		_, _ = fmt.Fprintf(GinkgoWriter, "Uninstalling CertManager...\n")
-		utils.UninstallCertManager()
+func tool(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
 	}
-})
+	return fallback
+}
+
+func kubectl(args ...string) (string, error) {
+	args = append([]string{"--kubeconfig", os.Getenv("KUBECONFIG"), "--request-timeout=20s"}, args...)
+	return runCommand(90*time.Second, tool("KUBECTL", "kubectl"), args...)
+}
+
+// Every subprocess is bounded, including cleanup. run.py captures all output in
+// evidence/ and deletes the Kind cluster even if this suite fails or times out.
+func runCommand(timeout time.Duration, name string, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Dir = projectDir
+	cmd.WaitDelay = 5 * time.Second
+	_, _ = fmt.Fprintf(GinkgoWriter, "running: %s %q\n", name, args)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(output), fmt.Errorf("%s failed: %w\n%s", name, err, output)
+	}
+	return string(output), nil
+}
