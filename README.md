@@ -98,7 +98,28 @@ make operand-manifests-check  # committed manifests, CRDs and union role match t
 make generate manifests       # controller-gen: deepcopy, CRD and RBAC
 make test                     # Go unit and envtest suites
 make test-offline             # Python tests and bash syntax check of test/cluster (no cluster)
+GOTOOLCHAIN=go1.24.13 make lint # match the Go 1.24 toolchain used by CI's pinned linter
 ```
+
+GitHub Actions runs the Go suites, lint, and offline tests. The offline job fetches
+the pinned bundles first so extraction and parity tests run instead of skipping
+because `.cache/bundles` is missing.
+
+`make test-e2e` requires Docker, Kind, kubectl and Python 3. It creates a new disposable Kind
+cluster with a dedicated kubeconfig, builds WAO, and tests the all-Disabled install:
+manager readiness, the default config, and absence of operands and native resources.
+It uses `config/e2e` to select the locally built WAO image without editing the
+committed image pin. It does not enable operands or require cert-manager or metrics.
+The full OLM and enabled-operand checks remain in `test/cluster` on a confirmed
+disposable OpenShift cluster.
+
+The Kind runner generates a unique cluster name by default. An explicit
+`KIND_CLUSTER` is locked against concurrent runs and must not already exist.
+Cleanup deletes the default config
+while WAO is still running, then removes the install manifests; the runner deletes
+its Kind cluster on success or failure. Raw output and the isolated kubeconfig stay
+under `evidence/<UTC-date>-kind-e2e-<pid>/`. CI saves only `e2e.log` as the
+`kind-e2e-logs` artifact, never the kubeconfig.
 
 `make operand-manifests` regenerates the operand manifests after a deliberate
 release-set change. `make bundle` and `make bundle-check` generate and check the
