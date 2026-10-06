@@ -83,7 +83,7 @@ func (r *WorkloadAvailabilityConfigReconciler) Reconcile(ctx context.Context, re
 		return ctrl.Result{Requeue: true}, r.Update(ctx, wac)
 	}
 
-	var statuses []v1alpha1.ComponentStatus
+	statuses := make([]v1alpha1.ComponentStatus, 0, len(components.All()))
 	var errs []error
 	progressing, retained := false, false
 	for _, def := range components.All() {

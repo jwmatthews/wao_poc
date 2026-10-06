@@ -36,7 +36,7 @@ func Render(def components.Definition, namespace string, imgs images.Set) ([]*un
 	if err != nil {
 		return nil, err
 	}
-	var out []*unstructured.Unstructured
+	out := make([]*unstructured.Unstructured, 0, len(files))
 	for _, name := range sortedNames(files) {
 		text := strings.ReplaceAll(string(files[name]), NamespacePlaceholder, namespace)
 		for _, b := range def.Images {

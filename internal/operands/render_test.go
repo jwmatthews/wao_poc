@@ -12,6 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+const testNamespace = "wao-ns"
+
 func testImages() images.Set {
 	s := images.Set{}
 	for _, k := range images.Required {
@@ -32,7 +34,7 @@ func find(t *testing.T, objs []*unstructured.Unstructured, kind, name string) *u
 
 func TestRenderNHCReplacesNamespaceImagesAndLabels(t *testing.T) {
 	def, _ := components.ByKey(v1alpha1.ComponentKeyNodeHealthCheck)
-	objs, err := operands.Render(def, "wao-ns", testImages())
+	objs, err := operands.Render(def, testNamespace, testImages())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,21 +51,21 @@ func TestRenderNHCReplacesNamespaceImagesAndLabels(t *testing.T) {
 		if o.GetLabels()[operands.LabelManagedBy] != operands.ManagedByValue || o.GetLabels()[operands.LabelComponent] != def.Key {
 			t.Errorf("%s/%s missing WAO labels: %v", o.GetKind(), o.GetName(), o.GetLabels())
 		}
-		if operands.IsNamespaced(o.GetKind()) && o.GetNamespace() != "wao-ns" {
+		if operands.IsNamespaced(o.GetKind()) && o.GetNamespace() != testNamespace {
 			t.Errorf("%s/%s namespace = %q", o.GetKind(), o.GetName(), o.GetNamespace())
 		}
 	}
 	vw := find(t, objs, "ValidatingWebhookConfiguration", "node-healthcheck-validating-webhook-configuration")
 	hooks, _, _ := unstructured.NestedSlice(vw.Object, "webhooks")
 	svc := hooks[0].(map[string]interface{})["clientConfig"].(map[string]interface{})["service"].(map[string]interface{})
-	if svc["namespace"] != "wao-ns" || svc["name"] != "node-healthcheck-webhook-service" {
+	if svc["namespace"] != testNamespace || svc["name"] != "node-healthcheck-webhook-service" {
 		t.Fatalf("webhook service = %v", svc)
 	}
 }
 
 func TestRenderOrdersRBACBeforeWorkloadsAndWebhooksLast(t *testing.T) {
 	def, _ := components.ByKey(v1alpha1.ComponentKeySelfNodeRemediation)
-	objs, err := operands.Render(def, "wao-ns", testImages())
+	objs, err := operands.Render(def, testNamespace, testImages())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,14 +75,18 @@ func TestRenderOrdersRBACBeforeWorkloadsAndWebhooksLast(t *testing.T) {
 			pos[o.GetKind()] = i
 		}
 	}
-	if !(pos["ServiceAccount"] < pos["ClusterRole"] && pos["ClusterRole"] < pos["ClusterRoleBinding"] && pos["Service"] < pos["Deployment"] && pos["Deployment"] < pos["ValidatingWebhookConfiguration"] && pos["Deployment"] < pos["MutatingWebhookConfiguration"]) {
+	if pos["ServiceAccount"] >= pos["ClusterRole"] ||
+		pos["ClusterRole"] >= pos["ClusterRoleBinding"] ||
+		pos["Service"] >= pos["Deployment"] ||
+		pos["Deployment"] >= pos["ValidatingWebhookConfiguration"] ||
+		pos["Deployment"] >= pos["MutatingWebhookConfiguration"] {
 		t.Fatalf("unexpected order: %v", pos)
 	}
 }
 
 func TestRenderSNRReplacesAgentImageEnv(t *testing.T) {
 	def, _ := components.ByKey(v1alpha1.ComponentKeySelfNodeRemediation)
-	objs, err := operands.Render(def, "wao-ns", testImages())
+	objs, err := operands.Render(def, testNamespace, testImages())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +108,7 @@ func TestRenderSNRReplacesAgentImageEnv(t *testing.T) {
 	}
 	crb := find(t, objs, "ClusterRoleBinding", "self-node-remediation-controller-manager")
 	subjects, _, _ := unstructured.NestedSlice(crb.Object, "subjects")
-	if subjects[0].(map[string]interface{})["namespace"] != "wao-ns" {
+	if subjects[0].(map[string]interface{})["namespace"] != testNamespace {
 		t.Fatalf("subject namespace not rewritten: %v", subjects[0])
 	}
 }
