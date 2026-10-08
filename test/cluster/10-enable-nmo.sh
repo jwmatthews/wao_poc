@@ -13,8 +13,9 @@ expect "service-ca created the webhook serving Secret with tls.crt and tls.key (
 # OLM appends get/list/watch on namespaces to the all-namespaces copy of the CSV permissions. Without it NMO's
 # cache for the medik8s-leases Namespace never syncs and the manager exits every few minutes.
 nmo_sa="system:serviceaccount:${NS}:node-maintenance-operator-controller-manager"
-expect "NMO manager ServiceAccount can list namespaces cluster-wide" k auth can-i list namespaces --as="$nmo_sa" -q
-expect "NMO manager ServiceAccount can watch namespaces cluster-wide" k auth can-i watch namespaces --as="$nmo_sa" -q
+# Namespace objects are cluster-scoped; avoid the CLI's default namespace scope for these checks.
+expect "NMO manager ServiceAccount can list namespaces cluster-wide" k auth can-i list namespaces --all-namespaces --as="$nmo_sa" -q
+expect "NMO manager ServiceAccount can watch namespaces cluster-wide" k auth can-i watch namespaces --all-namespaces --as="$nmo_sa" -q
 wait_for 120 "medik8s-leases namespace exists" found namespace medik8s-leases
 
 expect "NodeMaintenance for a missing node rejected (dry-run)" dry_run_rejected 10-admission-missing-node create <<'YAML'
