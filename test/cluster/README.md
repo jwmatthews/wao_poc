@@ -23,6 +23,26 @@ Each case `WAO-INST-NN` has one script `NN-<slug>.sh`. The scripts mutate a real
 
 Every command passes `--kubeconfig "$KUBECONFIG"` explicitly. The current context is never used.
 
+### Local Python setup
+
+Before the first run, create the Python environment at the **repository root**. From anywhere inside
+the checkout, including `test/cluster`, run:
+
+```sh
+cd "$(git rev-parse --show-toplevel)"
+python3 -m venv .venv
+.venv/bin/python -m pip install -r hack/requirements.txt
+```
+
+The scripts use `<repository-root>/.venv/bin/python` directly by default, so activation is not required.
+`full-run.sh build` builds the WAO image on the cluster, but its local checks and bundle/catalog
+generation need this environment. It does not create `.venv` automatically. If it reports
+`.venv/bin/python missing`, run the setup above; creating `.venv` inside `test/cluster` will not satisfy
+the check.
+
+The commands below run from the repository root. To launch from `test/cluster` instead, use
+`bash ./full-run.sh build`; it still uses the environment at the repository root.
+
 ## Running
 
 ```sh

@@ -89,9 +89,12 @@ regenerate them.
 
 ## Build and test
 
+Run from the repository root (the `cd` command works from any directory inside the checkout):
+
 ```sh
+cd "$(git rev-parse --show-toplevel)"
 python3 -m venv .venv
-.venv/bin/pip install -r hack/requirements.txt
+.venv/bin/python -m pip install -r hack/requirements.txt
 
 make bundles                  # fetch the pinned bundles into .cache/bundles and verify digests
 make operand-manifests-check  # committed manifests, CRDs and union role match the bundles
@@ -170,6 +173,22 @@ upgrade case needs an FBC catalog image (`make catalog-build catalog-push`).
 `test/cluster/full-run.sh` runs the POC on a **disposable** OpenShift cluster with classic OLM
 that you are authorized to modify. Pass the kubeconfig explicitly; the current context is never
 used. Without `CONFIRM=yes` it shows the cluster and asks before changing anything.
+
+First prepare the local Python environment, even though the operator image is built on the cluster.
+From anywhere inside the checkout, including `test/cluster`, run:
+
+```sh
+cd "$(git rev-parse --show-toplevel)"
+python3 -m venv .venv
+.venv/bin/python -m pip install -r hack/requirements.txt
+```
+
+The scripts use `<repository-root>/.venv/bin/python` directly by default; no activation is needed.
+They do not create the environment automatically. If `full-run.sh build` reports
+`.venv/bin/python missing`, use the setup above. The environment belongs at the repository root,
+including when you launch the script from `test/cluster`.
+
+Then run the desired phases from the repository root:
 
 ```sh
 export KUBECONFIG=/path/to/disposable.kubeconfig
