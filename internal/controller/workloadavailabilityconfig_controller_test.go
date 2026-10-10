@@ -114,6 +114,20 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		Expect(dep.OwnerReferences[0].Kind).To(Equal("WorkloadAvailabilityConfig"))
 		Expect(*dep.OwnerReferences[0].Controller).To(BeTrue())
 
+		console := &appsv1.Deployment{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-node-remediation-console-plugin"}, console)).To(Succeed())
+		Expect(console.Spec.Template.Spec.Containers[0].Image).To(Equal(testImages().Get(images.NHCConsole)))
+		Expect(console.Labels[operands.LabelComponent]).To(Equal(v1alpha1.ComponentKeyNodeHealthCheck))
+		cm := &corev1.ConfigMap{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-ca-bundle"}, cm)).To(Succeed())
+		Expect(cm.Annotations).To(HaveKeyWithValue("service.beta.openshift.io/inject-cabundle", "true"))
+		Expect(cm.Labels[operands.LabelManagedBy]).To(Equal(operands.ManagedByValue))
+		Expect(cm.OwnerReferences).To(HaveLen(1))
+		Expect(cm.Data).To(BeEmpty())
+		consoleSA := &corev1.ServiceAccount{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-console-plugin"}, consoleSA)).To(Succeed())
+		Expect(consoleSA.AutomountServiceAccountToken).To(Equal(ptr.To(false)))
+
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager"}, &rbacv1.ClusterRole{})).To(Succeed())
 		// OLM AllNamespaces behaviour: the CSV's namespaced permissions are also granted cluster-wide,
 		// with OLM's get/list/watch rule on namespaces appended.
@@ -131,6 +145,36 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-validating-webhook-configuration"}, vw)).To(Succeed())
 		Expect(vw.Webhooks[0].ClientConfig.Service.Namespace).To(Equal(ns))
 		Expect(vw.Annotations["service.beta.openshift.io/inject-cabundle"]).To(Equal("true"))
+	})
+
+	It("preserves the service-ca injected CA data across reconciles", func() {
+		// service-ca writes service-ca.crt with its own field manager. WAO applies no data and forces ownership
+		// of what it does apply, so the injected key must survive the next apply (spec P9).
+		injected := &corev1.ConfigMap{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
+			ObjectMeta: metav1.ObjectMeta{Name: "node-healthcheck-ca-bundle", Namespace: ns},
+			Data:       map[string]string{"service-ca.crt": "-----BEGIN CERTIFICATE-----\nenvtest\n-----END CERTIFICATE-----\n"}}
+		Expect(k8sClient.Patch(ctx, injected, client.Apply, client.FieldOwner("service-ca-operator"))).To(Succeed())
+		// Deleting an owned Deployment makes WAO re-apply every NHC object, the ConfigMap included.
+		Expect(k8sClient.Delete(ctx, &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "node-healthcheck-node-remediation-console-plugin", Namespace: ns}})).To(Succeed())
+		Eventually(func() error {
+			return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-node-remediation-console-plugin"}, &appsv1.Deployment{})
+		}).Should(Succeed())
+		cm := &corev1.ConfigMap{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-ca-bundle"}, cm)).To(Succeed())
+		Expect(cm.Data).To(HaveKey("service-ca.crt"))
+		Expect(cm.Annotations).To(HaveKeyWithValue("service.beta.openshift.io/inject-cabundle", "true"))
+	})
+
+	It("recreates the CA ConfigMap when it is deleted", func() {
+		cm := &corev1.ConfigMap{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-ca-bundle"}, cm)).To(Succeed())
+		uid := cm.UID
+		Expect(k8sClient.Delete(ctx, cm)).To(Succeed())
+		Eventually(func(g Gomega) {
+			fresh := &corev1.ConfigMap{}
+			g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-ca-bundle"}, fresh)).To(Succeed())
+			g.Expect(fresh.UID).NotTo(Equal(uid))
+		}).Should(Succeed())
 	})
 
 	It("refuses to adopt a foreign object with the same name", func() {
@@ -173,6 +217,30 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager"}, &rbacv1.ClusterRole{}))).To(BeTrue())
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager-all-namespaces"}, &rbacv1.ClusterRole{}))).To(BeTrue())
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager-all-namespaces"}, &rbacv1.ClusterRoleBinding{}))).To(BeTrue())
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-node-remediation-console-plugin"}, &appsv1.Deployment{}))).To(BeTrue())
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-ca-bundle"}, &corev1.ConfigMap{}))).To(BeTrue())
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-console-plugin"}, &corev1.ServiceAccount{}))).To(BeTrue())
+	})
+
+	It("refuses to adopt a foreign CA ConfigMap", func() {
+		foreign := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "node-healthcheck-ca-bundle", Namespace: ns}, Data: map[string]string{"service-ca.crt": "foreign"}}
+		Expect(k8sClient.Create(ctx, foreign)).To(Succeed())
+		setState(ctx, v1alpha1.ComponentKeyNodeHealthCheck, v1alpha1.ComponentStateEnabled)
+		Eventually(func(g Gomega) {
+			c := component(getWAC(ctx), v1alpha1.ComponentKeyNodeHealthCheck)
+			g.Expect(c.Phase).To(Equal(v1alpha1.ComponentPhaseDegraded))
+			g.Expect(c.Message).To(ContainSubstring("ConfigMap " + ns + "/node-healthcheck-ca-bundle"))
+			g.Expect(c.Message).To(ContainSubstring("not managed by"))
+		}).Should(Succeed())
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(foreign), foreign)).To(Succeed())
+		Expect(foreign.Data).To(HaveKeyWithValue("service-ca.crt", "foreign"))
+		Expect(foreign.Labels).NotTo(HaveKey(operands.LabelManagedBy))
+		setState(ctx, v1alpha1.ComponentKeyNodeHealthCheck, v1alpha1.ComponentStateDisabled)
+		Eventually(func(g Gomega) {
+			g.Expect(component(getWAC(ctx), v1alpha1.ComponentKeyNodeHealthCheck).Phase).To(Equal(v1alpha1.ComponentPhaseDisabled))
+		}).Should(Succeed())
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(foreign), foreign)).To(Succeed(), "WAO must not delete a foreign object on disable")
+		Expect(k8sClient.Delete(ctx, foreign)).To(Succeed()) // test cleanup, not WAO behavior
 	})
 
 	It("reports DisableIncomplete when SNR agents survive a manager-level disable", func() {

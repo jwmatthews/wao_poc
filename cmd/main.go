@@ -201,13 +201,14 @@ func main() {
 		Metrics:                metricsServerOptions,
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
-		// Namespaced operand kinds are cached only in the install namespace. Unstructured
+		// Namespaced operand kinds (Deployments, DaemonSets, Services, ConfigMaps) are cached only in the install namespace. Unstructured
 		// objects are not cached at all (controller-runtime default), so the foreign-object
 		// guard and the retained-resource listing read live from the API server.
 		Cache: cache.Options{ByObject: map[client.Object]cache.ByObject{
 			&appsv1.Deployment{}: {Namespaces: map[string]cache.Config{operatorNamespace: {}}},
 			&appsv1.DaemonSet{}:  {Namespaces: map[string]cache.Config{operatorNamespace: {}}},
 			&corev1.Service{}:    {Namespaces: map[string]cache.Config{operatorNamespace: {}}},
+			&corev1.ConfigMap{}:  {Namespaces: map[string]cache.Config{operatorNamespace: {}}},
 		}},
 		LeaderElection:   enableLeaderElection,
 		LeaderElectionID: "72846991.medik8s.io",
