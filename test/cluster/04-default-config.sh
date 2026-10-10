@@ -30,8 +30,8 @@ rs = yaml.safe_load(open(sys.argv[1]))
 print(json.dumps({env: i["pinned"] for c in rs["components"].values() for env, i in c["images"].items()}, sort_keys=True))' \
   "${REPO_ROOT}/release-set.yaml")
 export EXPECTED_RELEASE_SET="$expected_release_set"
-expect "status.releaseSet equals the seven pinned images in release-set.yaml" \
-  jcheck 'len(json.loads(os.environ["EXPECTED_RELEASE_SET"])) == 7 and {r["name"]: r["image"] for r in o["status"].get("releaseSet") or []} == json.loads(os.environ["EXPECTED_RELEASE_SET"])' get wac cluster
+expect "status.releaseSet equals the eight pinned images in release-set.yaml" \
+  jcheck 'len(json.loads(os.environ["EXPECTED_RELEASE_SET"])) == 8 and {r["name"]: r["image"] for r in o["status"].get("releaseSet") or []} == json.loads(os.environ["EXPECTED_RELEASE_SET"])' get wac cluster
 
 expect "a config named 'other' is rejected (server dry-run)" dry_run_rejected 04-cel-other create <<'YAML'
 apiVersion: workloadavailability.medik8s.io/v1alpha1

@@ -34,7 +34,10 @@ Raw output in this directory is git-ignored and may contain cluster-identifying 
 - Enable each of the six components in turn. Enabling SNR starts privileged SNR agents on every eligible node (D3).
 - Server dry-run admission probes only. No NodeHealthCheck, StorageBasedRemediationConfig, FenceAgentsRemediation,
   MachineDeletionRemediation, NodeMaintenance or SelfNodeRemediation is ever created.
+- Enabling NHC also adds `node-remediation-console-plugin` to `Console/cluster` `spec.plugins` (administrator step,
+  preserving other entries) and runs one short-lived curl pod in the install namespace; disabling NHC removes the entry.
 - Delete the WAO pod (twice), scale the SBR manager to 0 once, disable components, delete the config.
+- Case 13 deletes and re-annotates the WAO-owned ConfigMap `node-healthcheck-ca-bundle` once; WAO restores it.
 
 ## Cleanup (WAO-INST-18)
 - Delete the config, Subscription and CSV; record leftovers; delete the SNR config (agents stop), template and

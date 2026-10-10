@@ -248,3 +248,96 @@ restart_wao() {
   record "$1-delete-wao-pod" delete pod $old -n "$NS" --wait=false >/dev/null
   wait_for 300 "WAO pod replaced and Ready" wao_pod_replaced "$old"
 }
+
+# ---- OpenShift platform helpers (design brief D11) -------------------------------------------
+
+# prom_query EXPR : instant query against the platform Prometheus from inside its pod (read-only; the
+# upstream NHC readme documents the same path). Prints the JSON result array.
+prom_query() {
+  k -n openshift-monitoring exec prometheus-k8s-0 -c prometheus -- \
+    curl -sG --data-urlencode "query=$1" http://localhost:9090/api/v1/query |
+    python3 -c 'import json, sys; print(json.dumps(json.load(sys.stdin)["data"]["result"]))'
+}
+export -f prom_query   # usable inside `bash -c` subshells
+
+# prom_all_values EXPR VALUE : every series of EXPR has VALUE, and there is at least one series.
+prom_all_values() {
+  local out; out=$(prom_query "$1") || return 1
+  python3 -c 'import json, sys; r = json.loads(sys.argv[1]); sys.exit(0 if r and all(x["value"][1] == sys.argv[2] for x in r) else 1)' "$out" "$2"
+}
+
+# sm_selects_service : the NHC ServiceMonitor's matchLabels are all present on the metrics Service.
+sm_selects_service() {
+  local sel labels
+  sel=$(k get servicemonitor node-healthcheck-controller-manager-metrics-monitor -n "$NS" -o jsonpath='{.spec.selector.matchLabels}') || return 1
+  labels=$(k get service node-healthcheck-controller-manager-metrics-service -n "$NS" -o jsonpath='{.metadata.labels}') || return 1
+  python3 -c 'import json, sys; s, l = json.loads(sys.argv[1]), json.loads(sys.argv[2]); sys.exit(0 if s and all(l.get(k) == v for k, v in s.items()) else 1)' "$sel" "$labels"
+}
+
+# console_plugins : the console's enabled plugin list as a JSON array ("[]" when unset). Never modified by WAO.
+console_plugins() {
+  local p; p=$(k get consoles.operator.openshift.io cluster -o jsonpath='{.spec.plugins}') || return 1
+  printf '%s' "${p:-[]}"
+}
+
+# console_plugin_enabled NAME
+console_plugin_enabled() {
+  local p; p=$(console_plugins) || return 1
+  python3 -c 'import json, sys; sys.exit(0 if sys.argv[2] in json.loads(sys.argv[1]) else 1)' "$p" "$1"
+}
+
+# enable_console_plugin LABEL NAME : the administrator step. Appends NAME, preserving existing entries.
+enable_console_plugin() {
+  console_plugin_enabled "$2" && return 0
+  if [ "$(console_plugins)" = "[]" ]; then
+    record "$1" patch consoles.operator.openshift.io cluster --type json \
+      -p "[{\"op\":\"add\",\"path\":\"/spec/plugins\",\"value\":[\"$2\"]}]" >/dev/null
+  else
+    record "$1" patch consoles.operator.openshift.io cluster --type json \
+      -p "[{\"op\":\"add\",\"path\":\"/spec/plugins/-\",\"value\":\"$2\"}]" >/dev/null
+  fi
+}
+
+# disable_console_plugin LABEL NAME : remove NAME from spec.plugins, preserving the other entries.
+disable_console_plugin() {
+  local p idx
+  p=$(console_plugins) || return 1
+  idx=$(python3 -c 'import json, sys; l = json.loads(sys.argv[1]); print(l.index(sys.argv[2]) if sys.argv[2] in l else -1)' "$p" "$2")
+  [ "$idx" -ge 0 ] || return 0
+  record "$1" patch consoles.operator.openshift.io cluster --type json -p "[{\"op\":\"remove\",\"path\":\"/spec/plugins/$idx\"}]" >/dev/null
+}
+
+# trusted_fetch LABEL URL : fetch URL from a short-lived pod in $NS, verifying TLS against the service CA that
+# OpenShift publishes in every namespace (ConfigMap openshift-service-ca.crt). Prints the body. No -k anywhere.
+trusted_fetch() {
+  local pod="wao-fetch-$1" rc=0
+  k delete pod "$pod" -n "$NS" --ignore-not-found >/dev/null
+  k apply -n "$NS" -f - >/dev/null <<YAML
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${pod}
+  labels: {wao-test: fetch}
+spec:
+  restartPolicy: Never
+  securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+  containers:
+  - name: curl
+    image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+    command: ["curl", "-sS", "--fail", "--cacert", "/service-ca/service-ca.crt", "$2"]
+    securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+    volumeMounts: [{name: service-ca, mountPath: /service-ca, readOnly: true}]
+  volumes:
+  - name: service-ca
+    configMap: {name: openshift-service-ca.crt}
+YAML
+  if ! k wait pod "$pod" -n "$NS" --for=jsonpath='{.status.phase}'=Succeeded --timeout=120s >/dev/null 2>&1; then
+    k logs "$pod" -n "$NS" >&2 || true
+    k get pod "$pod" -n "$NS" -o jsonpath='{.status.phase} {.status.containerStatuses[*].state}' >&2 || true
+    rc=1
+  else
+    k logs "$pod" -n "$NS"
+  fi
+  k delete pod "$pod" -n "$NS" --ignore-not-found >/dev/null
+  return $rc
+}

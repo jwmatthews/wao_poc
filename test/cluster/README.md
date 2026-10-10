@@ -66,7 +66,7 @@ for inspection, then run `run-all.sh 18` later). Running a subset keeps earlier 
 | `02-install-wao.sh` | WAO-INST-02 install via OLM | namespace, OperatorGroup, Subscription, InstallPlan approval |
 | `03-clean-install.sh` | WAO-INST-03 clean-install invariants | no |
 | `04-default-config.sh` | WAO-INST-04 default config, status, CEL | no (dry-run only) |
-| `05-enable-nhc.sh` | WAO-INST-05 enable NHC | config patch |
+| `05-enable-nhc.sh` | WAO-INST-05 enable NHC | config patch; adds the plugin to Console/cluster spec.plugins; one short-lived curl pod |
 | `06-enable-snr.sh` | WAO-INST-06 enable SNR | config patch; **starts SNR agents on every eligible node** |
 | `07-enable-sbr.sh` | WAO-INST-07 enable SBR | config patch |
 | `08-enable-far.sh` | WAO-INST-08 enable FAR | config patch |
@@ -74,9 +74,9 @@ for inspection, then run `run-all.sh 18` later). Running a subset keeps earlier 
 | `10-enable-nmo.sh` | WAO-INST-10 enable NMO | config patch |
 | `11-parity.sh` | WAO-INST-11 parity, all six | no |
 | `12-restart.sh` | WAO-INST-12 restart idempotence | deletes the WAO pod |
-| `13-drift.sh` | WAO-INST-13 drift repair | scales the SBR manager to 0 |
+| `13-drift.sh` | WAO-INST-13 drift repair | scales the SBR manager to 0; deletes and re-annotates the WAO-owned CA ConfigMap `node-healthcheck-ca-bundle` |
 | `14-disable-sbr-far-mdr.sh` | WAO-INST-14 disable SBR, FAR, MDR | config patch |
-| `15-disable-nmo-nhc.sh` | WAO-INST-15 disable NMO and NHC | config patch |
+| `15-disable-nmo-nhc.sh` | WAO-INST-15 disable NMO and NHC | config patch; removes the plugin entry from Console/cluster |
 | `16-disable-snr.sh` | WAO-INST-16 disable SNR (manager level) | config patch |
 | `17-delete-config.sh` | WAO-INST-17 delete the config | deletes the config and the WAO pod |
 | `18-uninstall.sh` | WAO-INST-18 uninstall and cleanup | deletes everything above; stops SNR agents |
@@ -114,6 +114,7 @@ See [docs/agent-test-run.md](../../docs/agent-test-run.md).
   creates itself are expected (design brief D3).
 - Secrets are only checked for existence and data key names (`secret_key_names`), never values.
 - No script changes a webhook `failurePolicy`.
+- `05` edits `Console/cluster` only by appending or removing the single `node-remediation-console-plugin` entry; WAO itself never does (see docs/known-issues.md KI-1).
 
 ## Helpers (`lib.sh`)
 

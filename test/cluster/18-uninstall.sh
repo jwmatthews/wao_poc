@@ -75,6 +75,7 @@ wait_for 300 "all thirteen CRDs gone" all_crds_gone || fail "CRDs still present"
 
 record 18-delete-nhc-aggregation delete clusterrole,clusterrolebinding node-healthcheck-operator-aggregation --ignore-not-found >/dev/null || fail "delete NHC aggregation role/binding"
 if k api-resources --api-group=console.openshift.io -o name 2>/dev/null | grep -q '^consoleplugins'; then
+  disable_console_plugin 18-disable-plugin node-remediation-console-plugin || echo "note: could not edit the Console/cluster plugin list"
   record 18-delete-consoleplugin delete consoleplugin node-remediation-console-plugin --ignore-not-found >/dev/null || fail "delete ConsolePlugin"
 fi
 record 18-delete-wao-labelled delete clusterrole,clusterrolebinding,validatingwebhookconfiguration,mutatingwebhookconfiguration \
