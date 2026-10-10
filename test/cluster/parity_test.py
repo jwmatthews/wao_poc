@@ -102,6 +102,29 @@ class ParityTest(unittest.TestCase):
         d = next(x for x in parity.bundle_csv("nhc")["spec"]["install"]["spec"]["deployments"] if x["name"] == "node-healthcheck-controller-manager")
         self.assertEqual(parity.compare_deployment(d, self.rendered("nhc", d["name"])["spec"], images), 0)
 
+    def rendered_object(self, component, kind, name):
+        f = next((REPO / "internal/operands/manifests" / component).glob(f"*-{kind}-{name}.yaml"))
+        return yaml.safe_load(f.read_text())
+
+    def test_nhc_platform_contract_passes_on_rendered_manifests(self):
+        get = lambda kind, name: self.rendered_object("nhc", kind, name)
+        self.assertEqual(parity.check_platform_contract("nhc", get), 0)
+        self.assertEqual(parity.check_platform_contract("snr", get), 0, "only NHC has a platform contract")
+
+    def test_nhc_platform_contract_detects_missing_supplements(self):
+        # A bundle without the overlay on both sides must fail, not match (handoff requirement).
+        def get(kind, name):
+            o = copy.deepcopy(self.rendered_object("nhc", kind, name))
+            if kind == "Service" and name == "node-healthcheck-controller-manager-metrics-service":
+                o["metadata"]["labels"].pop("app.kubernetes.io/instance")
+            if kind == "ConfigMap":
+                o["metadata"]["annotations"] = {}
+            if kind == "Deployment":
+                for c in o["spec"]["template"]["spec"]["containers"]:
+                    c["volumeMounts"] = [m for m in c.get("volumeMounts") or [] if m["name"] != "tls-config"]
+            return o
+        self.assertEqual(parity.check_platform_contract("nhc", get), 3)
+
 
 if __name__ == "__main__":
     unittest.main()

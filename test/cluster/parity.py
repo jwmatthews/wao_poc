@@ -11,6 +11,7 @@ Role plus the ClusterRole and ClusterRoleBinding `<sa>-all-namespaces` that OLM 
 AllNamespaces OperatorGroup (the CSV rules followed by OLM's get/list/watch rule on namespaces).
 Tolerated differences: the WAO-added webhook-server-cert (D1) and tls-config (D11) volumes and mounts, the WAO component
 pod label (D10), and fields the bundle leaves unset that the API server defaults.
+For NHC, the OpenShift platform contract (metrics Service label and serving cert, CA ConfigMap, manager TLS mount, console Service) is asserted explicitly.
 Exit 0 when identical, 1 with a unified diff otherwise.
 """
 import argparse, difflib, json, os, pathlib, subprocess, sys
@@ -113,6 +114,40 @@ def compare_binding(name, role_name, sa, namespace, live, kind="ClusterRoleBindi
     return diff(f"{kind}/{name}", want, {"roleRef": live.get("roleRef"), "subjects": live.get("subjects")})
 
 
+# NHC-only OpenShift platform contract (design brief D11). The bundle on both sides of the comparison lacks these
+# additions, so they are asserted explicitly: a missing supplement must fail, not match.
+NHC_PLATFORM_CONTRACT = [
+    ("Service", "node-healthcheck-controller-manager-metrics-service",
+     lambda o: {"labels.instance": (o["metadata"].get("labels") or {}).get("app.kubernetes.io/instance"),
+                "serving-cert": (o["metadata"].get("annotations") or {}).get("service.beta.openshift.io/serving-cert-secret-name")},
+     {"labels.instance": "metrics", "serving-cert": "node-healthcheck-tls"}),
+    ("ConfigMap", "node-healthcheck-ca-bundle",
+     lambda o: {"inject-cabundle": (o["metadata"].get("annotations") or {}).get("service.beta.openshift.io/inject-cabundle")},
+     {"inject-cabundle": "true"}),
+    ("Deployment", "node-healthcheck-controller-manager",
+     lambda o: {"manager-mounts": sorted((m["name"], m["mountPath"], bool(m.get("readOnly")))
+                                         for c in o["spec"]["template"]["spec"]["containers"] if c["name"] == "manager"
+                                         for m in c.get("volumeMounts") or [] if m["name"] == "tls-config"),
+                "volumes": sorted((v["name"], (v.get("secret") or {}).get("secretName"))
+                                  for v in o["spec"]["template"]["spec"].get("volumes") or [] if v["name"] == "tls-config")},
+     {"manager-mounts": [["tls-config", "/etc/tls/private", True]], "volumes": [["tls-config", "node-healthcheck-tls"]]}),
+    ("Service", "node-healthcheck-node-remediation-console-plugin",
+     lambda o: {"serving-cert": (o["metadata"].get("annotations") or {}).get("service.beta.openshift.io/serving-cert-secret-name"),
+                "port": o["spec"]["ports"][0]["port"]},
+     {"serving-cert": "nrc-plugin-cert", "port": 9443}),
+]
+PLATFORM_CONTRACTS = {"nhc": NHC_PLATFORM_CONTRACT}
+
+
+def check_platform_contract(component, get):
+    """get(kind, name) -> live object. Returns the number of failed checks (0 when the component has no contract)."""
+    failures = 0
+    for kind, name, project_fn, want in PLATFORM_CONTRACTS.get(component, []):
+        got = json.loads(json.dumps(project_fn(get(kind, name))))  # tuples -> lists, like the JSON diff below
+        failures += diff(f"platform {kind}/{name}", want, got)
+    return failures
+
+
 def kubectl_json(*args):
     kc = os.environ.get("KUBECONFIG")
     if not kc:
@@ -144,6 +179,7 @@ def main():
         failures += compare_rules(name, all_namespaces_rules(p["rules"]), live.get("rules"))
         live = kubectl_json("get", "clusterrolebinding", name)
         failures += compare_binding(name, name, sa, a.namespace, live)
+    failures += check_platform_contract(a.component, lambda kind, name: kubectl_json("get", kind, name, "-n", a.namespace))
     sys.exit(1 if failures else 0)
 
 
