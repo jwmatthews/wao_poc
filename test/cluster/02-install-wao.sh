@@ -1,51 +1,40 @@
 #!/usr/bin/env bash
-# test/cluster/02-install-wao.sh — WAO-INST-02: install WAO through OLM with a manually approved InstallPlan.
+# test/cluster/02-install-wao.sh — WAO-INST-02: install WAO through OLM v1.
+# Namespace, installer RBAC (D12) and the ClusterExtension pinned to 0.1.0; wait for Installed=True/Succeeded.
 source "$(dirname "$0")/lib.sh"
 echo "== WAO-INST-02 install"
-record 02-namespace apply -f - >/dev/null <<YAML
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: ${NS}
-  annotations:
-    openshift.io/node-selector: ""
-YAML
-record 02-operatorgroup apply -f - >/dev/null <<YAML
-apiVersion: operators.coreos.com/v1
-kind: OperatorGroup
-metadata:
-  name: wao
-  namespace: ${NS}
-spec: {}
-YAML
-record 02-subscription apply -f - >/dev/null <<YAML
-apiVersion: operators.coreos.com/v1alpha1
-kind: Subscription
-metadata:
-  name: ${PACKAGE}
-  namespace: ${NS}
-spec:
-  channel: ${CHANNEL}
-  name: ${PACKAGE}
-  source: ${CATALOG}
-  sourceNamespace: ${CAT_NS}
-  installPlanApproval: Manual
-YAML
+record 02-namespace apply -f "$OLMV1_DIR/namespace.yaml" >/dev/null
+for f in 00-serviceaccount 10-clusterrole 20-clusterrolebinding; do
+  record "02-installer-$f" apply -f "$OLMV1_DIR/wao/$f.yaml" >/dev/null
+done
+# On OpenShift 5.0 the API server answers with a deprecation warning for spec.serviceAccount; `record`
+# keeps stderr in the evidence and the apply still exits 0 (Review Focus 1).
+record 02-clusterextension apply -f "$OLMV1_DIR/wao/30-clusterextension.yaml" >/dev/null
 
-installplan_ref() { k get subscription "$PACKAGE" -n "$NS" -o jsonpath='{.status.installPlanRef.name}'; }
-has_installplan() { local ip; ip=$(installplan_ref) || return 1; [ -n "$ip" ]; }
-wait_for 180 "InstallPlan created" has_installplan
-ip=$(installplan_ref)
-record 02-installplan get installplan "$ip" -n "$NS" -o json >/dev/null
-csv=$(k get installplan "$ip" -n "$NS" -o jsonpath='{.spec.clusterServiceVersionNames[0]}')
-expect "InstallPlan installs $CSV_NAME" test "$csv" = "$CSV_NAME"
-record 02-approve patch installplan "$ip" -n "$NS" --type merge -p '{"spec":{"approved":true}}' >/dev/null
-
-csv_succeeded() { local p; p=$(k get csv "$CSV_NAME" -n "$NS" -o jsonpath='{.status.phase}') || return 1; [ "$p" = Succeeded ]; }
-wait_for 300 "CSV $CSV_NAME Succeeded" csv_succeeded
+progress() { k get clusterextension "$CE_NAME" -o jsonpath='{range .status.conditions[?(@.type=="Progressing")]}{.reason}: {.message}{end}' 2>/dev/null | cut -c1-300; }
+start=$(date +%s)
+until ce_installed "$CE_NAME"; do
+  msg=$(progress)
+  echo "t+$(( $(date +%s) - start ))s $msg"
+  case "$msg" in
+    *forbidden*|*"cannot be managed"*|*"already exists"*)
+      record 02-clusterextension-failed get clusterextension "$CE_NAME" -o json >/dev/null
+      echo "FAIL: ClusterExtension $CE_NAME: $msg" >&2; exit 1 ;;
+  esac
+  if (( $(date +%s) - start > 600 )); then
+    record 02-clusterextension-timeout get clusterextension "$CE_NAME" -o json >/dev/null
+    echo "TIMEOUT: ClusterExtension $CE_NAME Installed" >&2; exit 1
+  fi
+  sleep 10
+done
+record 02-clusterextension-status get clusterextension "$CE_NAME" -o json >/dev/null
+expect "ClusterExtension $CE_NAME Installed=True/Succeeded" ce_installed "$CE_NAME"
+expect "ClusterExtension $CE_NAME Progressing=True/Succeeded" ce_progressing_succeeded "$CE_NAME"
+expect "installed bundle is $CSV_NAME" test "$(ce_installed_bundle "$CE_NAME")" = "$CSV_NAME"
 wait_for 180 "WAO Deployment Available" deployment_available "$WAO_DEPLOYMENT"
 expect "exactly one Deployment (the WAO controller)" only_wao_deployment
 expect "all thirteen CRDs exist" crds_present "$ALL_CRDS"
-expect "the CSV owns all thirteen CRDs" jcheck \
-  'len({c["name"] for c in o["spec"]["customresourcedefinitions"]["owned"]}) == 13' get csv "$CSV_NAME" -n "$NS"
+expect "all thirteen CRDs are owned by the ClusterExtension" jcheck \
+  'len([c for c in o["items"] if "medik8s.io" in c["metadata"]["name"] and c["metadata"].get("labels", {}).get("olm.operatorframework.io/owner-name") == os.environ["CE_NAME"]]) == 13' \
+  get crd
 snapshot 02
