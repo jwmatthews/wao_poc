@@ -114,6 +114,7 @@ See [docs/agent-test-run.md](../../docs/agent-test-run.md).
   creates itself are expected (design brief D3).
 - Secrets are only checked for existence and data key names (`secret_key_names`), never values.
 - No script changes a webhook `failurePolicy`.
+- `05` runs read-only `curl` queries via `oc exec` inside `openshift-monitoring/prometheus-k8s-0`.
 - `05` edits `Console/cluster` only by appending or removing the single `node-remediation-console-plugin` entry; WAO itself never does (see docs/known-issues.md KI-1).
 
 ## Helpers (`lib.sh`)

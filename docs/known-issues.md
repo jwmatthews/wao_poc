@@ -13,6 +13,7 @@ bug to fix today. Add new entries at the end; keep numbers stable.
 | KI-5 | Diagnostics (must-gather) not packaged | Open |
 | KI-6 | `make test` discovers foreign Go sources under ignored `evidence/` | Open, local environment |
 | KI-7 | Browser-level console validation is manual | Open |
+| KI-8 | Intermittent MDR manager crashloop on the disposable cluster | Open |
 
 ## KI-1 Console plugin enablement is manual and the ConsolePlugin registration outlives disable
 
@@ -89,6 +90,15 @@ narrowing the Makefile paths or by keeping evidence outside the module root.
 
 ## KI-7 Browser-level console validation is manual
 
-The cluster harness verifies the plugin manifest through the console backend's plugin
-proxy, which also verifies the backend's service-ca certificate. It does not load the UI
+The cluster harness fetches `plugin-manifest.json` directly from the backend Service with
+the namespace service CA, because the console's plugin proxy rejects non-browser sessions
+(HTTP 401). That also verifies the backend's service-ca certificate. It does not load the UI
 in a browser or exercise the list and details views. Do that manually after a run.
+
+## KI-8 Intermittent MDR manager crashloop on the disposable cluster
+
+Status: Open. Not caused by this branch: no MDR manifest or code changed, and the MDR
+parity and disable cases passed. Observed in run 1 of 2026-10-10 (the MDR manager pod stayed
+0/1 Running with 5 restarts in 5 minutes, and case 09 timed out) and in two of five earlier
+runs on 2026-10-01. Case 09 now records `09-mdr-pods` and `09-events` on timeout. Revisit on
+the next occurrence by inspecting those records.

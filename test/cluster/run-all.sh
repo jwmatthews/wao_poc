@@ -37,6 +37,7 @@ Raw output in this directory is git-ignored and may contain cluster-identifying 
 - Enabling NHC also adds `node-remediation-console-plugin` to `Console/cluster` `spec.plugins` (administrator step,
   preserving other entries) and runs one short-lived curl pod in the install namespace; disabling NHC removes the entry.
 - Delete the WAO pod (twice), scale the SBR manager to 0 once, disable components, delete the config.
+- Case 05 runs read-only `curl` queries via `oc exec` inside `openshift-monitoring/prometheus-k8s-0`.
 - Case 13 deletes and re-annotates the WAO-owned ConfigMap `node-healthcheck-ca-bundle` once; WAO restores it.
 
 ## Cleanup (WAO-INST-18)
