@@ -204,12 +204,19 @@ oc get nodes --kubeconfig "$KC"
   DIGEST=$(oc get istag wao:latest -n wao-poc-build --kubeconfig "$KC" -o jsonpath='{.image.metadata.name}')
   IMG=image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@$DIGEST
   ```
-- Regenerate the bundle and render the catalog:
+- Regenerate the bundle, then build the bundle and catalog images and render the ClusterCatalog
+  (what `bash test/cluster/full-run.sh build` scripts; see README "Operator image, bundle image and catalog"):
   ```sh
   make bundle IMG=$IMG VERSION=0.1.0 CHANNELS=alpha DEFAULT_CHANNEL=alpha
   make bundle-check
-  make catalog-configmap DEFAULT_CHANNEL=alpha   # -> dist/wao-poc-catalog.yaml
+  make fbc BUNDLE_IMG=$BUNDLE_IMG                # -> dist/catalog/, validated with opm
+  make clustercatalog CATALOG_IMG=$CATALOG_IMG   # -> dist/wao-poc-clustercatalog.yaml
   ```
+- Why an FBC image: OLM v1's `ClusterCatalog` accepts only images (design brief D6). catalogd reads
+  the directory named by the `operators.operatorframework.io.index.configs.v1` label, so a
+  `FROM scratch` image is enough.
+- Gotchas:
+  - Both catalogd and operator-controller pull from the build namespace, so grant `system:image-puller` to `system:serviceaccounts:openshift-catalogd` and `system:serviceaccounts:openshift-operator-controller`, not only to the install namespace.
 
 ## 10. Task 9: the live-cluster test harness
 
@@ -299,7 +306,7 @@ oc get nodes --kubeconfig "$KC"
 
 ## Appendix
 
-- Command quick reference: `make bundles operand-manifests-check generate manifests test test-offline bundle bundle-check catalog-configmap`
+- Command quick reference: `make bundles operand-manifests-check generate manifests test test-offline bundle bundle-check fbc clustercatalog olmv1-manifests-check`
 - Where things live:
   - operand manifests: `internal/operands/manifests/`
   - controller: `internal/controller/`

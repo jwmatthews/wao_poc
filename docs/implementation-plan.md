@@ -3940,7 +3940,7 @@ Run from the repository root after Tasks 1–9, with `KUBECONFIG` pointing at th
 Superseded in part by [docs/superpowers/plans/2026-10-10-olmv1-default-deployment.md](superpowers/plans/2026-10-10-olmv1-default-deployment.md) (decisions D11 and D12): cases WAO-INST-00, 01, 02 and 18 now use OLM v1. 01 applies a `ClusterCatalog` instead of the CatalogSource, 02 applies the namespace, installer RBAC and a `ClusterExtension` instead of the OperatorGroup, Subscription and InstallPlan, and 18 deletes the `ClusterExtension`, which removes the thirteen CRDs itself. The rows below for those four cases describe the original classic OLM harness and are kept as history. Cases 03–17 are unchanged.
 
 **Prerequisites:**
-- A disposable OpenShift 4.x cluster with classic OLM that you are authorized to modify.
+- A disposable OpenShift 4.18 or newer cluster with OLM v1 that you are authorized to modify.
 - `linux/amd64` nodes.
 - A control-plane topology NHC supports.
 - No medik8s operators or CRDs installed.

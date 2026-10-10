@@ -64,7 +64,7 @@ Tools needed on PATH: `go`, `oc`, `python3`, `bash` 3.2 or later. `make bundle` 
 ## 2. Check the cluster is suitable (read-only)
 
 Preflight is read-only and checks everything the harness needs: supported control-plane
-topology, all nodes `linux/amd64`, classic OLM present, no medik8s CRDs or CSVs, the install
+topology, all nodes `linux/amd64`, OLM v1 present (`ClusterExtension` and `ClusterCatalog` APIs, operator-controller Available), no medik8s CRDs or CSVs, the install
 namespace absent, and the WAO image present in the internal registry.
 
 ```sh
@@ -80,7 +80,7 @@ different check fails, resolve it before continuing:
 | medik8s CRDs or CSVs exist | Uninstall the standalone medik8s operators and delete their CRDs. Ask before deleting anything on a cluster you were not told is clean. |
 | namespace `openshift-workload-availability` exists | A previous run did not clean up. Run `bash test/cluster/run-all.sh 18` and re-run preflight. |
 | topology unsupported or nodes not amd64 | The cluster cannot be used. Report it. |
-| classic OLM absent | The cluster cannot be used with this harness. The OLM v1 experiments in `test/olmv1/` are a separate path. |
+| OLM v1 absent | The cluster is older than OpenShift 4.18 or has OLM v1 disabled. It cannot be used; report it. |
 
 Preflight appends the OpenShift version, node count and topology to `evidence/<date>-wao-poc/RUN.md`.
 
@@ -111,14 +111,32 @@ works. If `wao-poc-build` already exists from an earlier run on this cluster, sk
 The build takes several minutes. If it fails, read the build log with
 `oc logs -f bc/wao -n wao-poc-build` and report the failure; do not retry blindly.
 
-## 4. Point the bundle at the new image and render the catalog
+## 4. Point the bundle at the new image, build the bundle and catalog images, render the ClusterCatalog
 
 ```sh
 IMG=image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@$DIGEST
 make bundle IMG=$IMG VERSION=0.1.0 CHANNELS=alpha DEFAULT_CHANNEL=alpha
 make bundle-check
-make catalog-configmap DEFAULT_CHANNEL=alpha   # writes dist/wao-poc-catalog.yaml (git-ignored)
+
+# bundle image
+STAGE=$(mktemp -d) && cp bundle.Dockerfile "$STAGE/Dockerfile" && cp -R bundle "$STAGE/bundle"
+oc new-build --binary --name wao-bundle -n wao-poc-build --strategy docker --kubeconfig "$KUBECONFIG"
+oc start-build wao-bundle -n wao-poc-build --from-dir="$STAGE" --follow --kubeconfig "$KUBECONFIG"
+BUNDLE_IMG=image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao-bundle@$(oc get istag wao-bundle:latest -n wao-poc-build --kubeconfig "$KUBECONFIG" -o jsonpath='{.image.metadata.name}')
+
+# file-based catalog and catalog image
+make fbc BUNDLE_IMG=$BUNDLE_IMG                      # dist/catalog/, validated with opm
+STAGE=$(mktemp -d) && cp catalog.Dockerfile "$STAGE/Dockerfile" && mkdir "$STAGE/dist" && cp -R dist/catalog "$STAGE/dist/catalog"
+oc new-build --binary --name wao-catalog -n wao-poc-build --strategy docker --kubeconfig "$KUBECONFIG"
+oc start-build wao-catalog -n wao-poc-build --from-dir="$STAGE" --follow --kubeconfig "$KUBECONFIG"
+CATALOG_IMG=image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao-catalog@$(oc get istag wao-catalog:latest -n wao-poc-build --kubeconfig "$KUBECONFIG" -o jsonpath='{.image.metadata.name}')
+make clustercatalog CATALOG_IMG=$CATALOG_IMG         # dist/wao-poc-clustercatalog.yaml (git-ignored)
 ```
+
+`bash test/cluster/full-run.sh build` does all of this. Catalogd and operator-controller pull
+from `wao-poc-build`, so `system:image-puller` must be granted to
+`system:serviceaccounts:openshift-catalogd` and `system:serviceaccounts:openshift-operator-controller`
+as well as the install namespace (`full-run.sh build` does that too).
 
 `make bundle` rewrites tracked files under `bundle/`. Confirm the only change is the image
 digest:
@@ -130,7 +148,7 @@ git diff bundle/manifests/workload-availability-operator.clusterserviceversion.y
 
 Expect the container `image` line and the `createdAt` timestamp in the CSV, and the image
 digest in `config/manager/kustomization.yaml`. Also update the digest quoted in the
-"Operator image and POC catalog" section of `README.md` by hand. Any other diff means
+"Operator image, bundle image and catalog" section of `README.md` by hand. Any other diff means
 something else changed and must be understood before continuing. Do not commit the bundle
 change yet; see section 8.
 
@@ -149,16 +167,16 @@ bash test/cluster/run-all.sh
 This runs cases 00 through 18 in order and takes roughly 30 to 45 minutes, most of it waiting
 for managers and CA injection. What it does, in order:
 
-- 01 applies the ConfigMap-backed CatalogSource `wao-poc-catalog` in `openshift-marketplace`.
-- 02 creates the namespace, OperatorGroup and Subscription, and approves the InstallPlan.
+- 01 applies the ClusterCatalog `wao-poc` and waits for `Serving=True`.
+- 02 creates the namespace and installer RBAC and applies the ClusterExtension `workload-availability-operator` pinned to 0.1.0.
 - 03 and 04 verify the clean-install invariants and the default all-Disabled config.
 - 05 to 10 enable NHC, SNR, SBR, FAR, MDR and NMO one at a time. **06 starts privileged SNR
   agents on every eligible node.**
 - 11 checks parity between the rendered operands and the upstream bundles.
 - 12 and 13 restart WAO and repair deliberate drift.
 - 14 to 17 disable everything and delete the config.
-- 18 uninstalls WAO, removes the thirteen CRDs and the SNR leftovers, and deletes the namespace
-  and catalog. It keeps `wao-poc-build` on purpose and reports it as a `LEFTOVER`.
+- 18 deletes the config and the SNR objects, deletes the ClusterExtension (which removes the thirteen CRDs and every CR),
+  then the installer RBAC, ClusterCatalog and namespace. It keeps `wao-poc-build` on purpose and reports it as a `LEFTOVER`.
 
 Rules while it runs:
 
@@ -282,7 +300,7 @@ DIGEST=$(oc get istag wao:latest -n wao-poc-build --kubeconfig "$KUBECONFIG" -o 
 
 # bundle and catalog
 make bundle IMG=image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@$DIGEST VERSION=0.1.0 CHANNELS=alpha DEFAULT_CHANNEL=alpha
-make bundle-check && make catalog-configmap DEFAULT_CHANNEL=alpha
+make bundle-check && make fbc BUNDLE_IMG=$BUNDLE_IMG && make clustercatalog CATALOG_IMG=$CATALOG_IMG
 bash test/cluster/run-all.sh 00                    # must pass cleanly now
 
 # full run and results

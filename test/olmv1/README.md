@@ -1,5 +1,10 @@
 # OLM v1 (ClusterExtension) experiments
 
+> Since decision D11 the repository installs only through OLM v1 and `test/cluster/` is the
+> harness for that. The scripts here remain the record of the experiments (0001–0005) that
+> informed it. `gen-installer-rbac.py --only wao` also produces the committed
+> `config/olmv1/wao/` manifests (`make olmv1-manifests`).
+
 Scripts for installing the six RHWA operators through OLM v1 `ClusterExtension` and
 exercising their admission webhooks. They mutate a real cluster, so read
 [AGENTS.md](../../AGENTS.md) first. Same conventions as [test/cluster](../cluster/README.md):

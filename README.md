@@ -32,7 +32,7 @@ component starts **Disabled**. See [docs/design-brief.md](docs/design-brief.md).
 | Design brief | Written |
 | Implementation plan for the install case | Written: [docs/implementation-plan.md](docs/implementation-plan.md) |
 | Implementation | Done: Tasks 1–10 (operator, operand manifests, bundle, image, POC catalog, live-cluster harness, docs) |
-| Live install verification | Run on a disposable OpenShift 4.22 cluster (3 nodes, `HighlyAvailable`): four full runs of 19 cases. Runs found two WAO RBAC bugs, both fixed (see [Deviations from the plan](#deviations-from-the-plan), items 3 and 8). The final run passed 17 of 19: WAO-INST-09 and WAO-INST-12 failed only because the upstream MDR manager could not start under its 30Mi memory limit, which reproduces without WAO (see [Known upstream issues](#known-upstream-issues)). Every other case passed. A fifth run on 2026-10-05 against a fresh OpenShift 5.0.0-rc.5 cluster (3 nodes, `HighlyAvailable`, classic OLM) through `test/cluster/full-run.sh` passed all 19 cases, including MDR, which started with a warm page cache that time. Raw results are not committed |
+| Live install verification | Run on a disposable OpenShift 4.22 cluster (3 nodes, `HighlyAvailable`): four full runs of 19 cases. Runs found two WAO RBAC bugs, both fixed (see [Deviations from the plan](#deviations-from-the-plan), items 3 and 8). The final run passed 17 of 19: WAO-INST-09 and WAO-INST-12 failed only because the upstream MDR manager could not start under its 30Mi memory limit, which reproduces without WAO (see [Known upstream issues](#known-upstream-issues)). Every other case passed. A fifth run on 2026-10-05 against a fresh OpenShift 5.0.0-rc.5 cluster (3 nodes, `HighlyAvailable`) through `test/cluster/full-run.sh` passed all 19 cases, including MDR, which started with a warm page cache that time. Raw results are not committed |
 | Upgrade scenarios | Future plan |
 
 ## Layout
@@ -49,7 +49,10 @@ component starts **Disabled**. See [docs/design-brief.md](docs/design-brief.md).
 | `hack/fetch-bundles.py` | Fetches the pinned bundles anonymously from quay.io and verifies digests |
 | `hack/extract-operand-manifests.py` | Generates the operand manifests, component CRDs and the union role from the bundles |
 | `hack/check-bundle.py` | Checks the generated bundle against the POC contract and `release-set.yaml` |
-| `hack/configmap-catalog.py` | Renders the POC ConfigMap-backed CatalogSource from `bundle/` |
+| `hack/fbc-catalog.py` | Renders the OLM v1 file-based catalog from `bundle/` |
+| `hack/clustercatalog.py` | Renders the `ClusterCatalog` for a catalog image digest |
+| `catalog.Dockerfile` | Scratch catalog image, FBC at `/configs` |
+| `config/olmv1/` | Namespace, installer RBAC and `ClusterExtension` (generated) |
 | `bundle/` | The generated OLM bundle (one CSV, thirteen CRDs) |
 | `test/cluster/` | Live-cluster harness: `full-run.sh` (build, install, run) and the per-case scripts, see its [README](test/cluster/README.md) |
 | `AGENTS.md` | Instructions for coding agents working in this repository |
@@ -126,51 +129,62 @@ under `evidence/<UTC-date>-kind-e2e-<pid>/`. CI saves only `e2e.log` as the
 
 `make operand-manifests` regenerates the operand manifests after a deliberate
 release-set change. `make bundle` and `make bundle-check` generate and check the
-bundle; `make catalog-configmap` renders the POC catalog (next section).
+bundle; `make fbc` and `make clustercatalog` render the OLM v1 catalog (next section).
 
-## Operator image and POC catalog
+## Operator image, bundle image and catalog
 
-**Registry choice:** the OpenShift internal image registry of the disposable test
-cluster (plan Task 8, option B). No external registry credentials are needed. The
-image is built on the cluster with an OpenShift binary Docker build in its own
-namespace `wao-poc-build`, not in the install namespace, because preflight
-(WAO-INST-00) requires `openshift-workload-availability` to be absent and OLM
-creates it later. The bundle references the image **by digest**.
+**Registry choice:** the OpenShift internal image registry of the disposable test cluster. No
+external registry credentials are needed. Three images are built there with OpenShift binary
+Docker builds in the namespace `wao-poc-build`, not in the install namespace, because preflight
+(WAO-INST-00) requires `openshift-workload-availability` to be absent:
 
-The build uploads a clean `git archive` of `HEAD`, never the working directory, so
-git-ignored files such as kubeconfigs are never sent to the cluster.
+| Image | BuildConfig | Built from | Referenced by |
+| --- | --- | --- | --- |
+| WAO operator | `wao` | `git archive HEAD` (never the working tree) | the bundle CSV, by digest |
+| Bundle | `wao-bundle` | `bundle.Dockerfile` + `bundle/` | the FBC `olm.bundle.image`, by digest |
+| Catalog | `wao-catalog` | `catalog.Dockerfile` + `dist/catalog/` | the `ClusterCatalog` `wao-poc`, by digest |
+
+`bash test/cluster/full-run.sh build` does all of this (see the next section). By hand:
 
 ```sh
 KC=/path/to/disposable-cluster.kubeconfig   # always passed explicitly
-SRC=$(mktemp -d) && git archive HEAD | tar -x -C "$SRC"
-
 oc create namespace wao-poc-build --kubeconfig "$KC"
+for g in openshift-workload-availability openshift-catalogd openshift-operator-controller; do
+  oc policy add-role-to-group system:image-puller "system:serviceaccounts:$g" -n wao-poc-build --kubeconfig "$KC"
+done
+
+# 1. operator image
+SRC=$(mktemp -d) && git archive HEAD | tar -x -C "$SRC"
 oc new-build --binary --name wao -n wao-poc-build --strategy docker --kubeconfig "$KC"
-# Let pods in the install namespace pull from the build namespace (works before it exists).
-oc policy add-role-to-group system:image-puller \
-  system:serviceaccounts:openshift-workload-availability -n wao-poc-build --kubeconfig "$KC"
 oc start-build wao -n wao-poc-build --from-dir="$SRC" --follow --kubeconfig "$KC"
+IMG=image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@$(oc get istag wao:latest -n wao-poc-build --kubeconfig "$KC" -o jsonpath='{.image.metadata.name}')
+make bundle IMG=$IMG VERSION=0.1.0 CHANNELS=alpha DEFAULT_CHANNEL=alpha && make bundle-check
 
-DIGEST=$(oc get istag wao:latest -n wao-poc-build --kubeconfig "$KC" -o jsonpath='{.image.metadata.name}')
-IMG=image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@$DIGEST
+# 2. bundle image
+STAGE=$(mktemp -d) && cp bundle.Dockerfile "$STAGE/Dockerfile" && cp -R bundle "$STAGE/bundle"
+oc new-build --binary --name wao-bundle -n wao-poc-build --strategy docker --kubeconfig "$KC"
+oc start-build wao-bundle -n wao-poc-build --from-dir="$STAGE" --follow --kubeconfig "$KC"
+BUNDLE_IMG=image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao-bundle@$(oc get istag wao-bundle:latest -n wao-poc-build --kubeconfig "$KC" -o jsonpath='{.image.metadata.name}')
 
-make bundle IMG=$IMG VERSION=0.1.0 CHANNELS=alpha DEFAULT_CHANNEL=alpha
-make bundle-check
-make catalog-configmap DEFAULT_CHANNEL=alpha   # writes dist/wao-poc-catalog.yaml (git-ignored)
+# 3. file-based catalog and catalog image
+make fbc BUNDLE_IMG=$BUNDLE_IMG                      # dist/catalog/, validated with opm
+STAGE=$(mktemp -d) && cp catalog.Dockerfile "$STAGE/Dockerfile" && mkdir "$STAGE/dist" && cp -R dist/catalog "$STAGE/dist/catalog"
+oc new-build --binary --name wao-catalog -n wao-poc-build --strategy docker --kubeconfig "$KC"
+oc start-build wao-catalog -n wao-poc-build --from-dir="$STAGE" --follow --kubeconfig "$KC"
+CATALOG_IMG=image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao-catalog@$(oc get istag wao-catalog:latest -n wao-poc-build --kubeconfig "$KC" -o jsonpath='{.image.metadata.name}')
+make clustercatalog CATALOG_IMG=$CATALOG_IMG         # dist/wao-poc-clustercatalog.yaml (git-ignored)
 ```
+
+For an external registry use `make bundle-build bundle-push catalog-build catalog-push` with
+`BUNDLE_IMG` and `CATALOG_IMG` set to digest references after the push.
 
 The committed bundle currently references
 `image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@sha256:6077f4265aaf49de3e445e07bd7ee1750171951cdc2d7de4a11f7d8f63328671`
-(linux/amd64). A different cluster needs its own build and a regenerated bundle.
-
-`dist/wao-poc-catalog.yaml` holds a ConfigMap with the CSV and thirteen CRDs and a
-`sourceType: internal` CatalogSource named `wao-poc-catalog` in
-`openshift-marketplace` (design brief D6). It is for the POC install case only. The
-upgrade case needs an FBC catalog image (`make catalog-build catalog-push`).
+(linux/amd64). A different cluster needs its own builds and a regenerated bundle.
 
 ## Run the POC on a cluster
 
-`test/cluster/full-run.sh` runs the POC on a **disposable** OpenShift cluster with classic OLM
+`test/cluster/full-run.sh` runs the POC on a **disposable** OpenShift 4.18+ cluster (OLM v1)
 that you are authorized to modify. Pass the kubeconfig explicitly; the current context is never
 used. Without `CONFIRM=yes` it shows the cluster and asks before changing anything.
 
@@ -192,20 +206,20 @@ Then run the desired phases from the repository root:
 
 ```sh
 export KUBECONFIG=/path/to/disposable.kubeconfig
-bash test/cluster/full-run.sh build      # build the WAO image on the cluster, point the bundle at it, render the catalog
-bash test/cluster/full-run.sh install    # install WAO through OLM; leaves it installed, every component Disabled
+bash test/cluster/full-run.sh build      # build the WAO, bundle and catalog images on the cluster, point the bundle at it, render the ClusterCatalog
+bash test/cluster/full-run.sh install    # install WAO through OLM v1; leaves it installed, every component Disabled
 bash test/cluster/full-run.sh run        # the full verification, WAO-INST-00..18, ending with uninstall and a report
 bash test/cluster/full-run.sh            # build, then run
 ```
 
 | Phase | What it does | Mutates |
 | --- | --- | --- |
-| `build` | Workstation checks (`make bundles operand-manifests-check test test-offline`), read-only preflight, on-cluster image build from `git archive HEAD` into `wao-poc-build`, `make bundle` pointed at the new digest, `make catalog-configmap` | namespace `wao-poc-build`; tracked files `README.md`, the bundle CSV and `config/manager/kustomization.yaml` (review and commit them) |
-| `install` | Cases 00–02: catalog, OLM install, InstallPlan approval. Prints the CSV and component phases and the `oc patch` to enable a component | CatalogSource in `openshift-marketplace`; namespace `openshift-workload-availability` |
+| `build` | Workstation checks (`make bundles operand-manifests-check test test-offline`), read-only preflight, on-cluster image build from `git archive HEAD` into `wao-poc-build`, `make bundle` pointed at the new digest, bundle and catalog image builds, `make fbc`, `make clustercatalog` | namespace `wao-poc-build`, BuildConfigs `wao-bundle`, `wao-catalog`; tracked files `README.md`, the bundle CSV and `config/manager/kustomization.yaml` (review and commit them) |
+| `install` | Cases 00–02: ClusterCatalog, namespace and installer RBAC, ClusterExtension. Prints the CSV and component phases and the `oc patch` to enable a component | ClusterCatalog `wao-poc`; namespace `openshift-workload-availability`; installer RBAC |
 | `run` | Cases 00–18: install, enable all six components, parity, restart, drift, disable, delete config, uninstall. Writes `REPORT.md` beside `results.json` | everything above, then removes it; case 06 starts SNR agents on every node |
 
-`install` and `run` need a prior `build` on that cluster (the image in its internal registry and
-`dist/wao-poc-catalog.yaml`). After `install`, continue with single cases such as
+`install` and `run` need a prior `build` on that cluster (the three images in its internal registry and
+`dist/wao-poc-clustercatalog.yaml`). After `install`, continue with single cases such as
 `bash test/cluster/run-all.sh 05` and clean up with `bash test/cluster/run-all.sh 18`.
 Options: `SKIP_BUILD=1` reuses the image already on the cluster, `SKIP_PREREQS=1` skips the
 workstation checks, `ALLOW_DIRTY=1` permits uncommitted changes. Raw output goes only to the
@@ -214,26 +228,32 @@ git-ignored `evidence/`. See [test/cluster/README.md](test/cluster/README.md) an
 
 ## Install by hand
 
-What `full-run.sh install` does, on a disposable cluster with no medik8s operators or CRDs installed:
+What `full-run.sh install` does, on a disposable OpenShift 4.18+ cluster with no medik8s operators
+or CRDs installed (design brief D11, D12):
 
-1. `oc apply -f dist/wao-poc-catalog.yaml` and wait for the CatalogSource to be `READY`.
-2. Create the namespace `openshift-workload-availability` with the annotation
-   `openshift.io/node-selector: ""`, an OperatorGroup with an empty spec (all
-   namespaces), and a Subscription to package `workload-availability-operator`,
-   channel `alpha`, source `wao-poc-catalog` in `openshift-marketplace`.
-3. Approve the InstallPlan. The CSV `workload-availability-operator.v0.1.0`
-   reaches `Succeeded` and owns all thirteen CRDs.
-4. WAO creates the config `cluster` with every component `Disabled` (D4). Enable a
-   component with, for example:
+1. `oc apply -f dist/wao-poc-clustercatalog.yaml` and wait for the `ClusterCatalog` `wao-poc` to
+   report `Serving=True`.
+2. `oc apply -f config/olmv1/namespace.yaml` (the namespace with `openshift.io/node-selector: ""`
+   and privileged PSA labels), then `oc apply -f config/olmv1/wao/00-serviceaccount.yaml`,
+   `10-clusterrole.yaml` and `20-clusterrolebinding.yaml` (installer RBAC; ignored on OpenShift 5.0,
+   required on 4.18–4.22).
+3. `oc apply -f config/olmv1/wao/30-clusterextension.yaml`. The `ClusterExtension`
+   `workload-availability-operator` reaches `Installed=True` with reason `Succeeded`, installs bundle
+   `workload-availability-operator.v0.1.0`, and the thirteen CRDs carry the label
+   `olm.operatorframework.io/owner-name=workload-availability-operator`.
+4. WAO creates the config `cluster` with every component `Disabled` (D4). Enable a component with,
+   for example:
 
    ```sh
    oc patch workloadavailabilityconfig cluster --type merge \
      -p '{"spec":{"components":{"nodeHealthCheck":{"state":"Enabled"}}}}'
    ```
 
-`test/cluster/02-install-wao.sh` performs steps 2 and 3. The harness in
-[test/cluster/](test/cluster/README.md) runs the whole install case (plan section 4).
-It writes raw output only to the git-ignored `evidence/`.
+**Uninstall:** delete the `WorkloadAvailabilityConfig` first so WAO's finalizer removes the
+operands; delete any `SelfNodeRemediationConfig` (its DaemonSet is garbage-collected); then
+`oc delete clusterextension workload-availability-operator`. **This deletes all thirteen CRDs and
+every remaining custom resource of those kinds.** Then delete the installer RBAC, the
+`ClusterCatalog` and the namespace.
 
 ## What Enabled and Disabled mean
 
@@ -272,14 +292,13 @@ removed, the operand objects it renders. Specifically:
 2. Delete the config: `oc delete workloadavailabilityconfig cluster`. Its finalizer
    removes any remaining operand objects. WAO creates a new all-Disabled config the
    next time it starts (D4), which is harmless.
-3. Delete the Subscription and the CSV in `openshift-workload-availability`. OLM
-   removes WAO's Deployment; CRDs remain, as with any OLM uninstall.
+3. Delete the ClusterExtension `workload-availability-operator`. OLM v1 removes WAO's
+   Deployment and the thirteen CRDs.
 4. If desired, remove what remains: delete the SNR config
    `self-node-remediation-config` (its agent DaemonSet is garbage-collected), the
-   SNR template and Secret `self-node-remediation-certificates`, the thirteen CRDs
-   (this deletes every custom resource of those kinds), the NHC aggregation
+   SNR template and Secret `self-node-remediation-certificates`, the NHC aggregation
    ClusterRole and binding, the ConsolePlugin, the `medik8s-leases` namespace, the
-   CatalogSource and its ConfigMap, the namespace and the `wao-poc-build` namespace.
+   ClusterCatalog, the namespace and the `wao-poc-build` namespace.
 
 `test/cluster/18-uninstall.sh` performs this cleanup.
 

@@ -7,14 +7,14 @@ Each case `WAO-INST-NN` has one script `NN-<slug>.sh`. The scripts mutate a real
 
 ## Prerequisites
 
-- A **disposable** OpenShift 4.x cluster with classic OLM that you are authorized to modify. Confirm which
+- A **disposable** OpenShift 4.18 or newer cluster with OLM v1 (default since 4.18) that you are authorized to modify. Confirm which
   cluster to use with the person you are working for before every session.
 - `linux/amd64` nodes and a control-plane topology NHC supports (`HighlyAvailable`, `SingleReplica`,
   `HighlyAvailableArbiter`, `External`).
 - No medik8s operators or CRDs installed.
 - The WAO image pullable by the cluster. The POC bundle points at the internal registry
   (`wao-poc-build/wao@sha256:…`); preflight checks the image stream image exists.
-- `dist/wao-poc-catalog.yaml` from `make catalog-configmap`, `.cache/bundles/` from `make bundles`, and
+- `dist/wao-poc-clustercatalog.yaml` from `make clustercatalog` (written by `full-run.sh build`), `.cache/bundles/` from `make bundles`, and
   `.venv` with `hack/requirements.txt` (PyYAML, used by `parity.py`).
 - `oc` (or `kubectl` via `OC=kubectl`) and `python3`. The scripts run under bash 3.2 or later. Run them with
   `bash`, not `zsh`.
@@ -35,7 +35,7 @@ python3 -m venv .venv
 ```
 
 The scripts use `<repository-root>/.venv/bin/python` directly by default, so activation is not required.
-`full-run.sh build` builds the WAO image on the cluster, but its local checks and bundle/catalog
+`full-run.sh build` builds the WAO, bundle and catalog images on the cluster, but its local checks and bundle/catalog
 generation need this environment. It does not create `.venv` automatically. If it reports
 `.venv/bin/python missing`, run the setup above; creating `.venv` inside `test/cluster` will not satisfy
 the check.
@@ -62,8 +62,8 @@ for inspection, then run `run-all.sh 18` later). Running a subset keeps earlier 
 | Script | Case | Mutates |
 | --- | --- | --- |
 | `00-preflight.sh` | WAO-INST-00 preflight | no |
-| `01-catalog.sh` | WAO-INST-01 catalog | CatalogSource and ConfigMap in `openshift-marketplace` |
-| `02-install-wao.sh` | WAO-INST-02 install via OLM | namespace, OperatorGroup, Subscription, InstallPlan approval |
+| `01-catalog.sh` | WAO-INST-01 catalog | ClusterCatalog `wao-poc` |
+| `02-install-wao.sh` | WAO-INST-02 install via OLM v1 | namespace, installer RBAC, ClusterExtension `workload-availability-operator` |
 | `03-clean-install.sh` | WAO-INST-03 clean-install invariants | no |
 | `04-default-config.sh` | WAO-INST-04 default config, status, CEL | no (dry-run only) |
 | `05-enable-nhc.sh` | WAO-INST-05 enable NHC | config patch |
@@ -91,7 +91,7 @@ Every phase confirms the cluster first (`CONFIRM=yes` skips the prompt) and logs
 - `build`: workstation checks, preflight with the image check skipped (`SKIP_IMAGE_CHECK=1`), on-cluster
   image build from `git archive HEAD` into `wao-poc-build`, `make bundle` pointed at the new digest (it
   also updates the digest quoted in `README.md`), a guard that only those three tracked files changed,
-  `make catalog-configmap`.
+  the bundle and catalog image builds, `make fbc` and `make clustercatalog`.
 - `install`: `run-all.sh 00 01 02`. Leaves WAO installed with every component Disabled and prints the
   next commands. Clean up with `run-all.sh 18`.
 - `run`: `run-all.sh` (00..18), then a `REPORT.md` skeleton beside `results.json` with a sanitization grep.
