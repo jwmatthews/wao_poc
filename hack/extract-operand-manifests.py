@@ -186,6 +186,10 @@ def apply_deployment_patch(dep, comp, platform, mods):
     pc = next(c for c in patch["spec"]["template"]["spec"]["containers"] if c["name"] == "manager")
     if pc.get("args") != manager.get("args") or pc.get("ports") != manager.get("ports"):
         raise SystemExit(f"{dep['metadata']['name']}: upstream OpenShift deployment patch ({upstream}) changes args or ports; review it")
+    taken = {v["name"] for v in pod.get("volumes") or []} | {m["name"] for m in manager.get("volumeMounts") or []}
+    clash = sorted(({v["name"] for v in patch["spec"]["template"]["spec"]["volumes"]} | {m["name"] for m in pc["volumeMounts"]}) & taken)
+    if clash:
+        raise SystemExit(f"{dep['metadata']['name']}: bundle already has volume or mount {clash} that the upstream OpenShift deployment patch ({upstream}) adds; review it")
     manager.setdefault("volumeMounts", []).extend(copy.deepcopy(pc["volumeMounts"]))
     pod.setdefault("volumes", []).extend(copy.deepcopy(patch["spec"]["template"]["spec"]["volumes"]))
     names = ", ".join(v["name"] for v in patch["spec"]["template"]["spec"]["volumes"])
@@ -422,6 +426,11 @@ def main():
         mods = []
         objects = (rbac(csv, comp, mods) + other_objects(others, comp, platform, mods) + deployments(csv, comp, platform, mods)
                    + webhooks(csv, comp, mods) + (platform_objects(comp, platform, mods) if platform else []))
+        if platform:
+            missing = [what for what, prefix in (("Service patch", "Service/"), ("Deployment patch", "Deployment/")) if not any(
+                m.startswith(prefix) and ("from upstream OpenShift packaging" in m) for m in mods)]
+            if missing:
+                raise SystemExit(f"{name}: upstream OpenShift packaging {', '.join(missing)} was not applied; the bundle's metrics Service or manager Deployment no longer matches")
         rendered[name] = (objects, mods)
         meta[name] = (bundle_ref, csv["metadata"]["name"], inputs, crds, platform)
         for crd_name, crd in crds:

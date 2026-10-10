@@ -1,5 +1,5 @@
 # hack/extract_operand_manifests_test.py
-import hashlib, json, pathlib, subprocess, sys, tempfile, unittest
+import hashlib, json, pathlib, shutil, subprocess, sys, tempfile, unittest
 
 import yaml
 
@@ -340,6 +340,37 @@ class ExtractionTest(unittest.TestCase):
                                 "--out", f"{d}/m", "--crd-out", f"{d}/c", "--rbac-out", f"{d}/u.yaml"], capture_output=True, text=True)
             self.assertNotEqual(r.returncode, 0)
             self.assertIn("deployment patch", r.stdout + r.stderr)
+
+    def _extract_with_modified_nhc_bundle(self, mutate):
+        """Run the extractor against a copy of the cached bundles whose NHC bundle was changed by mutate(manifests_dir)."""
+        with tempfile.TemporaryDirectory() as d:
+            cache = pathlib.Path(d) / "bundles"
+            shutil.copytree(CACHE, cache)
+            mutate(cache / "nhc" / "manifests")
+            return subprocess.run([sys.executable, str(SCRIPT), "--bundles", str(cache), "--release-set", str(RELEASE_SET),
+                                   "--out", f"{d}/m", "--crd-out", f"{d}/c", "--rbac-out", f"{d}/u.yaml"], capture_output=True, text=True)
+
+    def test_nhc_platform_service_patch_not_applied_fails_extraction(self):
+        def rename_metrics_service(manifests):
+            f = next(manifests.glob("*metrics-service_v1_service.yaml"))
+            svc = yaml.safe_load(f.read_text())
+            svc["metadata"]["name"] = "renamed-metrics-service"
+            f.write_text(yaml.safe_dump(svc))
+        r = self._extract_with_modified_nhc_bundle(rename_metrics_service)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("Service patch was not applied", r.stdout + r.stderr)
+
+    def test_nhc_platform_deployment_patch_volume_collision_fails_extraction(self):
+        def add_tls_config_volume(manifests):
+            f = next(manifests.glob("*.clusterserviceversion.yaml"))
+            csv = yaml.safe_load(f.read_text())
+            for d in csv["spec"]["install"]["spec"]["deployments"]:
+                if d["name"] == "node-healthcheck-controller-manager":
+                    d["spec"]["template"]["spec"].setdefault("volumes", []).append({"name": "tls-config", "emptyDir": {}})
+            f.write_text(yaml.safe_dump(csv))
+        r = self._extract_with_modified_nhc_bundle(add_tls_config_volume)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("already has volume or mount", r.stdout + r.stderr)
 
 
 if __name__ == "__main__":
