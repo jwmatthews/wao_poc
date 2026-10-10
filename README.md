@@ -32,7 +32,7 @@ component starts **Disabled**. See [docs/design-brief.md](docs/design-brief.md).
 | Design brief | Written |
 | Implementation plan for the install case | Written: [docs/implementation-plan.md](docs/implementation-plan.md) |
 | Implementation | Done: Tasks 1–10 (operator, operand manifests, bundle, image, POC catalog, live-cluster harness, docs) |
-| Live install verification | Run on a disposable OpenShift 4.22 cluster (3 nodes, `HighlyAvailable`): four full runs of 19 cases. Runs found two WAO RBAC bugs, both fixed (see [Deviations from the plan](#deviations-from-the-plan), items 3 and 8). The final run passed 17 of 19: WAO-INST-09 and WAO-INST-12 failed only because the upstream MDR manager could not start under its 30Mi memory limit, which reproduces without WAO (see [Known upstream issues](#known-upstream-issues)). Every other case passed. A fifth run on 2026-10-05 against a fresh OpenShift 5.0.0-rc.5 cluster (3 nodes, `HighlyAvailable`) through `test/cluster/full-run.sh` passed all 19 cases, including MDR, which started with a warm page cache that time. Raw results are not committed |
+| Live install verification | Run on a disposable OpenShift 4.22 cluster (3 nodes, `HighlyAvailable`): four full runs of 19 cases. Runs found two WAO RBAC bugs, both fixed (see [Deviations from the plan](#deviations-from-the-plan), items 3 and 8). The final run passed 17 of 19: WAO-INST-09 and WAO-INST-12 failed only because the upstream MDR manager could not start under its 30Mi memory limit, which reproduces without WAO (see [Known upstream issues](#known-upstream-issues)). Every other case passed. A fifth run on 2026-10-05 against a fresh OpenShift 5.0.0-rc.5 cluster (3 nodes, `HighlyAvailable`) through `test/cluster/full-run.sh` passed all 19 cases, including MDR, which started with a warm page cache that time. The OLM v1 install path (ClusterCatalog and ClusterExtension) was verified on 2026-10-10 on OpenShift 5.0.0-rc.5 (3 nodes, `HighlyAvailable`) through `test/cluster/full-run.sh all`: 19 pass, 0 fail, 0 blocked. Raw results are not committed |
 | Upgrade scenarios | Future plan |
 
 ## Layout
@@ -179,7 +179,7 @@ For an external registry use `make bundle-build bundle-push catalog-build catalo
 `BUNDLE_IMG` and `CATALOG_IMG` set to digest references after the push.
 
 The committed bundle currently references
-`image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@sha256:6077f4265aaf49de3e445e07bd7ee1750171951cdc2d7de4a11f7d8f63328671`
+`image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@sha256:6f54a0c72fbe8fe9ecc769c57b5e12ec952153ca9d1fd53269f19ec32195556a`
 (linux/amd64). A different cluster needs its own builds and a regenerated bundle.
 
 ## Run the POC on a cluster

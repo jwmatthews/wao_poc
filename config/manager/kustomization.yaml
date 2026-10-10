@@ -3,6 +3,6 @@ resources:
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
-- digest: sha256:6077f4265aaf49de3e445e07bd7ee1750171951cdc2d7de4a11f7d8f63328671
+- digest: sha256:6f54a0c72fbe8fe9ecc769c57b5e12ec952153ca9d1fd53269f19ec32195556a
   name: controller
   newName: image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao
