@@ -97,6 +97,7 @@ help: ## Display this help.
 
 PYTHON ?= .venv/bin/python
 BUNDLE_CACHE ?= .cache/bundles
+FBC_DIR ?= dist/catalog
 
 .PHONY: bundles
 bundles: ## Fetch the pinned upstream bundles from release-set.yaml into .cache/bundles.
@@ -113,9 +114,15 @@ operand-manifests-check: ## Verify the committed operand manifests, CRDs and uni
 bundle-check: ## Verify the generated bundle against the POC contract and release-set.yaml.
 	$(PYTHON) hack/check-bundle.py bundle release-set.yaml
 
+.PHONY: fbc
+fbc: bundle-check opm ## Render the OLM v1 file-based catalog for BUNDLE_IMG (digest ref) into dist/catalog and validate it.
+	rm -rf $(FBC_DIR)
+	$(PYTHON) hack/fbc-catalog.py --bundle bundle --bundle-image $(BUNDLE_IMG) --out $(FBC_DIR)
+	$(OPM) validate $(FBC_DIR)
+
 .PHONY: test-offline
 test-offline: ## Run every offline Python test and syntax-check the live-cluster scripts (no cluster needed).
-	$(PYTHON) -m unittest hack/extract_operand_manifests_test.py hack/e2e_runner_test.py
+	$(PYTHON) -m unittest hack/extract_operand_manifests_test.py hack/e2e_runner_test.py hack/fbc_catalog_test.py
 	$(PYTHON) -m unittest discover -s test/cluster -p 'parity_test.py'
 	$(PYTHON) -m unittest discover -s test/cluster -p 'results_test.py'
 	for f in test/cluster/*.sh; do bash -n "$$f" || exit 1; done
@@ -339,7 +346,7 @@ ifeq (,$(shell which opm 2>/dev/null))
 	set -e ;\
 	mkdir -p $(dir $(OPM)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.55.0/$${OS}-$${ARCH}-opm ;\
+	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.60.0/$${OS}-$${ARCH}-opm ;\
 	chmod +x $(OPM) ;\
 	}
 else
