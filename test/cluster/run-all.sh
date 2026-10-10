@@ -29,17 +29,18 @@ if [ ! -f "$RUN_DIR/RUN.md" ]; then
 Raw output in this directory is git-ignored and may contain cluster-identifying details.
 
 ## Intended mutations
-- Apply the ConfigMap-backed CatalogSource `wao-poc-catalog` in `openshift-marketplace`.
-- Create namespace `openshift-workload-availability`, an OperatorGroup and a Manual Subscription; approve the InstallPlan.
+- Apply the ClusterCatalog `wao-poc` (FBC image in the internal registry).
+- Create namespace `openshift-workload-availability`, the installer ServiceAccount `wao-installer` with its ClusterRole and
+  ClusterRoleBinding, and the ClusterExtension `workload-availability-operator` pinned to 0.1.0.
 - Enable each of the six components in turn. Enabling SNR starts privileged SNR agents on every eligible node (D3).
 - Server dry-run admission probes only. No NodeHealthCheck, StorageBasedRemediationConfig, FenceAgentsRemediation,
   MachineDeletionRemediation, NodeMaintenance or SelfNodeRemediation is ever created.
 - Delete the WAO pod (twice), scale the SBR manager to 0 once, disable components, delete the config.
 
 ## Cleanup (WAO-INST-18)
-- Delete the config, Subscription and CSV; record leftovers; delete the SNR config (agents stop), template and
-  Secret, the thirteen CRDs, the NHC aggregation role and binding, the ConsolePlugin, `medik8s-leases` if present,
-  the catalog and the namespace.
+- Delete the config and the SNR config, template and Secret (agents stop); delete the ClusterExtension, which removes
+  the thirteen CRDs and every remaining CR; delete the installer RBAC, the NHC aggregation role and binding, the
+  ConsolePlugin, `medik8s-leases` if present, the ClusterCatalog and the namespace.
 - Kept deliberately: the image build namespace `wao-poc-build`.
 MD
 fi

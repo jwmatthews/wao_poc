@@ -2,6 +2,9 @@
 # test/cluster/18-uninstall.sh — WAO-INST-18: uninstall WAO, record what remains, then clean the cluster back to a
 # state that passes WAO-INST-00 again. Deliberately keeps the image build namespace ($BUILD_NS).
 #
+# Delete the config, the SNR objects, then the ClusterExtension (which removes the thirteen CRDs and every CR), the
+# installer RBAC, the ClusterCatalog and the namespace.
+#
 # Cleanup keeps going after a failed step so one stuck object does not leave everything behind; the case fails
 # if any step failed. Deleting the SNR config garbage-collects the SNR agent DaemonSet (agents stop).
 source "$(dirname "$0")/lib.sh"
@@ -28,10 +31,21 @@ if found wac cluster >/dev/null 2>&1; then
   wait_for 180 "config deleted by WAO's finalizer" absent wac cluster || echo "note: config still present; finalizer cleared after uninstall"
 fi
 
-# 2. Uninstall WAO through OLM.
-record 18-delete-subscription delete subscription "$PACKAGE" -n "$NS" --ignore-not-found --wait=false >/dev/null || fail "delete Subscription"
-record 18-delete-csv delete csv "$CSV_NAME" -n "$NS" --ignore-not-found --wait=false >/dev/null || fail "delete CSV"
-expect "CSV $CSV_NAME gone" wait_for 180 "CSV gone" absent csv "$CSV_NAME" -n "$NS" || rc=1
+# 2. Uninstall WAO through OLM v1. Deleting the ClusterExtension deletes the thirteen CRDs and therefore every CR.
+# Remove the SNR objects first, while a stuck finalizer can still be cleared explicitly; otherwise the deletion could hang.
+if found selfnoderemediationconfig self-node-remediation-config -n "$NS" >/dev/null 2>&1; then
+  record 18-delete-snr-config delete selfnoderemediationconfig self-node-remediation-config -n "$NS" --wait=false >/dev/null || fail "delete SNR config"
+  if ! wait_for 120 "SNR config gone" absent selfnoderemediationconfig self-node-remediation-config -n "$NS"; then
+    clear_finalizers selfnoderemediationconfig self-node-remediation-config -n "$NS"
+    wait_for 60 "SNR config gone" absent selfnoderemediationconfig self-node-remediation-config -n "$NS" || fail "SNR config still present"
+  fi
+fi
+wait_for 180 "SNR agent DaemonSet garbage-collected" absent daemonset self-node-remediation-ds -n "$NS" \
+  || record 18-delete-snr-ds delete daemonset self-node-remediation-ds -n "$NS" --ignore-not-found --wait=false >/dev/null || true
+record 18-delete-snr-template delete selfnoderemediationtemplate self-node-remediation-automatic-strategy-template -n "$NS" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+record 18-ce-before get clusterextension "$CE_NAME" -o json >/dev/null 2>&1 || true
+record 18-delete-clusterextension delete clusterextension "$CE_NAME" --ignore-not-found --wait=false >/dev/null || fail "delete ClusterExtension"
+expect "ClusterExtension $CE_NAME gone" wait_for 600 "ClusterExtension gone" absent clusterextension "$CE_NAME" || rc=1
 expect "WAO Deployment gone" wait_for 180 "WAO Deployment gone" absent deployment "$WAO_DEPLOYMENT" -n "$NS" || rc=1
 
 # 3. Record what remains before cleaning up.
@@ -54,18 +68,6 @@ if found wac cluster >/dev/null 2>&1; then
   clear_finalizers workloadavailabilityconfig cluster
   wait_for 60 "config gone" absent wac cluster || fail "config still present"
 fi
-if found selfnoderemediationconfig self-node-remediation-config -n "$NS" >/dev/null 2>&1; then
-  record 18-delete-snr-config delete selfnoderemediationconfig self-node-remediation-config -n "$NS" --wait=false >/dev/null || fail "delete SNR config"
-  if ! wait_for 120 "SNR config gone" absent selfnoderemediationconfig self-node-remediation-config -n "$NS"; then
-    clear_finalizers selfnoderemediationconfig self-node-remediation-config -n "$NS"
-    wait_for 60 "SNR config gone" absent selfnoderemediationconfig self-node-remediation-config -n "$NS" || fail "SNR config still present"
-  fi
-fi
-if ! wait_for 180 "SNR agent DaemonSet garbage-collected" absent daemonset self-node-remediation-ds -n "$NS"; then
-  echo "NOTE: DaemonSet not garbage-collected; deleting it explicitly"
-  record 18-delete-snr-ds delete daemonset self-node-remediation-ds -n "$NS" --ignore-not-found --wait=false >/dev/null || fail "delete SNR DaemonSet"
-fi
-record 18-delete-snr-template delete selfnoderemediationtemplate self-node-remediation-automatic-strategy-template -n "$NS" --ignore-not-found --wait=false >/dev/null 2>&1 || true
 record 18-delete-snr-secret delete secret self-node-remediation-certificates -n "$NS" --ignore-not-found >/dev/null || fail "delete SNR Secret"
 
 # shellcheck disable=SC2086
@@ -84,9 +86,11 @@ if found namespace medik8s-leases >/dev/null 2>&1; then
   wait_for 300 "medik8s-leases gone" absent namespace medik8s-leases || fail "medik8s-leases still present"
 fi
 
-record 18-delete-catalog delete -f "$CATALOG_FILE" --ignore-not-found --wait=false >/dev/null || fail "delete catalog"
-wait_for 120 "CatalogSource gone" absent catalogsource "$CATALOG" -n "$CAT_NS" || fail "CatalogSource still present"
-wait_for 120 "catalog ConfigMap gone" absent configmap "$CATALOG" -n "$CAT_NS" || fail "catalog ConfigMap still present"
+record 18-delete-clustercatalog delete clustercatalog "$CLUSTERCATALOG" --ignore-not-found --wait=false >/dev/null || fail "delete ClusterCatalog"
+wait_for 120 "ClusterCatalog gone" absent clustercatalog "$CLUSTERCATALOG" || fail "ClusterCatalog still present"
+for f in 20-clusterrolebinding 10-clusterrole 00-serviceaccount; do
+  record "18-delete-installer-$f" delete -f "$OLMV1_DIR/wao/$f.yaml" --ignore-not-found >/dev/null || fail "delete installer $f"
+done
 
 record 18-delete-namespace delete namespace "$NS" --ignore-not-found --wait=false >/dev/null || fail "delete namespace"
 wait_for 600 "namespace $NS gone" absent namespace "$NS" || fail "namespace $NS still present"
@@ -97,7 +101,7 @@ if found namespace "$BUILD_NS" >/dev/null 2>&1; then
 fi
 
 # 6. The cluster passes preflight again.
-expect "CSV and WAO Deployment gone" absent csv "$CSV_NAME" -n "$NS" || rc=1
+expect "ClusterExtension gone" absent clusterextension "$CE_NAME" || rc=1
 expect "no WAO-labelled cluster-scoped object remains" none_found clusterrole,clusterrolebinding,validatingwebhookconfiguration,mutatingwebhookconfiguration -l app.kubernetes.io/managed-by=workload-availability-operator || rc=1
 if bash "$(dirname "$0")/00-preflight.sh" >"${RUN_DIR}/raw/18-final-preflight.log" 2>&1; then
   echo "PASS: final preflight (WAO-INST-00) passes again"
