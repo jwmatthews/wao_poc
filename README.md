@@ -239,7 +239,8 @@ It writes raw output only to the git-ignored `evidence/`.
 
 **Enabled** renders the component's operand objects from the pinned bundle and
 applies them with server-side apply: manager Deployment, Services, ServiceAccounts,
-roles and bindings, ConfigMaps and webhook configurations. The phase becomes
+roles and bindings, ConfigMaps and webhook configurations and, for NHC, the console backend Deployment and
+Service, the CA ConfigMap and Prometheus discovery RBAC (design brief D11). The phase becomes
 `Available` once the managers are ready and, for NHC, SNR, FAR and NMO, the
 service-ca CA bundles are injected into the webhooks (D1).
 
@@ -335,7 +336,7 @@ Bugs in the plan found and fixed during implementation:
    are stricter: an API error fails a check instead of counting as "absent".
 6. FAR v0.8.0 rejects a template without parameters, so the dry-run template
    carries one `nodeparameters` entry (field names are lower case).
-7. The CSV `relatedImages` lists the seven component images but not the WAO image
+7. The CSV `relatedImages` lists the eight component images (seven managers and agents plus the NHC console plugin) but not the WAO image
    itself; operator-sdk builds the list only from `RELATED_IMAGE_*` environment
    variables.
 8. A WAO bug found by the live tests: when OLM copies a CSV's namespaced

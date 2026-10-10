@@ -27,14 +27,18 @@ Every CRD has a single served and stored version: `v1beta1` for NMO's
 
 ## Node Health Check v0.12.0
 
-Bundle CSV `node-healthcheck-operator.v0.12.0`. Source tag commit
-`a49ec14c47c5c1f0e5b81c68bf2880ff17ec4a5f`.
+Bundle CSV `node-healthcheck-operator.v0.12.0`, taken from the OKD community bundle
+(`quay.io/community-operator-pipeline-prod/node-healthcheck-operator@sha256:e7684ebb…`), which is the
+published k8s bundle plus the console backend. Source tag commit
+`a49ec14c47c5c1f0e5b81c68bf2880ff17ec4a5f`. The OpenShift metrics additions below come from that
+commit's `config/manifests/ocp` and `config/optional/prometheus-ocp`, kept verbatim under
+`hack/platform/nhc/` (design brief D11).
 
 | Object | Name | Notes |
 | --- | --- | --- |
 | CRD | `nodehealthchecks.remediation.medik8s.io` | Cluster-scoped |
-| Deployment | `node-healthcheck-controller-manager` | 2 replicas; service account `node-healthcheck-controller-manager`; image `quay.io/medik8s/node-healthcheck-operator:v0.12.0`; args `--health-probe-bind-address=:8081 --metrics-bind-address=0.0.0.0:8443 --leader-elect --enable-http2=false`; env `DEPLOYMENT_NAMESPACE` and `POD_NAME` from the downward API; selector `app.kubernetes.io/component=controller-manager, app.kubernetes.io/name=node-healthcheck-operator`; control-plane tolerations; no volumes |
-| Service | `node-healthcheck-controller-manager-metrics-service` | 8443 to `https` |
+| Deployment | `node-healthcheck-controller-manager` | 2 replicas; service account `node-healthcheck-controller-manager`; image `quay.io/medik8s/node-healthcheck-operator:v0.12.0`; args `--health-probe-bind-address=:8081 --metrics-bind-address=0.0.0.0:8443 --leader-elect --enable-http2=false`; env `DEPLOYMENT_NAMESPACE` and `POD_NAME` from the downward API; selector `app.kubernetes.io/component=controller-manager, app.kubernetes.io/name=node-healthcheck-operator`; control-plane tolerations; WAO mounts `node-healthcheck-tls` read-only at `/etc/tls/private` (D11) and the webhook certificate (D1) |
+| Service | `node-healthcheck-controller-manager-metrics-service` | 8443 to `https`; WAO adds label `app.kubernetes.io/instance=metrics` and a serving-cert annotation for `node-healthcheck-tls` (D11) |
 | Service | `node-healthcheck-webhook-service` | 443 to 9443; WAO adds a service-ca serving-cert annotation (design brief D1) |
 | ClusterRole | `node-healthcheck-metrics-reader` | `/metrics` get |
 | CSV namespaced permissions | `node-healthcheck-controller-manager` | configmaps, leases, events |
@@ -42,13 +46,18 @@ Bundle CSV `node-healthcheck-operator.v0.12.0`. Source tag commit
 | CSV cluster permissions | `node-healthcheck-controller-manager` | 17 rules: namespaces create/get/patch; nodes and pods read; deployments and replicasets read; OpenShift config read; consoleplugins; leases; machinehealthchecks and machines; servicemonitors; PodDisruptionBudgets read; clusterroles and clusterrolebindings `*`; nodehealthchecks; tokenreviews; subjectaccessreviews |
 | ValidatingWebhookConfiguration | `node-healthcheck-validating-webhook-configuration` | Holds the webhook below; WAO adds the service-ca CA-bundle injection annotation (D1) |
 | Webhook | `vnodehealthcheck.kb.io` | Validating, `Fail`, CREATE/UPDATE/DELETE on `nodehealthchecks`, path `/validate-remediation-medik8s-io-v1alpha1-nodehealthcheck` |
+| Deployment | `node-healthcheck-node-remediation-console-plugin` | 1 replica; service account `node-healthcheck-console-plugin` (`automountServiceAccountToken: false`); image `quay.io/medik8s/node-remediation-console:v0.12.0`; nginx on 9443 serving the dynamic console plugin; mounts service-ca Secret `nrc-plugin-cert` at `/var/serving-cert` |
+| Service | `node-healthcheck-node-remediation-console-plugin` | 9443; serving-cert annotation for `nrc-plugin-cert`; the backend the NHC-created ConsolePlugin points at |
+| CSV namespaced permissions | `node-healthcheck-console-plugin` | one no-op `configmaps` rule, present so OLM creates the ServiceAccount; also copied cluster-wide as `-all-namespaces` |
+| ConfigMap | `node-healthcheck-ca-bundle` | `service.beta.openshift.io/inject-cabundle: "true"`; service-ca writes `service-ca.crt`; referenced by the NHC-created ServiceMonitor (D11) |
+| Role and RoleBinding | `node-healthcheck-prometheus-k8s` | services, endpoints, pods, endpointslices get/list/watch for `openshift-monitoring/prometheus-k8s` (D11) |
 
 Created by the NHC manager at runtime, not by WAO:
 
 | Object | Name | Source |
 | --- | --- | --- |
 | ClusterRole and ClusterRoleBinding | `node-healthcheck-operator-aggregation` | [rbac/aggregation.go](https://github.com/medik8s/node-healthcheck-operator/blob/a49ec14c47c5c1f0e5b81c68bf2880ff17ec4a5f/internal/controller/rbac/aggregation.go) |
-| ConsolePlugin (OpenShift only) | `node-remediation-console-plugin`, pointing at Service `node-healthcheck-node-remediation-console-plugin`, which the upstream bundle does not ship | [console/plugin.go](https://github.com/medik8s/node-healthcheck-operator/blob/a49ec14c47c5c1f0e5b81c68bf2880ff17ec4a5f/internal/controller/console/plugin.go) |
+| ConsolePlugin (OpenShift only) | `node-remediation-console-plugin`, pointing at Service `node-healthcheck-node-remediation-console-plugin`, which WAO renders from the OKD bundle | [console/plugin.go](https://github.com/medik8s/node-healthcheck-operator/blob/a49ec14c47c5c1f0e5b81c68bf2880ff17ec4a5f/internal/controller/console/plugin.go) |
 | ServiceMonitor (OpenShift only) | `node-healthcheck-controller-manager-metrics-monitor`, referencing CA ConfigMap `node-healthcheck-ca-bundle` | [servicemonitor/monitor.go](https://github.com/medik8s/node-healthcheck-operator/blob/a49ec14c47c5c1f0e5b81c68bf2880ff17ec4a5f/internal/controller/servicemonitor/monitor.go) |
 | Namespace | `medik8s-leases` (or `LEASE_NAMESPACE`), created on first node lease | medik8s common lease manager, vendored |
 
@@ -202,6 +211,7 @@ Creating a real `NodeMaintenance` cordons and drains the node.
 | Variable | Upstream reference in the bundle | Used for |
 | --- | --- | --- |
 | `RELATED_IMAGE_NHC_MANAGER` | `quay.io/medik8s/node-healthcheck-operator:v0.12.0` | NHC manager |
+| `RELATED_IMAGE_NHC_CONSOLE` | `quay.io/medik8s/node-remediation-console:v0.12.0` | NHC console plugin backend |
 | `RELATED_IMAGE_SNR_MANAGER` | `quay.io/medik8s/self-node-remediation-operator:v0.13.0` | SNR manager and, through `SELF_NODE_REMEDIATION_IMAGE`, its agents |
 | `RELATED_IMAGE_SBR_MANAGER` | `quay.io/medik8s/storage-based-remediation-operator:v0.3.0` | SBR manager |
 | `RELATED_IMAGE_SBR_AGENT` | `quay.io/medik8s/storage-based-remediation-agent:v0.3.0` | SBR agents, through `RELATED_IMAGE_AGENT` |
@@ -210,5 +220,5 @@ Creating a real `NodeMaintenance` cordons and drains the node.
 | `RELATED_IMAGE_NMO_MANAGER` | `quay.io/medik8s/node-maintenance-operator:v0.21.0` | NMO manager |
 
 The bundles reference tags. WAO renders the pinned digests from
-`release-set.yaml` instead, so a moved tag cannot change what is installed. All seven
+`release-set.yaml` instead, so a moved tag cannot change what is installed. All eight
 images are single-architecture `linux/amd64` at these releases.

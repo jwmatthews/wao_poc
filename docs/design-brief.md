@@ -150,6 +150,7 @@ out of scope for the POC.
 | D8 | The POC CSV owns all twelve component CRDs plus the WA config CRD, whether or not a component is enabled | One API owner per cluster; standalone installs of these operators cannot coexist with WAO | Same |
 | D9 | Placeholder namespaces left in bundle RBAC subjects (for example `sbr-operator-system`) are rewritten to the install namespace | OLM rewrites CSV-defined subjects; WAO must do the same for objects it renders | Same |
 | D10 | Every operand pod gets the label `workloadavailability.medik8s.io/component=<key>`. A Service whose upstream selector also matches another component's pods gets that label added to its selector. At these releases only MDR's metrics Service is affected | All six managers share one namespace, and MDR's upstream selector is only `control-plane: controller-manager`, a label every other manager pod also carries | Component-specific selectors upstream |
+| D11 | OpenShift platform supplements: where an upstream component publishes an OpenShift or OKD bundle built from the same tag, WAO pins that bundle; additions that exist only in upstream source (NHC's OCP metrics overlay) are applied from verbatim copies of the pinned commit's files under `hack/platform/<component>/`, recorded in provenance. WAO never edits `Console/cluster` or the component-created `ConsolePlugin`, and does not report them | The unchanged NHC manager assumes OpenShift packaging supplied its console backend and metrics TLS wiring; the published k8s bundle has neither. Console enablement and registration cleanup stay administrator actions (known issue KI-1) | Upstream bundles that carry the complete platform packaging |
 
 ## 9. Non-goals for the POC
 
@@ -172,7 +173,7 @@ On a clean OpenShift cluster with classic OLM:
 2. Nothing component-related runs until enabled.
 3. Enabling each of the six components yields operand Deployments and RBAC
    identical to the upstream bundle, apart from the documented certificate wiring
-   and component label, and working admission.
+   and component label, and, for NHC on OpenShift, the platform supplements of D11, and working admission.
 4. Every operand Service selects only its own component's pods.
 5. Disable and config deletion behave as described in sections 7 and 8, and status
    tells the truth about what is left.

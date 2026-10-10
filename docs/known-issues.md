@@ -46,6 +46,9 @@ oc --kubeconfig "$KUBECONFIG" patch consoles.operator.openshift.io cluster --typ
 oc --kubeconfig "$KUBECONFIG" delete consoleplugin node-remediation-console-plugin
 ```
 
+The live harness performs enablement in `test/cluster/05-enable-nhc.sh` and removal in
+`15-disable-nmo-nhc.sh`.
+
 ## KI-2 Platform Prometheus EndpointSlice discovery parity
 
 The upstream OCP overlay grants the platform Prometheus ServiceAccount get/list/watch on
