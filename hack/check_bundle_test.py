@@ -77,6 +77,13 @@ class CheckBundleTest(unittest.TestCase):
         self.assertIn("ConfigMap/extra", proc.stdout)
         self.assertNotIn("ConfigMap catalog", proc.stdout)
 
+    def test_missing_feature_annotation_rejected(self):
+        del self.csv["metadata"]["annotations"]["features.operators.openshift.io/disconnected"]
+        self.save()
+        proc = check(self.bundle)
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("features.operators.openshift.io", proc.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

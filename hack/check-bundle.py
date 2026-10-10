@@ -49,6 +49,15 @@ def olmv1_problems(csv, bundle_dir):
         types = {p.get("type") for p in (yaml.safe_load(props_file.read_text()) or {}).get("properties", [])}
         for t in sorted(types & UNSUPPORTED_PROPERTIES):
             problems.append(f"metadata/properties.yaml declares {t}; OLM v1 rejects dependency properties")
+    annotations = csv["metadata"].get("annotations", {})
+    missing = [k for k in ("disconnected", "fips-compliant", "proxy-aware", "tls-profiles", "token-auth-aws",
+                           "token-auth-azure", "token-auth-gcp", "cnf", "cni", "csi")
+               if f"features.operators.openshift.io/{k}" not in annotations]
+    if missing:
+        problems.append(f"CSV lacks features.operators.openshift.io annotations: {missing}")
+    bundle_ann = yaml.safe_load((meta / "annotations.yaml").read_text())["annotations"]
+    if "com.redhat.openshift.versions" not in bundle_ann:
+        problems.append("metadata/annotations.yaml lacks com.redhat.openshift.versions (run make bundle)")
     return problems
 
 

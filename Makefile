@@ -5,6 +5,9 @@
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= 0.0.1
 
+# OPENSHIFT_VERSIONS is the com.redhat.openshift.versions value written into the bundle metadata.
+OPENSHIFT_VERSIONS ?= v4.18
+
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
@@ -147,7 +150,7 @@ clustercatalog: ## Render the ClusterCatalog for CATALOG_IMG (digest ref) into d
 
 .PHONY: test-offline
 test-offline: ## Run every offline Python test and syntax-check the live-cluster scripts (no cluster needed).
-	$(PYTHON) -m unittest hack/extract_operand_manifests_test.py hack/e2e_runner_test.py hack/fbc_catalog_test.py hack/check_bundle_test.py hack/clustercatalog_test.py
+	$(PYTHON) -m unittest hack/extract_operand_manifests_test.py hack/e2e_runner_test.py hack/fbc_catalog_test.py hack/check_bundle_test.py hack/clustercatalog_test.py hack/bundle_annotations_test.py
 	$(PYTHON) -m unittest discover -s test/cluster -p 'parity_test.py'
 	$(PYTHON) -m unittest discover -s test/cluster -p 'results_test.py'
 	for f in test/cluster/*.sh; do bash -n "$$f" || exit 1; done
@@ -353,6 +356,7 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	rm -rf bundle/manifests # generate bundle --overwrite never removes stale objects
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
+	$(PYTHON) hack/bundle-annotations.py --bundle bundle --dockerfile bundle.Dockerfile --openshift-versions $(OPENSHIFT_VERSIONS)
 	$(OPERATOR_SDK) bundle validate ./bundle
 
 .PHONY: bundle-build
