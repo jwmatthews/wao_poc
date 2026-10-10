@@ -160,7 +160,7 @@ make catalog-configmap DEFAULT_CHANNEL=alpha   # writes dist/wao-poc-catalog.yam
 ```
 
 The committed bundle currently references
-`image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@sha256:78859f4e9ea5fdf1fcf8df3ddf1b8405e483b19784bd02fe1f3d5dc94813b5f5`
+`image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@sha256:579bbf8f03e9365bb348a66cd80a07e30aec1e5eddc70e076c39ffd3d344afed`
 (linux/amd64). A different cluster needs its own build and a regenerated bundle.
 
 `dist/wao-poc-catalog.yaml` holds a ConfigMap with the CSV and thirteen CRDs and a
