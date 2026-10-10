@@ -20,7 +20,8 @@ expect "WAO removed the console backend" absent deployment node-healthcheck-node
 if console_plugin_enabled node-remediation-console-plugin; then
   others=$(console_plugins | python3 -c 'import json, sys; print(json.dumps([p for p in json.load(sys.stdin) if p != "node-remediation-console-plugin"]))')
   disable_console_plugin 15-disable-plugin node-remediation-console-plugin
-  expect "plugin entry removed from Console/cluster, other entries preserved" [ "$(console_plugins)" = "$others" ]
+  expect "plugin entry removed from Console/cluster, other entries preserved" \
+    python3 -c 'import json, sys; sys.exit(0 if json.loads(sys.argv[1]) == json.loads(sys.argv[2]) else 1)' "$others" "$(console_plugins)"
 fi
 expect "no NHC webhook name is registered" no_webhook_matching 'vnodehealthcheck\.kb\.io'
 expect "no NMO webhook name is registered" no_webhook_matching 'vnodemaintenance\.kb\.io'
