@@ -95,6 +95,13 @@ class ParityTest(unittest.TestCase):
                 e["valueFrom"]["fieldRef"]["apiVersion"] = "v1"
         self.assertEqual(parity.compare_deployment(d, live["spec"], images), 0)
 
+    def test_nhc_manager_tls_volume_is_tolerated_like_the_webhook_volume(self):
+        # Spec P3: the metrics serving-certificate volume is a documented WAO addition, not drift.
+        self.assertEqual(parity.WAO_VOLUMES, {"webhook-server-cert", "tls-config"})
+        images = parity.image_map(self.release_set, "nhc")
+        d = next(x for x in parity.bundle_csv("nhc")["spec"]["install"]["spec"]["deployments"] if x["name"] == "node-healthcheck-controller-manager")
+        self.assertEqual(parity.compare_deployment(d, self.rendered("nhc", d["name"])["spec"], images), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -279,6 +279,68 @@ class ExtractionTest(unittest.TestCase):
             self.skipTest("committed outputs not generated yet")
         run(committed, REPO / "config/crd/bases", REPO / "config/rbac/operand_union_role.yaml", "--check")
 
+    def test_nhc_metrics_platform_wiring(self):
+        # Issue #3: what upstream's config/manifests/ocp overlay adds for platform Prometheus mTLS.
+        svc = next(s for s in self.kinds(self.nhc, "Service") if s["metadata"]["name"] == "node-healthcheck-controller-manager-metrics-service")
+        self.assertEqual(svc["metadata"]["labels"]["app.kubernetes.io/instance"], "metrics")
+        self.assertEqual(svc["metadata"]["annotations"]["service.beta.openshift.io/serving-cert-secret-name"], "node-healthcheck-tls")
+        self.assertNotIn("app.kubernetes.io/instance", svc["spec"]["selector"], "the label is on the Service, not the pods")
+        d = next(x for x in self.kinds(self.nhc, "Deployment") if x["metadata"]["name"] == "node-healthcheck-controller-manager")
+        pod = d["spec"]["template"]["spec"]
+        vol = next(v for v in pod["volumes"] if v["name"] == "tls-config")
+        self.assertEqual(vol, {"name": "tls-config", "secret": {"secretName": "node-healthcheck-tls"}}, "not optional: startup waits for issuance")
+        manager = next(c for c in pod["containers"] if c["name"] == "manager")
+        self.assertIn({"name": "tls-config", "mountPath": "/etc/tls/private", "readOnly": True}, manager["volumeMounts"])
+        self.assertIn("webhook-server-cert", [m["name"] for m in manager["volumeMounts"]], "D1 webhook wiring still present")
+        cm = next(x for x in self.kinds(self.nhc, "ConfigMap") if x["metadata"]["name"] == "node-healthcheck-ca-bundle")
+        self.assertEqual(cm["metadata"]["annotations"], {"service.beta.openshift.io/inject-cabundle": "true"})
+        self.assertEqual(cm["metadata"]["namespace"], "__WAO_NAMESPACE__")
+        self.assertNotIn("data", cm, "service-ca owns the data; WAO applies none")
+
+    def test_nhc_prometheus_discovery_rbac_keeps_external_subject(self):
+        role = next(x for x in self.kinds(self.nhc, "Role") if x["metadata"]["name"] == "node-healthcheck-prometheus-k8s")
+        self.assertTrue(any("endpointslices" in r["resources"] for r in role["rules"]))
+        rb = next(x for x in self.kinds(self.nhc, "RoleBinding") if x["metadata"]["name"] == "node-healthcheck-prometheus-k8s")
+        self.assertEqual(rb["roleRef"], {"apiGroup": "rbac.authorization.k8s.io", "kind": "Role", "name": "node-healthcheck-prometheus-k8s"})
+        self.assertEqual(rb["subjects"], [{"kind": "ServiceAccount", "name": "prometheus-k8s", "namespace": "openshift-monitoring"}])
+
+    def test_nhc_client_ca_read_is_covered_without_a_kube_system_role(self):
+        for comp, docs in self.docs.items():
+            for d in docs.values():
+                self.assertNotEqual(d["metadata"].get("namespace"), "kube-system", f"{comp} renders into kube-system")
+        cr = next(x for x in self.kinds(self.nhc, "ClusterRole") if x["metadata"]["name"] == "node-healthcheck-controller-manager-all-namespaces")
+        self.assertTrue(any("" in r["apiGroups"] and "configmaps" in r["resources"] and {"get", "list", "watch"} <= set(r["verbs"])
+                            for r in cr["rules"]), "NHC manager cannot read kube-system/extension-apiserver-authentication")
+
+    def test_nhc_platform_sources_recorded(self):
+        prov = json.loads((self.out / "provenance.json").read_text())
+        src = prov["bundles"]["nhc"]["platform_sources"]
+        self.assertEqual(src["upstream"], "https://github.com/medik8s/node-healthcheck-operator")
+        self.assertEqual(src["commit"], "a49ec14c47c5c1f0e5b81c68bf2880ff17ec4a5f")
+        self.assertEqual(set(src["files"]), {"ca-configmap.yaml", "prometheus-k8s-role.yaml", "prometheus-k8s-rolebinding.yaml",
+                                             "auth_proxy_service_patch.yaml", "deployment_patch.yaml"})
+        for local, entry in src["files"].items():
+            self.assertEqual(entry["sha256"], sha(REPO / "hack/platform/nhc" / local), local)
+            self.assertTrue(entry["path"].startswith("config/"), local)
+        for comp in ("snr", "sbr", "far", "mdr", "nmo"):
+            self.assertNotIn("platform_sources", prov["bundles"][comp])
+
+    def test_nhc_platform_deployment_patch_drift_fails_extraction(self):
+        # If upstream's OCP deployment patch ever changes more than the volume and mount, review it; do not absorb it silently.
+        with tempfile.TemporaryDirectory() as d:
+            plat = pathlib.Path(d) / "platform" / "nhc"
+            plat.mkdir(parents=True)
+            for f in (REPO / "hack/platform/nhc").glob("*.yaml"):
+                (plat / f.name).write_text(f.read_text())
+            patch = yaml.safe_load((plat / "deployment_patch.yaml").read_text())
+            patch["spec"]["template"]["spec"]["containers"][0]["args"].append("--new-flag")
+            (plat / "deployment_patch.yaml").write_text(yaml.safe_dump(patch))
+            r = subprocess.run([sys.executable, str(SCRIPT), "--bundles", str(CACHE), "--release-set", str(RELEASE_SET),
+                                "--platform", str(pathlib.Path(d) / "platform"),
+                                "--out", f"{d}/m", "--crd-out", f"{d}/c", "--rbac-out", f"{d}/u.yaml"], capture_output=True, text=True)
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn("deployment patch", r.stdout + r.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

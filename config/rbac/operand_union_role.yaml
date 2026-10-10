@@ -197,6 +197,16 @@ rules:
   - ''
   resources:
   - services
+  - endpoints
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - services
   - serviceaccounts
   - configmaps
   verbs:
@@ -359,6 +369,14 @@ rules:
   - update
   - patch
   - delete
+- apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - fence-agents-remediation.medik8s.io
   resources:

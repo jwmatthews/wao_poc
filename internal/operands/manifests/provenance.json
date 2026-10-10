@@ -107,22 +107,56 @@
         "nhc/11-ClusterRoleBinding-node-healthcheck-controller-manager.yaml": "aeb21d9b91f11813a5d165356622852beca956a8e05d093b20f9924d823a3395",
         "nhc/20-Role-node-healthcheck-console-plugin.yaml": "27c637ed1c861d960b49069c40b7f3b03396e9a55ce60e52edc29bbefdff6dae",
         "nhc/20-Role-node-healthcheck-controller-manager.yaml": "6892fd3c6e2b4f4ab0e7f8bb0798e294ff9e2b359498deb0a507b267017c7ff4",
+        "nhc/20-Role-node-healthcheck-prometheus-k8s.yaml": "d91f69561706b91ac78488c1c6d235ef447e69c02da9b38d0e179683e86419f4",
         "nhc/21-RoleBinding-node-healthcheck-console-plugin.yaml": "79f2ba70ef79f581ee9d58a7bc79739cb6209a0e628f027bd177bf5adc3599a6",
         "nhc/21-RoleBinding-node-healthcheck-controller-manager.yaml": "9997d7d9eed0e9258427e217c38653403077dca94b47d3cadab6b983bc14aed0",
-        "nhc/40-Service-node-healthcheck-controller-manager-metrics-service.yaml": "d09653e14ea55b4571236ab7ee73105ca4981a2ea8714671b8618969e06e5f8a",
+        "nhc/21-RoleBinding-node-healthcheck-prometheus-k8s.yaml": "a554e29da2aee0b17cc005a14e0343808f004fb9c7be767310ec411957a73fd8",
+        "nhc/30-ConfigMap-node-healthcheck-ca-bundle.yaml": "b9fa31b0162fe5deea7c5b96f8eb18647aa45f707db9921a734f38cdc8c7a240",
+        "nhc/40-Service-node-healthcheck-controller-manager-metrics-service.yaml": "1deec391f4fbe8a7cd94932f99d157bfeaab582ba2b611f4488d67ee93fb369a",
         "nhc/40-Service-node-healthcheck-node-remediation-console-plugin.yaml": "27ca1e9a322adefdf5b5eeec40c5496097e817ef245568ac102668134fe9e4fc",
         "nhc/40-Service-node-healthcheck-webhook-service.yaml": "cd2b3fd83be0c232d489b4aa2fa67fcee965d2b319624334cd1f5d788c1e74d6",
-        "nhc/50-Deployment-node-healthcheck-controller-manager.yaml": "0f170521dc5f350f009192e3890f46dd777bd4c78111a7fa696455158f4a465a",
+        "nhc/50-Deployment-node-healthcheck-controller-manager.yaml": "18ff8fb1e7d4e0ab53abea7c8314479ba5acbb06f96058e160ed1161775c13aa",
         "nhc/50-Deployment-node-healthcheck-node-remediation-console-plugin.yaml": "c653ce9295bea3ec3c2db6c4edd7f7d909588a63675c7d38acbd436f8c47af54",
         "nhc/60-ValidatingWebhookConfiguration-node-healthcheck-validating-webhook-configuration.yaml": "a20d2901420f6d0de879abedebff203a46ccdd7eed2615ad1ca62292c3bcfd1e"
+      },
+      "platform_sources": {
+        "commit": "a49ec14c47c5c1f0e5b81c68bf2880ff17ec4a5f",
+        "files": {
+          "auth_proxy_service_patch.yaml": {
+            "path": "config/manifests/ocp/auth_proxy_service_patch.yaml",
+            "sha256": "dd82781424269e9c75bc21f612d22a1864e2e0af3a5e17d2e4ab6527b3e9faeb"
+          },
+          "ca-configmap.yaml": {
+            "path": "config/optional/prometheus-ocp/ca-configmap.yaml",
+            "sha256": "cec581e690ef884b514dac8a4a517d54636281cdfdd0909750ab124e075ba0b3"
+          },
+          "deployment_patch.yaml": {
+            "path": "config/manifests/ocp/deployment_patch.yaml",
+            "sha256": "bd746f994645bce1c42c420928af1de83a754da13345d2023950aaa4e188899f"
+          },
+          "prometheus-k8s-role.yaml": {
+            "path": "config/optional/prometheus-ocp/prometheus-k8s-role.yaml",
+            "sha256": "342a03e70ef66710d87255240225915fcc1e9ec19639e52c09f7de1eeab2ff98"
+          },
+          "prometheus-k8s-rolebinding.yaml": {
+            "path": "config/optional/prometheus-ocp/prometheus-k8s-rolebinding.yaml",
+            "sha256": "466bf2ffbd165e9d11157a394e414c678d77d780d4886389c24a922f25800230"
+          }
+        },
+        "upstream": "https://github.com/medik8s/node-healthcheck-operator"
       },
       "wao_modifications": [
         "CSV permissions for node-healthcheck-console-plugin also rendered as ClusterRole/ClusterRoleBinding node-healthcheck-console-plugin-all-namespaces, as OLM grants them for an AllNamespaces OperatorGroup, plus OLM's appended get/list/watch rule on namespaces",
         "CSV permissions for node-healthcheck-controller-manager also rendered as ClusterRole/ClusterRoleBinding node-healthcheck-controller-manager-all-namespaces, as OLM grants them for an AllNamespaces OperatorGroup, plus OLM's appended get/list/watch rule on namespaces",
         "CSV permissions/clusterPermissions rendered as Role/RoleBinding/ClusterRole/ClusterRoleBinding named after each ServiceAccount",
+        "ConfigMap/node-healthcheck-ca-bundle: added from upstream OpenShift packaging config/optional/prometheus-ocp/ca-configmap.yaml",
+        "Deployment/node-healthcheck-controller-manager: added metrics serving-certificate volume tls-config from upstream OpenShift packaging config/manifests/ocp/deployment_patch.yaml",
         "Deployment/node-healthcheck-controller-manager: added service-ca webhook certificate volume node-healthcheck-webhook-server-cert at /tmp/k8s-webhook-server/serving-certs",
         "Deployment/node-healthcheck-controller-manager: pod template labeled workloadavailability.medik8s.io/component=nodeHealthCheck",
         "Deployment/node-healthcheck-node-remediation-console-plugin: pod template labeled workloadavailability.medik8s.io/component=nodeHealthCheck",
+        "Role/node-healthcheck-prometheus-k8s: added from upstream OpenShift packaging config/optional/prometheus-ocp/prometheus-k8s-role.yaml",
+        "RoleBinding/node-healthcheck-prometheus-k8s: added from upstream OpenShift packaging config/optional/prometheus-ocp/prometheus-k8s-rolebinding.yaml",
+        "Service/node-healthcheck-controller-manager-metrics-service: merged labels and annotations from upstream OpenShift packaging config/manifests/ocp/auth_proxy_service_patch.yaml",
         "Service/node-healthcheck-webhook-service: added service.beta.openshift.io/serving-cert-secret-name",
         "ServiceAccount/node-healthcheck-console-plugin: automountServiceAccountToken=false, as upstream's service_account.yaml sets it",
         "ValidatingWebhookConfiguration: generated from CSV webhookdefinitions with service-ca CA bundle injection"

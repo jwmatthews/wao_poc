@@ -9,7 +9,7 @@ release-set.yaml before comparing.
 RBAC checked: each clusterPermissions ClusterRole, and for each namespaced `permissions` entry the
 Role plus the ClusterRole and ClusterRoleBinding `<sa>-all-namespaces` that OLM would also create for an
 AllNamespaces OperatorGroup (the CSV rules followed by OLM's get/list/watch rule on namespaces).
-Tolerated differences: the WAO-added webhook-server-cert volume and mount (D1), the WAO component
+Tolerated differences: the WAO-added webhook-server-cert (D1) and tls-config (D11) volumes and mounts, the WAO component
 pod label (D10), and fields the bundle leaves unset that the API server defaults.
 Exit 0 when identical, 1 with a unified diff otherwise.
 """
@@ -18,7 +18,9 @@ import argparse, difflib, json, os, pathlib, subprocess, sys
 import yaml
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
-WAO_VOLUME = "webhook-server-cert"
+# Volumes WAO adds to upstream Deployments: the service-ca webhook certificate (D1) and NHC's metrics serving
+# certificate from the upstream OpenShift overlay (D11). Everything else in a pod spec must match the bundle.
+WAO_VOLUMES = {"webhook-server-cert", "tls-config"}
 CONTAINER_FIELDS = ["image", "command", "args", "env", "ports", "livenessProbe", "readinessProbe", "startupProbe",
                     "securityContext", "resources", "volumeMounts"]
 
@@ -47,13 +49,13 @@ def normalize_deployment(spec):
     containers = []
     for c in pod["containers"]:
         cc = {f: c.get(f) for f in CONTAINER_FIELDS}
-        cc["volumeMounts"] = [m for m in c.get("volumeMounts") or [] if m["name"] != WAO_VOLUME] or None
+        cc["volumeMounts"] = [m for m in c.get("volumeMounts") or [] if m["name"] not in WAO_VOLUMES] or None
         containers.append(cc)
     return {"replicas": spec.get("replicas", 1), "selector": spec["selector"],
             "serviceAccountName": pod.get("serviceAccountName"), "tolerations": pod.get("tolerations"),
             "priorityClassName": pod.get("priorityClassName"), "securityContext": pod.get("securityContext"),
             "affinity": pod.get("affinity"), "topologySpreadConstraints": pod.get("topologySpreadConstraints"),
-            "volumes": [v for v in pod.get("volumes") or [] if v["name"] != WAO_VOLUME] or None,
+            "volumes": [v for v in pod.get("volumes") or [] if v["name"] not in WAO_VOLUMES] or None,
             "containers": containers}
 
 

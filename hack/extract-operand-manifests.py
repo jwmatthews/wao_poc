@@ -8,6 +8,7 @@ CSV, and the union ClusterRole that lets WAO create component RBAC (RBAC escalat
 All six operands share one namespace, so a cross-component pass (design brief D10) labels every
 operand pod with its component, narrows any Service selector that would also match another
 component's pods, and rejects duplicate object identities across components.
+NHC also receives the upstream OpenShift packaging additions kept verbatim under hack/platform/nhc (D11).
 """
 import argparse
 import copy
@@ -38,13 +39,32 @@ ORDER = {"ServiceAccount": "00", "ClusterRole": "10", "ClusterRoleBinding": "11"
          "ConfigMap": "30", "Service": "40", "Deployment": "50",
          "ValidatingWebhookConfiguration": "60", "MutatingWebhookConfiguration": "61"}
 
+# Upstream OpenShift packaging inputs the published bundles do not carry (design brief D11). Verbatim copies
+# live under hack/platform/<component>/; see the README there. Only NHC has them at these releases.
+PLATFORM_DIR_DEFAULT = pathlib.Path(__file__).resolve().parent / "platform"
+NHC_PLATFORM = {
+    "upstream": "https://github.com/medik8s/node-healthcheck-operator",
+    "commit": "a49ec14c47c5c1f0e5b81c68bf2880ff17ec4a5f",
+    "name_prefix": "node-healthcheck-",   # kustomize namePrefix of upstream's config/patches/common
+    "metrics_service": "node-healthcheck-controller-manager-metrics-service",
+    "manager_deployment": "node-healthcheck-controller-manager",
+    "files": {
+        "ca-configmap.yaml": "config/optional/prometheus-ocp/ca-configmap.yaml",
+        "prometheus-k8s-role.yaml": "config/optional/prometheus-ocp/prometheus-k8s-role.yaml",
+        "prometheus-k8s-rolebinding.yaml": "config/optional/prometheus-ocp/prometheus-k8s-rolebinding.yaml",
+        "auth_proxy_service_patch.yaml": "config/manifests/ocp/auth_proxy_service_patch.yaml",
+        "deployment_patch.yaml": "config/manifests/ocp/deployment_patch.yaml",
+    },
+}
+
 # key: the WorkloadAvailabilityConfig API key, also the value of COMPONENT_LABEL on operand pods.
 COMPONENTS = {
     "nhc": {"key": "nodeHealthCheck", "prefix": "node-healthcheck", "webhook_service": "node-healthcheck-webhook-service",
             "webhook_deployment": "node-healthcheck-controller-manager",
             # OLM creates ServiceAccounts from CSV permissions, so the bundle cannot carry upstream's
             # config/optional/console-plugin/service_account.yaml setting; WAO restores it (design brief D11).
-            "automount_disabled": ["node-healthcheck-console-plugin"]},
+            "automount_disabled": ["node-healthcheck-console-plugin"],
+            "platform": NHC_PLATFORM},
     "snr": {"key": "selfNodeRemediation", "prefix": "self-node-remediation", "webhook_service": "self-node-remediation-webhook-service",
             "webhook_deployment": "self-node-remediation-controller-manager"},
     "sbr": {"key": "storageBasedRemediation", "prefix": "sbr-operator", "webhook_service": None, "webhook_deployment": None},
@@ -116,7 +136,63 @@ def rewrite_subjects(obj, mods):
     return obj
 
 
-def deployments(csv, comp, mods):
+def load_platform(name, comp, platform_dir):
+    """Verbatim upstream OpenShift packaging files: {local name: (upstream path, sha256, parsed object)}."""
+    plat = comp.get("platform")
+    if not plat:
+        return {}
+    out = {}
+    for local, upstream in plat["files"].items():
+        raw = (pathlib.Path(platform_dir) / name / local).read_bytes()
+        out[local] = (upstream, sha256_bytes(raw), yaml.safe_load(raw))
+    return out
+
+
+def platform_objects(comp, platform, mods):
+    """Objects the upstream OpenShift overlay adds and the bundle lacks: CA ConfigMap and Prometheus discovery RBAC."""
+    out = []
+    prefix = comp["platform"]["name_prefix"]
+    for local in ("ca-configmap.yaml", "prometheus-k8s-role.yaml", "prometheus-k8s-rolebinding.yaml"):
+        upstream, _, obj = platform[local]
+        obj = clean(obj)
+        obj["metadata"]["name"] = prefix + obj["metadata"]["name"]
+        obj["metadata"]["namespace"] = NAMESPACE_PLACEHOLDER  # upstream `system` -> install namespace
+        if obj["kind"] == "RoleBinding":
+            obj["roleRef"]["name"] = prefix + obj["roleRef"]["name"]
+            # The subject (openshift-monitoring/prometheus-k8s) is the platform's ServiceAccount; keep it verbatim.
+        if obj["kind"] == "ConfigMap":
+            obj.pop("data", None)  # service-ca injects service-ca.crt and owns it; WAO applies no data
+        mods.append(f"{obj['kind']}/{obj['metadata']['name']}: added from upstream OpenShift packaging {upstream}")
+        out.append(obj)
+    return out
+
+
+def apply_service_patch(obj, comp, platform, mods):
+    """Merge the OCP metrics Service patch (instance label, serving-cert annotation) into the bundle's Service."""
+    upstream, _, patch = platform["auth_proxy_service_patch.yaml"]
+    if comp["platform"]["name_prefix"] + patch["metadata"]["name"] != comp["platform"]["metrics_service"]:
+        raise SystemExit(f"{upstream} targets {patch['metadata']['name']}, not the metrics Service")
+    obj["metadata"].setdefault("labels", {}).update(patch["metadata"].get("labels") or {})
+    obj["metadata"].setdefault("annotations", {}).update(patch["metadata"].get("annotations") or {})
+    mods.append(f"Service/{obj['metadata']['name']}: merged labels and annotations from upstream OpenShift packaging {upstream}")
+
+
+def apply_deployment_patch(dep, comp, platform, mods):
+    """Add the OCP deployment patch's metrics serving-certificate volume and mount to the manager.
+    The patch repeats args and ports; they must equal the bundle's, otherwise the patch changed and needs review."""
+    upstream, _, patch = platform["deployment_patch.yaml"]
+    pod = dep["spec"]["template"]["spec"]
+    manager = next(c for c in pod["containers"] if c["name"] == "manager")
+    pc = next(c for c in patch["spec"]["template"]["spec"]["containers"] if c["name"] == "manager")
+    if pc.get("args") != manager.get("args") or pc.get("ports") != manager.get("ports"):
+        raise SystemExit(f"{dep['metadata']['name']}: upstream OpenShift deployment patch ({upstream}) changes args or ports; review it")
+    manager.setdefault("volumeMounts", []).extend(copy.deepcopy(pc["volumeMounts"]))
+    pod.setdefault("volumes", []).extend(copy.deepcopy(patch["spec"]["template"]["spec"]["volumes"]))
+    names = ", ".join(v["name"] for v in patch["spec"]["template"]["spec"]["volumes"])
+    mods.append(f"Deployment/{dep['metadata']['name']}: added metrics serving-certificate volume {names} from upstream OpenShift packaging {upstream}")
+
+
+def deployments(csv, comp, platform, mods):
     out = []
     for d in csv["spec"]["install"]["spec"]["deployments"]:
         dep = {"apiVersion": "apps/v1", "kind": "Deployment",
@@ -129,6 +205,8 @@ def deployments(csv, comp, mods):
             manager = next(c for c in pod["containers"] if c["name"] == "manager")
             manager.setdefault("volumeMounts", []).append({"name": "webhook-server-cert", "mountPath": WEBHOOK_CERT_DIR, "readOnly": True})
             mods.append(f"Deployment/{d['name']}: added service-ca webhook certificate volume {secret} at {WEBHOOK_CERT_DIR}")
+        if platform and d["name"] == comp["platform"]["manager_deployment"]:
+            apply_deployment_patch(dep, comp, platform, mods)
         out.append(dep)
     return out
 
@@ -207,7 +285,7 @@ def webhooks(csv, comp, mods):
     return out
 
 
-def other_objects(others, comp, mods):
+def other_objects(others, comp, platform, mods):
     out = []
     for obj in others:
         obj = with_namespace(clean(obj))
@@ -215,6 +293,8 @@ def other_objects(others, comp, mods):
         if comp["webhook_service"] and obj["kind"] == "Service" and obj["metadata"]["name"] == comp["webhook_service"]:
             obj["metadata"].setdefault("annotations", {})[SERVING_CERT_ANNOTATION] = f"{comp['prefix']}-webhook-server-cert"
             mods.append(f"Service/{obj['metadata']['name']}: added {SERVING_CERT_ANNOTATION}")
+        if platform and obj["kind"] == "Service" and obj["metadata"]["name"] == comp["platform"]["metrics_service"]:
+            apply_service_patch(obj, comp, platform, mods)
         out.append(obj)
     return out
 
@@ -327,6 +407,7 @@ def main():
     ap.add_argument("--out", required=True, help="internal/operands/manifests")
     ap.add_argument("--crd-out", required=True, help="config/crd/bases")
     ap.add_argument("--rbac-out", required=True, help="config/rbac/operand_union_role.yaml")
+    ap.add_argument("--platform", default=str(PLATFORM_DIR_DEFAULT), help="hack/platform: verbatim upstream OpenShift packaging inputs")
     ap.add_argument("--check", action="store_true", help="verify outputs are current instead of writing")
     args = ap.parse_args()
     release_set = yaml.safe_load(pathlib.Path(args.release_set).read_text())
@@ -337,25 +418,32 @@ def main():
         bundle_ref, csv, crds, others, inputs = load_bundle(args.bundles, name)
         if bundle_ref != release_set["components"][name]["bundle"]:
             raise SystemExit(f"{name}: cached bundle {bundle_ref} does not match release-set.yaml; run `make bundles`")
+        platform = load_platform(name, comp, args.platform)
         mods = []
-        objects = rbac(csv, comp, mods) + other_objects(others, comp, mods) + deployments(csv, comp, mods) + webhooks(csv, comp, mods)
+        objects = (rbac(csv, comp, mods) + other_objects(others, comp, platform, mods) + deployments(csv, comp, platform, mods)
+                   + webhooks(csv, comp, mods) + (platform_objects(comp, platform, mods) if platform else []))
         rendered[name] = (objects, mods)
-        meta[name] = (bundle_ref, csv["metadata"]["name"], inputs, crds)
+        meta[name] = (bundle_ref, csv["metadata"]["name"], inputs, crds, platform)
         for crd_name, crd in crds:
             crd_files[crd_name] = dump(clean(crd))
     isolate(rendered)
     for name, (objects, mods) in rendered.items():
+        comp = COMPONENTS[name]
         files = {filename(o): dump(o) for o in objects}
         if len(files) != len(objects):
             raise SystemExit(f"{name}: duplicate output filenames")
         check_images(name, files, release_set)
         problems += write_tree(pathlib.Path(args.out) / name, files, args.check)
-        bundle_ref, csv_name, inputs, crds = meta[name]
-        provenance["bundles"][name] = {
+        bundle_ref, csv_name, inputs, crds, platform = meta[name]
+        entry = {
             "bundle": bundle_ref, "csv": csv_name, "inputs": inputs,
             "outputs": {f"{name}/{fn}": sha256_bytes(text.encode()) for fn, text in sorted(files.items())},
             "crds": [c for c, _ in crds], "wao_modifications": sorted(set(mods)),
         }
+        if platform:
+            entry["platform_sources"] = {"upstream": comp["platform"]["upstream"], "commit": comp["platform"]["commit"],
+                                         "files": {local: {"path": p, "sha256": h} for local, (p, h, _) in sorted(platform.items())}}
+        provenance["bundles"][name] = entry
     # The CRD directory also holds the controller-gen CRD for WorkloadAvailabilityConfig; never delete or flag it.
     problems += write_tree(args.crd_out, crd_files, args.check, ignore_extra=True)
     union = union_role(rendered)
