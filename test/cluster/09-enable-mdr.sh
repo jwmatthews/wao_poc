@@ -5,7 +5,12 @@ source "$(dirname "$0")/lib.sh"
 echo "== WAO-INST-09 enable MDR"
 record 09-machine-api get crd machines.machine.openshift.io -o name >/dev/null 2>&1 || echo "note: Machine API absent; MDR cannot act on this cluster"
 set_state 09 machineDeletionRemediation Enabled
-wait_for 300 "MDR manager Available" deployment_available machine-deletion-remediation-controller-manager
+wait_for 300 "MDR manager Available" deployment_available machine-deletion-remediation-controller-manager || {
+  # keep the diagnosis in the evidence tree before the later cleanup removes the pods (no Secret values are read)
+  record 09-mdr-pods get pods -n "$NS" -l workloadavailability.medik8s.io/component=machineDeletionRemediation -o json >/dev/null || true
+  record 09-events get events -n "$NS" -o json >/dev/null || true
+  exit 1
+}
 wait_for 180 "status phase Available" phase_is machineDeletionRemediation Available
 expect "status has no admissionReady field" field_is machineDeletionRemediation admissionReady null
 expect "every rendered MDR operand object exists" operands_present mdr

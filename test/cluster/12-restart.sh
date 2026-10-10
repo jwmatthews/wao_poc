@@ -29,8 +29,8 @@ PY
 }
 before="${RUN_DIR}/raw/12-state-before.json"; after="${RUN_DIR}/raw/12-state-after.json"
 state "$before"
-expect "operand Deployments recorded (all six components enabled)" \
-  python3 -c 'import json,sys; sys.exit(0 if len(json.load(open(sys.argv[1]))["deployments"]) == 6 else 1)' "$before"
+expect "operand Deployments recorded (six component managers plus the NHC console backend)" \
+  python3 -c 'import json,sys; sys.exit(0 if len(json.load(open(sys.argv[1]))["deployments"]) == 7 else 1)' "$before"
 
 # Watch the config for resourceVersion changes while WAO restarts. No --request-timeout: it is a watch.
 watch_file="${RUN_DIR}/raw/12-wac-watch.txt"

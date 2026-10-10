@@ -58,7 +58,8 @@ wait_for 300 "platform Prometheus scrapes every NHC target (up == 1)" nhc_target
 no_rejected_sm() { prom_all_values 'prometheus_operator_managed_resources{job="prometheus-operator",namespace="openshift-monitoring",resource="ServiceMonitor",state="rejected"}' 0; }
 wait_for 300 "Prometheus operator rejects no ServiceMonitor" no_rejected_sm
 prom_query 'up{namespace="'"$NS"'"}' > "${RUN_DIR}/raw/05-prometheus-targets.json" || true
-expect "the rejected-ServiceMonitor alert is not firing" bash -c '[ "$(prom_query "ALERTS{alertname=\"PrometheusOperatorRejectedResources\",alertstate=\"firing\"}")" = "[]" ]'
+no_rejected_alert() { [ "$(prom_query 'ALERTS{alertname="PrometheusOperatorRejectedResources",alertstate="firing"}')" = "[]" ]; }
+wait_for 120 "the rejected-ServiceMonitor alert is not firing" no_rejected_alert
 
 # ---- console backend (issue #4): trusted fetch, then the administrator enables the plugin ----
 record 05-consoleplugin get consoleplugin node-remediation-console-plugin -o json >/dev/null

@@ -107,7 +107,16 @@ none_found() { local out; out=$(k get "$@" -o name) || return 1; [ -z "$out" ]; 
 found() { local out; out=$(k get "$@" -o name) || return 1; [ -n "$out" ]; }
 
 # absent ARGS... : the named object does not exist. Any other API error fails.
-absent() { local out; out=$(k get "$@" --ignore-not-found -o name) || return 1; [ -z "$out" ]; }
+# An API error (for example a TLS handshake timeout on a busy control plane) is retried up to three times; a
+# successful read that finds the object still fails the check.
+absent() {
+  local out try
+  for try in 1 2 3; do
+    if out=$(k get "$@" --ignore-not-found -o name); then [ -z "$out" ]; return; fi
+    sleep 5
+  done
+  return 1
+}
 
 # deployment_available NAME : Deployment NAME in $NS has condition Available=True.
 deployment_available() { k wait "deployment/$1" -n "$NS" --for=condition=Available --timeout=10s >/dev/null; }
@@ -256,7 +265,7 @@ restart_wao() {
 prom_query() {
   k -n openshift-monitoring exec prometheus-k8s-0 -c prometheus -- \
     curl -sG --data-urlencode "query=$1" http://localhost:9090/api/v1/query |
-    python3 -c 'import json, sys; print(json.dumps(json.load(sys.stdin)["data"]["result"]))'
+    python3 -c 'import json, sys; d = json.load(sys.stdin); sys.exit("prometheus query failed: " + str(d.get("error", d.get("status")))) if d.get("status") != "success" else print(json.dumps(d["data"]["result"]))'
 }
 export -f prom_query   # usable inside `bash -c` subshells
 
