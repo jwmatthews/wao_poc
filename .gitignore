@@ -76,3 +76,6 @@ dist/
 bin/
 kubeconfig*
 __pycache__/
+
+# Subagent-driven-development scratch (ledger, briefs, review packages)
+.superpowers/
