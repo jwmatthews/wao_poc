@@ -27,7 +27,16 @@ def pinned_images(release_set_path):
     return {env: img["pinned"] for comp in rs["components"].values() for env, img in comp["images"].items()}
 
 
-def main(bundle_dir="bundle", release_set="release-set.yaml"):
+def rule_key(rule):
+    return tuple(tuple(sorted(rule.get(k) or [])) for k in ("apiGroups", "resources", "resourceNames", "verbs"))
+
+
+def union_role_rules(path):
+    docs = yaml.safe_load_all(pathlib.Path(path).read_text())
+    return next(d for d in docs if d and d["kind"] == "ClusterRole")["rules"]
+
+
+def main(bundle_dir="bundle", release_set="release-set.yaml", union_role="config/rbac/operand_union_role.yaml"):
     pinned = pinned_images(release_set)
     problems, csv, crds, extra = [], None, set(), []
     for f in sorted(pathlib.Path(bundle_dir, "manifests").glob("*.yaml")):
@@ -63,13 +72,18 @@ def main(bundle_dir="bundle", release_set="release-set.yaml"):
                 problems.append(f"WAO Deployment env {name}={env.get(name)!r}, release-set.yaml pins {image!r}")
         if "OPERATOR_NAMESPACE" not in env:
             problems.append("WAO Deployment lacks OPERATOR_NAMESPACE")
+    union = union_role_rules(union_role)
+    have = {rule_key(r) for perm in spec["install"]["spec"].get("clusterPermissions", []) for r in perm.get("rules", [])}
+    for r in union:
+        if rule_key(r) not in have:
+            problems.append(f"union role rule missing from CSV clusterPermissions: {r}")
     if csv["metadata"]["annotations"].get("operatorframework.io/suggested-namespace") != "openshift-workload-availability":
         problems.append("suggested-namespace annotation missing or wrong")
     if extra:
         problems.append(f"bundle contains objects a ConfigMap catalog cannot carry: {extra}")
     if problems:
         print("\n".join(problems)); sys.exit(1)
-    print(f"bundle OK: {csv['metadata']['name']} owns {len(owned)} CRDs, {len(pinned)} pinned operand images")
+    print(f"bundle OK: {csv['metadata']['name']} owns {len(owned)} CRDs, {len(pinned)} pinned operand images, {len(union)} union-role rules")
 
 
 if __name__ == "__main__":
