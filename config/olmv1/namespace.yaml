@@ -1,0 +1,13 @@
+# config/olmv1/namespace.yaml: the install namespace. OLM v1 does not create it.
+# Privileged PSA labels: the SNR and SBR node agents WAO's operands create run privileged.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-workload-availability
+  annotations:
+    openshift.io/node-selector: ""
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+    security.openshift.io/scc.podSecurityLabelSync: "false"

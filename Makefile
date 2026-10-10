@@ -131,12 +131,27 @@ catalog-build: fbc ## Build the OLM v1 catalog image (FROM scratch, FBC at /conf
 catalog-push: ## Push the catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
 
+OLMV1_DIR ?= config/olmv1
+.PHONY: olmv1-manifests olmv1-manifests-check
+olmv1-manifests: bundle-check ## Regenerate the OLM v1 installer RBAC and ClusterExtension for the WAO bundle into config/olmv1/wao.
+	$(PYTHON) test/olmv1/gen-installer-rbac.py --only wao --out $(OLMV1_DIR)
+olmv1-manifests-check: ## Verify config/olmv1/wao is current for the committed bundle.
+	@tmp=$$(mktemp -d) && $(PYTHON) test/olmv1/gen-installer-rbac.py --only wao --out $$tmp >/dev/null && \
+	  diff -r $$tmp/wao $(OLMV1_DIR)/wao && rm -rf $$tmp && echo "config/olmv1/wao is current"
+
+CLUSTERCATALOG_FILE ?= dist/wao-poc-clustercatalog.yaml
+.PHONY: clustercatalog
+clustercatalog: ## Render the ClusterCatalog for CATALOG_IMG (digest ref) into dist/wao-poc-clustercatalog.yaml.
+	mkdir -p dist
+	$(PYTHON) hack/clustercatalog.py --name wao-poc --image $(CATALOG_IMG) > $(CLUSTERCATALOG_FILE)
+
 .PHONY: test-offline
 test-offline: ## Run every offline Python test and syntax-check the live-cluster scripts (no cluster needed).
-	$(PYTHON) -m unittest hack/extract_operand_manifests_test.py hack/e2e_runner_test.py hack/fbc_catalog_test.py hack/check_bundle_test.py
+	$(PYTHON) -m unittest hack/extract_operand_manifests_test.py hack/e2e_runner_test.py hack/fbc_catalog_test.py hack/check_bundle_test.py hack/clustercatalog_test.py
 	$(PYTHON) -m unittest discover -s test/cluster -p 'parity_test.py'
 	$(PYTHON) -m unittest discover -s test/cluster -p 'results_test.py'
 	for f in test/cluster/*.sh; do bash -n "$$f" || exit 1; done
+	$(MAKE) olmv1-manifests-check
 
 ##@ Development
 
