@@ -24,11 +24,12 @@ as operands in one namespace.
 
 ## Cluster work
 
-Live-cluster tests (plan section 4) need a **disposable** OpenShift cluster with
-classic OLM that you are authorized to modify, selected through the `KUBECONFIG`
-environment variable. The repository never contains cluster credentials or
-cluster-identifying details. Do not run cluster tests unless the person you are
-working for has confirmed which cluster to use in the current session.
+Live-cluster tests (plan section 4) need a **disposable** OpenShift cluster, 4.18 or newer with
+OLM v1 (`ClusterExtension` and `ClusterCatalog` APIs), that you are authorized to modify, selected
+through the `KUBECONFIG` environment variable. The repository installs only through OLM v1 (D11);
+classic OLM is not used. The repository never contains cluster credentials or cluster-identifying
+details. Do not run cluster tests unless the person you are working for has confirmed which
+cluster to use in the current session.
 
 Disposable OpenShift clusters you may use for testing are described in the local
 file `DISPOSABLE_OPENSHIFT_CLUSTERS.md`, which points to their kubeconfig files.
