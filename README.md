@@ -175,8 +175,16 @@ CATALOG_IMG=image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao-c
 make clustercatalog CATALOG_IMG=$CATALOG_IMG         # dist/wao-poc-clustercatalog.yaml (git-ignored)
 ```
 
-For an external registry use `make bundle-build bundle-push catalog-build catalog-push` with
-`BUNDLE_IMG` and `CATALOG_IMG` set to digest references after the push.
+For an external registry:
+
+1. `make bundle-build bundle-push BUNDLE_IMG=<registry>/wao-bundle:v0.1.0`
+2. Resolve the pushed bundle digest (for example
+   `skopeo inspect --format '{{.Digest}}' docker://<registry>/wao-bundle:v0.1.0`).
+3. `make catalog-build catalog-push BUNDLE_IMG=<registry>/wao-bundle@sha256:<digest> CATALOG_IMG=<registry>/wao-catalog:v0.1.0`
+4. Resolve the pushed catalog digest the same way.
+5. `make clustercatalog CATALOG_IMG=<registry>/wao-catalog@sha256:<digest>`
+
+The bundle CSV references the operator image by digest, so that image must also be pullable from the target cluster.
 
 The committed bundle currently references
 `image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@sha256:6f54a0c72fbe8fe9ecc769c57b5e12ec952153ca9d1fd53269f19ec32195556a`
@@ -249,11 +257,7 @@ or CRDs installed (design brief D11, D12):
      -p '{"spec":{"components":{"nodeHealthCheck":{"state":"Enabled"}}}}'
    ```
 
-**Uninstall:** delete the `WorkloadAvailabilityConfig` first so WAO's finalizer removes the
-operands; delete any `SelfNodeRemediationConfig` (its DaemonSet is garbage-collected); then
-`oc delete clusterextension workload-availability-operator`. **This deletes all thirteen CRDs and
-every remaining custom resource of those kinds.** Then delete the installer RBAC, the
-`ClusterCatalog` and the namespace.
+**Uninstall:** see [Uninstall](#uninstall) below.
 
 ## What Enabled and Disabled mean
 
@@ -287,18 +291,20 @@ removed, the operand objects it renders. Specifically:
 
 ## Uninstall
 
-1. Set every component to `Disabled` and wait for each phase to be `Disabled` or
-   `DisableIncomplete`.
-2. Delete the config: `oc delete workloadavailabilityconfig cluster`. Its finalizer
-   removes any remaining operand objects. WAO creates a new all-Disabled config the
-   next time it starts (D4), which is harmless.
-3. Delete the ClusterExtension `workload-availability-operator`. OLM v1 removes WAO's
-   Deployment and the thirteen CRDs.
-4. If desired, remove what remains: delete the SNR config
-   `self-node-remediation-config` (its agent DaemonSet is garbage-collected), the
-   SNR template and Secret `self-node-remediation-certificates`, the NHC aggregation
-   ClusterRole and binding, the ConsolePlugin, the `medik8s-leases` namespace, the
-   ClusterCatalog, the namespace and the `wao-poc-build` namespace.
+1. Delete the config: `oc delete workloadavailabilityconfig cluster`. WAO's finalizer
+   removes the operands. WAO creates a new all-Disabled config the next time it
+   starts (D4), which is harmless.
+2. Delete the `SelfNodeRemediationConfig` and `SelfNodeRemediationTemplate`, and wait
+   for the SNR agent DaemonSet `self-node-remediation-ds` to be garbage-collected.
+3. `oc delete clusterextension workload-availability-operator`.
+   **This deletes all thirteen CRDs and every remaining custom resource of those kinds.**
+4. Delete the leftovers the upstream components created: Secret
+   `self-node-remediation-certificates`, ClusterRole and ClusterRoleBinding
+   `node-healthcheck-operator-aggregation`, ConsolePlugin
+   `node-remediation-console-plugin`, and namespace `medik8s-leases`.
+5. Delete the installer RBAC (`config/olmv1/wao/20-clusterrolebinding.yaml`,
+   `10-clusterrole.yaml`, `00-serviceaccount.yaml`, in that order), the ClusterCatalog
+   `wao-poc` and the namespace `openshift-workload-availability`.
 
 `test/cluster/18-uninstall.sh` performs this cleanup.
 

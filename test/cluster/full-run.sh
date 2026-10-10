@@ -54,8 +54,8 @@ binary_build() {
   if absent buildconfig "$name" -n "$BUILD_NS"; then
     record "build-new-build-$name" new-build --binary --name "$name" -n "$BUILD_NS" --strategy docker >/dev/null
   fi
-  oc_long start-build "$name" -n "$BUILD_NS" --from-dir="$dir" --follow --wait >&2
-  digest=$(k get istag "$name:latest" -n "$BUILD_NS" -o jsonpath='{.image.metadata.name}')
+  oc_long start-build "$name" -n "$BUILD_NS" --from-dir="$dir" --follow --wait >&2 || die "build $name failed"
+  digest=$(k get istag "$name:latest" -n "$BUILD_NS" -o jsonpath='{.image.metadata.name}') || die "cannot read istag $name:latest in $BUILD_NS"
   case "$digest" in sha256:*) ;; *) die "no image digest for istag $name:latest in $BUILD_NS (got '$digest')" ;; esac
   echo "${REGISTRY}/${BUILD_NS}/${name}@${digest}"
 }
@@ -150,6 +150,7 @@ phase_build() {
   # README quotes the digest the committed bundle references; keep it current.
   sed -i.bak -E "s#${REGISTRY}/${BUILD_NS}/wao@sha256:[0-9a-f]{64}#${img}#" README.md && rm -f README.md.bak
   make bundle-check
+  make olmv1-manifests-check
   grep -q "image: ${img}" bundle/manifests/workload-availability-operator.clusterserviceversion.yaml \
     || die "bundle CSV does not reference $img"
   local allowed dirty_after new_changes unexpected
@@ -173,7 +174,7 @@ config/manager/kustomization.yaml"
   stage=$(mktemp -d)
   cp bundle.Dockerfile "$stage/Dockerfile"
   cp -R bundle "$stage/bundle"
-  bundle_img=$(binary_build "$BUNDLE_BC" "$stage")
+  bundle_img=$(binary_build "$BUNDLE_BC" "$stage") || exit 1
   rm -rf "$stage"
   echo "bundle image: $bundle_img"
 
@@ -185,7 +186,7 @@ config/manager/kustomization.yaml"
   cp catalog.Dockerfile "$stage/Dockerfile"
   mkdir -p "$stage/dist"
   cp -R dist/catalog "$stage/dist/catalog"
-  catalog_img=$(binary_build "$CATALOG_BC" "$stage")
+  catalog_img=$(binary_build "$CATALOG_BC" "$stage") || exit 1
   rm -rf "$stage"
   echo "catalog image: $catalog_img"
   make clustercatalog CATALOG_IMG="$catalog_img"

@@ -3,7 +3,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.0.1
+VERSION ?= 0.1.0
 
 # OPENSHIFT_VERSIONS is the com.redhat.openshift.versions value written into the bundle metadata.
 OPENSHIFT_VERSIONS ?= v4.18
@@ -30,8 +30,9 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
 # This variable is used to construct full image tags for bundle and catalog images.
 #
-# For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# medik8s.io/workload-availability-operator-bundle:$VERSION and medik8s.io/workload-availability-operator-catalog:$VERSION.
+# For example, 'make bundle-build bundle-push' builds and pushes <IMAGE_TAG_BASE>-bundle:v<VERSION>, and
+# 'make catalog-build catalog-push' builds and pushes <IMAGE_TAG_BASE>-catalog:v<VERSION>. catalog-build needs
+# BUNDLE_IMG as a digest reference (repo@sha256:...), and clustercatalog needs CATALOG_IMG as a digest reference.
 IMAGE_TAG_BASE ?= medik8s.io/workload-availability-operator
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
@@ -128,7 +129,7 @@ CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:v$(VERSION)
 
 .PHONY: catalog-build
 catalog-build: fbc ## Build the OLM v1 catalog image (FROM scratch, FBC at /configs) for BUNDLE_IMG.
-	$(CONTAINER_TOOL) build -f catalog.Dockerfile -t $(CATALOG_IMG) .
+	$(CONTAINER_TOOL) build --platform $(PLATFORM) -f catalog.Dockerfile -t $(CATALOG_IMG) .
 
 .PHONY: catalog-push
 catalog-push: ## Push the catalog image.
@@ -361,7 +362,7 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
-	$(CONTAINER_TOOL) build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	$(CONTAINER_TOOL) build --platform $(PLATFORM) -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.

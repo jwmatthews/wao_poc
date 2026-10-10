@@ -14,7 +14,7 @@ record 02-clusterextension apply -f "$OLMV1_DIR/wao/30-clusterextension.yaml" >/
 progress() { k get clusterextension "$CE_NAME" -o jsonpath='{range .status.conditions[?(@.type=="Progressing")]}{.reason}: {.message}{end}' 2>/dev/null | cut -c1-300; }
 start=$(date +%s)
 until ce_installed "$CE_NAME"; do
-  msg=$(progress)
+  msg=$(progress || true)
   echo "t+$(( $(date +%s) - start ))s $msg"
   case "$msg" in
     *forbidden*|*"cannot be managed"*|*"already exists"*)

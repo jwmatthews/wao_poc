@@ -96,8 +96,9 @@ SRC=$(mktemp -d) && git archive HEAD | tar -x -C "$SRC"
 
 oc create namespace wao-poc-build --kubeconfig "$KUBECONFIG"
 oc new-build --binary --name wao -n wao-poc-build --strategy docker --kubeconfig "$KUBECONFIG"
-oc policy add-role-to-group system:image-puller \
-  system:serviceaccounts:openshift-workload-availability -n wao-poc-build --kubeconfig "$KUBECONFIG"
+for g in openshift-workload-availability openshift-catalogd openshift-operator-controller; do
+  oc policy add-role-to-group system:image-puller system:serviceaccounts:$g -n wao-poc-build --kubeconfig "$KUBECONFIG"
+done
 oc start-build wao -n wao-poc-build --from-dir="$SRC" --follow --kubeconfig "$KUBECONFIG"
 
 DIGEST=$(oc get istag wao:latest -n wao-poc-build --kubeconfig "$KUBECONFIG" -o jsonpath='{.image.metadata.name}')
@@ -300,6 +301,7 @@ DIGEST=$(oc get istag wao:latest -n wao-poc-build --kubeconfig "$KUBECONFIG" -o 
 
 # bundle and catalog
 make bundle IMG=image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@$DIGEST VERSION=0.1.0 CHANNELS=alpha DEFAULT_CHANNEL=alpha
+# $BUNDLE_IMG and $CATALOG_IMG are the digest references printed by full-run.sh build (or resolved by hand per README "Operator image, bundle image and catalog").
 make bundle-check && make fbc BUNDLE_IMG=$BUNDLE_IMG && make clustercatalog CATALOG_IMG=$CATALOG_IMG
 bash test/cluster/run-all.sh 00                    # must pass cleanly now
 

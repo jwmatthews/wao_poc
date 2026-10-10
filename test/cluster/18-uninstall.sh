@@ -88,9 +88,15 @@ fi
 
 record 18-delete-clustercatalog delete clustercatalog "$CLUSTERCATALOG" --ignore-not-found --wait=false >/dev/null || fail "delete ClusterCatalog"
 wait_for 120 "ClusterCatalog gone" absent clustercatalog "$CLUSTERCATALOG" || fail "ClusterCatalog still present"
-for f in 20-clusterrolebinding 10-clusterrole 00-serviceaccount; do
-  record "18-delete-installer-$f" delete -f "$OLMV1_DIR/wao/$f.yaml" --ignore-not-found >/dev/null || fail "delete installer $f"
-done
+# On OpenShift 4.18-4.22 operator-controller needs the installer ServiceAccount to finish an uninstall.
+if absent clusterextension "$CE_NAME"; then
+  for f in 20-clusterrolebinding 10-clusterrole 00-serviceaccount; do
+    record "18-delete-installer-$f" delete -f "$OLMV1_DIR/wao/$f.yaml" --ignore-not-found >/dev/null || fail "delete installer $f"
+  done
+else
+  echo "LEFTOVER: installer RBAC kept because ClusterExtension $CE_NAME still exists"
+  fail "ClusterExtension still present; installer RBAC kept"
+fi
 
 record 18-delete-namespace delete namespace "$NS" --ignore-not-found --wait=false >/dev/null || fail "delete namespace"
 wait_for 600 "namespace $NS gone" absent namespace "$NS" || fail "namespace $NS still present"
