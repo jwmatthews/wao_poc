@@ -29,9 +29,9 @@ through WAO's existing operand lifecycle. Success:
 - A default all-Disabled installation still creates no NHC resource.
 - On the confirmed disposable cluster: `node-healthcheck-ca-bundle` carries
   `service-ca.crt`, the ServiceMonitor selects the metrics Service, NHC scrape targets are
-  up, the rejection alert clears, the console backend is ready behind a trusted
-  service-ca certificate, and the plugin manifest is served through the console
-  backend's plugin proxy once the plugin is enabled.
+  up, the rejection metric clears, the console backend is ready and serves its plugin
+  manifest over TLS that verifies against the service CA, and enabling the plugin
+  rolls the OpenShift console out cleanly.
 - Component images, webhook failure policies, the no-adoption rule and the public API are
   unchanged.
 
@@ -139,11 +139,14 @@ Live cluster, `test/cluster/`:
   `node-healthcheck-tls` have `tls.crt` and `tls.key` (key names only); the CA ConfigMap
   has `service-ca.crt`; the ServiceMonitor selector matches the metrics Service; the
   platform Prometheus reports NHC targets `up` and no rejected-ServiceMonitor condition
-  for the namespace; the manager log reports mTLS configured. Then enable the plugin in
-  `Console/cluster` with a JSON patch that preserves existing entries, wait for the
-  console operator to settle, and fetch
-  `/api/plugins/node-remediation-console-plugin/plugin-manifest.json` from the console
-  route with a bearer token; the body must name the plugin.
+  for the namespace; the manager log reports mTLS configured. Fetch
+  `https://node-healthcheck-node-remediation-console-plugin.<ns>.svc:9443/plugin-manifest.json`
+  from a short-lived pod in the install namespace with `curl --cacert` pointed at the
+  namespace's `openshift-service-ca.crt` ConfigMap, so TLS trust is verified rather than
+  skipped; the body must name the plugin. Then enable the plugin in `Console/cluster`
+  with a JSON patch that preserves existing entries and wait for the console Deployment
+  to roll out. The console's own plugin proxy cannot be exercised from a script: it
+  requires a browser session, and bearer tokens are rejected (verified, HTTP 401).
 - `15-disable-nmo-nhc.sh`: expect the CA ConfigMap and console backend absent; remove
   the plugin entry the harness added, preserving others; keep recording the
   `ConsolePlugin` as an upstream leftover.
