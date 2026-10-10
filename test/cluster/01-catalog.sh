@@ -1,20 +1,15 @@
 #!/usr/bin/env bash
-# test/cluster/01-catalog.sh — WAO-INST-01: the POC ConfigMap-backed catalog serves the WAO package.
+# test/cluster/01-catalog.sh — WAO-INST-01: the WAO ClusterCatalog serves the package.
+# Applies the ClusterCatalog rendered by `make clustercatalog` (full-run.sh build) and waits for Serving=True.
 source "$(dirname "$0")/lib.sh"
 echo "== WAO-INST-01 catalog"
-[ -f "$CATALOG_FILE" ] || { echo "FAIL: $CATALOG_FILE missing; run \`make catalog-configmap\`" >&2; exit 1; }
-record 01-apply-catalog apply -f "$CATALOG_FILE" >/dev/null
-
-catalog_ready() {
-  local s; s=$(k get catalogsource "$CATALOG" -n "$CAT_NS" -o jsonpath='{.status.connectionState.lastObservedState}') || return 1
-  [ "$s" = READY ]
-}
-wait_for 180 "CatalogSource $CATALOG READY" catalog_ready
-
-package_has_channel() {
-  jcheck 'any(i["metadata"]["name"] == os.environ["PACKAGE"] and os.environ["CHANNEL"] in [c["name"] for c in i["status"].get("channels") or []] for i in o["items"])' \
-    get packagemanifest -n "$CAT_NS" -l "catalog=${CATALOG}"
-}
-wait_for 180 "packagemanifest $PACKAGE from $CATALOG lists channel $CHANNEL" package_has_channel
-record 01-packagemanifest get packagemanifest -n "$CAT_NS" -l "catalog=${CATALOG}" -o json >/dev/null
-expect "packagemanifest $PACKAGE lists channel $CHANNEL" package_has_channel
+[ -f "$CLUSTERCATALOG_FILE" ] || { echo "FAIL: $CLUSTERCATALOG_FILE missing; run \`bash test/cluster/full-run.sh build\`" >&2; exit 1; }
+record 01-apply-clustercatalog apply -f "$CLUSTERCATALOG_FILE" >/dev/null
+wait_for 300 "ClusterCatalog $CLUSTERCATALOG Serving" catalog_serving "$CLUSTERCATALOG"
+record 01-clustercatalog get clustercatalog "$CLUSTERCATALOG" -o json >/dev/null
+expect "ClusterCatalog $CLUSTERCATALOG is Serving" catalog_serving "$CLUSTERCATALOG"
+expect "ClusterCatalog $CLUSTERCATALOG resolved its image to a digest" \
+  jcheck '"@sha256:" in o["status"]["resolvedSource"]["image"]["ref"]' get clustercatalog "$CLUSTERCATALOG"
+expect "ClusterCatalog $CLUSTERCATALOG carries the name label the ClusterExtension selector uses" \
+  jcheck 'o["metadata"]["labels"].get("olm.operatorframework.io/metadata.name") == os.environ["CLUSTERCATALOG"]' \
+  get clustercatalog "$CLUSTERCATALOG"
