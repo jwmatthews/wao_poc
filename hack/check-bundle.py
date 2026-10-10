@@ -2,8 +2,12 @@
 # hack/check-bundle.py
 """Assert the generated bundle matches the POC contract and release-set.yaml. Exit 1 with reasons."""
 import pathlib, sys
+import re
 
 import yaml
+
+SEMVER_RE = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$")
+UNSUPPORTED_PROPERTIES = {"olm.package.required", "olm.gvk.required", "olm.constraint"}
 
 EXPECTED_CRDS = {
     "workloadavailabilityconfigs.workloadavailability.medik8s.io",
@@ -27,6 +31,27 @@ def pinned_images(release_set_path):
     return {env: img["pinned"] for comp in rs["components"].values() for env, img in comp["images"].items()}
 
 
+def olmv1_problems(csv, bundle_dir):
+    """Rules operator-controller enforces at install time (docs/investigations/olmv1, checklist MUST rows)."""
+    spec, problems = csv["spec"], []
+    if spec.get("webhookdefinitions"):
+        problems.append("CSV spec.webhookdefinitions is set; OLM v1 only supports it on OpenShift 4.21+ and the POC keeps "
+                        "component webhooks runtime-created (D1)")
+    if (spec.get("apiservicedefinitions") or {}).get("owned"):
+        problems.append("CSV spec.apiservicedefinitions.owned is set; OLM v1 rejects owned APIServices")
+    if not SEMVER_RE.match(str(spec.get("version", ""))):
+        problems.append(f"CSV spec.version {spec.get('version')!r} is not semver; OLM v1 resolves by semver")
+    meta = pathlib.Path(bundle_dir, "metadata")
+    if (meta / "dependencies.yaml").exists():
+        problems.append("metadata/dependencies.yaml present; OLM v1 rejects bundle dependencies")
+    props_file = meta / "properties.yaml"
+    if props_file.exists():
+        types = {p.get("type") for p in (yaml.safe_load(props_file.read_text()) or {}).get("properties", [])}
+        for t in sorted(types & UNSUPPORTED_PROPERTIES):
+            problems.append(f"metadata/properties.yaml declares {t}; OLM v1 rejects dependency properties")
+    return problems
+
+
 def main(bundle_dir="bundle", release_set="release-set.yaml"):
     pinned = pinned_images(release_set)
     problems, csv, crds, extra = [], None, set(), []
@@ -41,6 +66,7 @@ def main(bundle_dir="bundle", release_set="release-set.yaml"):
     if csv is None:
         sys.exit("no CSV in bundle")
     spec = csv["spec"]
+    problems += olmv1_problems(csv, bundle_dir)
     owned = {c["name"] for c in spec["customresourcedefinitions"].get("owned", [])}
     if owned != EXPECTED_CRDS:
         problems.append(f"owned CRDs differ: missing={sorted(EXPECTED_CRDS - owned)} unexpected={sorted(owned - EXPECTED_CRDS)}")
