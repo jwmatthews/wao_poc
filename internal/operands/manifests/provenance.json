@@ -82,7 +82,7 @@
       ]
     },
     "nhc": {
-      "bundle": "quay.io/medik8s/node-healthcheck-operator-bundle@sha256:2a2ad916a9f827015474b4220b089ba61313112e697d45a50610186b620e1dba",
+      "bundle": "quay.io/community-operator-pipeline-prod/node-healthcheck-operator@sha256:e7684ebbcc543d8077fd218c7a1c9ce6c7ee622cce9d1806cd2672d792fcec72",
       "crds": [
         "remediation.medik8s.io_nodehealthchecks.yaml"
       ],
@@ -90,30 +90,41 @@
       "inputs": {
         "node-healthcheck-controller-manager-metrics-service_v1_service.yaml": "37ed8f32f02b76ca0a25df29355978a0f1f4606417f7d3152c09f3fc24391478",
         "node-healthcheck-metrics-reader_rbac.authorization.k8s.io_v1_clusterrole.yaml": "6c91b6472af813bc89ce61c1abdb328763cbf860be2bb969b9466f44ed4a1a52",
-        "node-healthcheck-operator.clusterserviceversion.yaml": "370c38adc266c00d5f99acc8368e5b0d4679c11a337ca32e10740f8ce2c5c76c",
+        "node-healthcheck-node-remediation-console-plugin_v1_service.yaml": "c14b208ef2f6a2f55a3388424a96328cda545857f0474854ec20e517f964adb9",
+        "node-healthcheck-operator.clusterserviceversion.yaml": "bd934c5d5b948786a6d816da3bf6d4a14620484d8396deece699469d4ee613a8",
         "node-healthcheck-webhook-service_v1_service.yaml": "2f64090c6cf057b5af6ddab6ded693849e03ef5a4c88b38dda29d6867edf7eef",
         "remediation.medik8s.io_nodehealthchecks.yaml": "794c3c9af727f829fc9b8bc4fa22b63260e984199a037bd985110bd91937201b"
       },
       "outputs": {
+        "nhc/00-ServiceAccount-node-healthcheck-console-plugin.yaml": "050468021793282de4547ab7c8d17a541321403022db4cd977f1a37f04463900",
         "nhc/00-ServiceAccount-node-healthcheck-controller-manager.yaml": "3da42c6d60e6a99d8f25815e2c6940e0ee727020348deef644e75651cb98a872",
+        "nhc/10-ClusterRole-node-healthcheck-console-plugin-all-namespaces.yaml": "a0c2e892c3b93c3e7ce955bf598be90912bc9662767cbdbc9bf61064e7a7aee3",
         "nhc/10-ClusterRole-node-healthcheck-controller-manager-all-namespaces.yaml": "42bd72de43b83e2ed0dc25963c23b647f9f911644da26520c6121bd2b631de12",
         "nhc/10-ClusterRole-node-healthcheck-controller-manager.yaml": "3501f21df24ed312105400b863a00c669e0ca4e31371bd8ec42a09a9558b9434",
         "nhc/10-ClusterRole-node-healthcheck-metrics-reader.yaml": "bf5d9360d45f49169a4b52e0c3da5766ed91b3ef012da7daea30fac25b5b114f",
+        "nhc/11-ClusterRoleBinding-node-healthcheck-console-plugin-all-namespaces.yaml": "ec45253005b2a15a2174f97779ac72fb35da68ddf6eaeca1b2785673202303df",
         "nhc/11-ClusterRoleBinding-node-healthcheck-controller-manager-all-namespaces.yaml": "6d08f04c064090745eb101ec9b332458679669fd44fc05642c9124e5da2cd9d8",
         "nhc/11-ClusterRoleBinding-node-healthcheck-controller-manager.yaml": "aeb21d9b91f11813a5d165356622852beca956a8e05d093b20f9924d823a3395",
+        "nhc/20-Role-node-healthcheck-console-plugin.yaml": "27c637ed1c861d960b49069c40b7f3b03396e9a55ce60e52edc29bbefdff6dae",
         "nhc/20-Role-node-healthcheck-controller-manager.yaml": "6892fd3c6e2b4f4ab0e7f8bb0798e294ff9e2b359498deb0a507b267017c7ff4",
+        "nhc/21-RoleBinding-node-healthcheck-console-plugin.yaml": "79f2ba70ef79f581ee9d58a7bc79739cb6209a0e628f027bd177bf5adc3599a6",
         "nhc/21-RoleBinding-node-healthcheck-controller-manager.yaml": "9997d7d9eed0e9258427e217c38653403077dca94b47d3cadab6b983bc14aed0",
         "nhc/40-Service-node-healthcheck-controller-manager-metrics-service.yaml": "d09653e14ea55b4571236ab7ee73105ca4981a2ea8714671b8618969e06e5f8a",
+        "nhc/40-Service-node-healthcheck-node-remediation-console-plugin.yaml": "27ca1e9a322adefdf5b5eeec40c5496097e817ef245568ac102668134fe9e4fc",
         "nhc/40-Service-node-healthcheck-webhook-service.yaml": "cd2b3fd83be0c232d489b4aa2fa67fcee965d2b319624334cd1f5d788c1e74d6",
         "nhc/50-Deployment-node-healthcheck-controller-manager.yaml": "0f170521dc5f350f009192e3890f46dd777bd4c78111a7fa696455158f4a465a",
+        "nhc/50-Deployment-node-healthcheck-node-remediation-console-plugin.yaml": "c653ce9295bea3ec3c2db6c4edd7f7d909588a63675c7d38acbd436f8c47af54",
         "nhc/60-ValidatingWebhookConfiguration-node-healthcheck-validating-webhook-configuration.yaml": "a20d2901420f6d0de879abedebff203a46ccdd7eed2615ad1ca62292c3bcfd1e"
       },
       "wao_modifications": [
+        "CSV permissions for node-healthcheck-console-plugin also rendered as ClusterRole/ClusterRoleBinding node-healthcheck-console-plugin-all-namespaces, as OLM grants them for an AllNamespaces OperatorGroup, plus OLM's appended get/list/watch rule on namespaces",
         "CSV permissions for node-healthcheck-controller-manager also rendered as ClusterRole/ClusterRoleBinding node-healthcheck-controller-manager-all-namespaces, as OLM grants them for an AllNamespaces OperatorGroup, plus OLM's appended get/list/watch rule on namespaces",
         "CSV permissions/clusterPermissions rendered as Role/RoleBinding/ClusterRole/ClusterRoleBinding named after each ServiceAccount",
         "Deployment/node-healthcheck-controller-manager: added service-ca webhook certificate volume node-healthcheck-webhook-server-cert at /tmp/k8s-webhook-server/serving-certs",
         "Deployment/node-healthcheck-controller-manager: pod template labeled workloadavailability.medik8s.io/component=nodeHealthCheck",
+        "Deployment/node-healthcheck-node-remediation-console-plugin: pod template labeled workloadavailability.medik8s.io/component=nodeHealthCheck",
         "Service/node-healthcheck-webhook-service: added service.beta.openshift.io/serving-cert-secret-name",
+        "ServiceAccount/node-healthcheck-console-plugin: automountServiceAccountToken=false, as upstream's service_account.yaml sets it",
         "ValidatingWebhookConfiguration: generated from CSV webhookdefinitions with service-ca CA bundle injection"
       ]
     },

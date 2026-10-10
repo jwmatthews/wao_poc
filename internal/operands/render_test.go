@@ -199,3 +199,25 @@ func TestRenderGrantsCSVNamespacedPermissionsClusterWide(t *testing.T) {
 		}
 	}
 }
+
+// Issue #4: the console backend is an NHC operand with its own pinned image (spec P2, P6).
+func TestRenderNHCConsoleBackend(t *testing.T) {
+	def, _ := components.ByKey(v1alpha1.ComponentKeyNodeHealthCheck)
+	if want := []string{"node-healthcheck-controller-manager", "node-healthcheck-node-remediation-console-plugin"}; !reflect.DeepEqual(def.Deployments, want) {
+		t.Fatalf("NHC deployments = %v, want %v", def.Deployments, want)
+	}
+	objs, err := operands.Render(def, testNamespace, testImages())
+	if err != nil {
+		t.Fatal(err)
+	}
+	dep := find(t, objs, "Deployment", "node-healthcheck-node-remediation-console-plugin")
+	containers, _, _ := unstructured.NestedSlice(dep.Object, "spec", "template", "spec", "containers")
+	if img := containers[0].(map[string]interface{})["image"]; img != testImages().Get(images.NHCConsole) {
+		t.Fatalf("console image = %v, want the pinned %s", img, images.NHCConsole)
+	}
+	find(t, objs, "Service", "node-healthcheck-node-remediation-console-plugin")
+	sa := find(t, objs, "ServiceAccount", "node-healthcheck-console-plugin")
+	if v, ok, _ := unstructured.NestedBool(sa.Object, "automountServiceAccountToken"); !ok || v {
+		t.Fatalf("console ServiceAccount automountServiceAccountToken = %v,%v, want false", v, ok)
+	}
+}

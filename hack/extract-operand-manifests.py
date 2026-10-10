@@ -41,7 +41,10 @@ ORDER = {"ServiceAccount": "00", "ClusterRole": "10", "ClusterRoleBinding": "11"
 # key: the WorkloadAvailabilityConfig API key, also the value of COMPONENT_LABEL on operand pods.
 COMPONENTS = {
     "nhc": {"key": "nodeHealthCheck", "prefix": "node-healthcheck", "webhook_service": "node-healthcheck-webhook-service",
-            "webhook_deployment": "node-healthcheck-controller-manager"},
+            "webhook_deployment": "node-healthcheck-controller-manager",
+            # OLM creates ServiceAccounts from CSV permissions, so the bundle cannot carry upstream's
+            # config/optional/console-plugin/service_account.yaml setting; WAO restores it (design brief D11).
+            "automount_disabled": ["node-healthcheck-console-plugin"]},
     "snr": {"key": "selfNodeRemediation", "prefix": "self-node-remediation", "webhook_service": "self-node-remediation-webhook-service",
             "webhook_deployment": "self-node-remediation-controller-manager"},
     "sbr": {"key": "storageBasedRemediation", "prefix": "sbr-operator", "webhook_service": None, "webhook_deployment": None},
@@ -130,7 +133,7 @@ def deployments(csv, comp, mods):
     return out
 
 
-def rbac(csv, mods):
+def rbac(csv, comp, mods):
     spec = csv["spec"]["install"]["spec"]
     out, sas = [], set()
     for p in spec.get("permissions", []) or []:
@@ -165,7 +168,11 @@ def rbac(csv, mods):
     for d in spec["deployments"]:
         sas.add(d["spec"]["template"]["spec"]["serviceAccountName"])
     for sa in sorted(sas):
-        out.append({"apiVersion": "v1", "kind": "ServiceAccount", "metadata": {"name": sa, "namespace": NAMESPACE_PLACEHOLDER}})
+        obj = {"apiVersion": "v1", "kind": "ServiceAccount", "metadata": {"name": sa, "namespace": NAMESPACE_PLACEHOLDER}}
+        if sa in comp.get("automount_disabled", []):
+            obj["automountServiceAccountToken"] = False
+            mods.append(f"ServiceAccount/{sa}: automountServiceAccountToken=false, as upstream's service_account.yaml sets it")
+        out.append(obj)
     mods.append("CSV permissions/clusterPermissions rendered as Role/RoleBinding/ClusterRole/ClusterRoleBinding named after each ServiceAccount")
     return out
 
@@ -331,7 +338,7 @@ def main():
         if bundle_ref != release_set["components"][name]["bundle"]:
             raise SystemExit(f"{name}: cached bundle {bundle_ref} does not match release-set.yaml; run `make bundles`")
         mods = []
-        objects = rbac(csv, mods) + other_objects(others, comp, mods) + deployments(csv, comp, mods) + webhooks(csv, comp, mods)
+        objects = rbac(csv, comp, mods) + other_objects(others, comp, mods) + deployments(csv, comp, mods) + webhooks(csv, comp, mods)
         rendered[name] = (objects, mods)
         meta[name] = (bundle_ref, csv["metadata"]["name"], inputs, crds)
         for crd_name, crd in crds:

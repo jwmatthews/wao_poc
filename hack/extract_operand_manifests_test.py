@@ -46,7 +46,8 @@ class ExtractionTest(unittest.TestCase):
         return [d for d in docs.values() if d["kind"] == kind]
 
     def test_nhc_manager_and_validating_webhook(self):
-        self.assertEqual([d["metadata"]["name"] for d in self.kinds(self.nhc, "Deployment")], ["node-healthcheck-controller-manager"])
+        self.assertEqual(sorted(d["metadata"]["name"] for d in self.kinds(self.nhc, "Deployment")),
+                         ["node-healthcheck-controller-manager", "node-healthcheck-node-remediation-console-plugin"])
         vw = self.kinds(self.nhc, "ValidatingWebhookConfiguration")
         self.assertEqual(len(vw), 1)
         self.assertEqual(vw[0]["metadata"]["name"], "node-healthcheck-validating-webhook-configuration")
@@ -231,10 +232,37 @@ class ExtractionTest(unittest.TestCase):
         self.assertTrue(any(r.get("resourceNames") == ["privileged"] and "use" in r["verbs"] for r in role["rules"]))
         self.assertTrue(any("validatingwebhookconfigurations" in r.get("resources", []) for r in role["rules"]))
 
+    def test_nhc_console_backend_from_okd_bundle(self):
+        # Issue #4: the OKD community bundle is the k8s bundle plus the console backend.
+        deps = {d["metadata"]["name"]: d for d in self.kinds(self.nhc, "Deployment")}
+        self.assertIn("node-healthcheck-node-remediation-console-plugin", deps)
+        d = deps["node-healthcheck-node-remediation-console-plugin"]
+        pod = d["spec"]["template"]["spec"]
+        c = pod["containers"][0]
+        self.assertEqual(c["image"], "quay.io/medik8s/node-remediation-console:v0.12.0")
+        self.assertEqual(c["ports"], [{"containerPort": 9443, "name": "nrc-server", "protocol": "TCP"}])
+        self.assertEqual(c["volumeMounts"], [{"mountPath": "/var/serving-cert", "name": "nrc-plugin-cert", "readOnly": True}])
+        self.assertEqual(pod["volumes"], [{"name": "nrc-plugin-cert", "secret": {"defaultMode": 420, "secretName": "nrc-plugin-cert"}}])
+        self.assertEqual(pod["serviceAccountName"], "node-healthcheck-console-plugin")
+        self.assertEqual(d["spec"]["template"]["metadata"]["labels"]["workloadavailability.medik8s.io/component"], "nodeHealthCheck")
+        svc = next(s for s in self.kinds(self.nhc, "Service") if s["metadata"]["name"] == "node-healthcheck-node-remediation-console-plugin")
+        self.assertEqual(svc["metadata"]["annotations"]["service.beta.openshift.io/serving-cert-secret-name"], "nrc-plugin-cert")
+        self.assertEqual(svc["spec"]["ports"], [{"name": "9443-tcp", "port": 9443, "protocol": "TCP", "targetPort": "nrc-server"}])
+        self.assertEqual(svc["spec"]["selector"], {"app.kubernetes.io/component": "node-remediation-console-plugin",
+                                                   "app.kubernetes.io/name": "node-healthcheck-operator"})
+        sa = next(x for x in self.kinds(self.nhc, "ServiceAccount") if x["metadata"]["name"] == "node-healthcheck-console-plugin")
+        self.assertIs(sa["automountServiceAccountToken"], False, "upstream service_account.yaml disables token automount")
+        role = next(x for x in self.kinds(self.nhc, "Role") if x["metadata"]["name"] == "node-healthcheck-console-plugin")
+        self.assertEqual(role["rules"], [{"apiGroups": [""], "resourceNames": ["no-op-placeholder"], "resources": ["configmaps"], "verbs": ["get"]}])
+        self.assertIn("node-healthcheck-console-plugin-all-namespaces", {x["metadata"]["name"] for x in self.kinds(self.nhc, "ClusterRole")})
+        prov = json.loads((self.out / "provenance.json").read_text())
+        self.assertTrue(prov["bundles"]["nhc"]["bundle"].startswith("quay.io/community-operator-pipeline-prod/node-healthcheck-operator@sha256:"))
+        self.assertTrue(any("automountServiceAccountToken" in m for m in prov["bundles"]["nhc"]["wao_modifications"]))
+
     def test_provenance_and_determinism(self):
         prov = json.loads((self.out / "provenance.json").read_text())
         self.assertEqual(set(prov["bundles"]), {"nhc", "snr", "sbr", "far", "mdr", "nmo"})
-        self.assertTrue(prov["bundles"]["nhc"]["bundle"].startswith("quay.io/medik8s/node-healthcheck-operator-bundle@sha256:"))
+        self.assertTrue(prov["bundles"]["nhc"]["bundle"].startswith("quay.io/community-operator-pipeline-prod/node-healthcheck-operator@sha256:"))
         for comp in prov["bundles"].values():
             for f, h in comp["outputs"].items():
                 self.assertEqual(h, sha(self.out / f))

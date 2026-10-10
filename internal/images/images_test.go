@@ -14,7 +14,7 @@ func TestFromEnvReportsEveryMissingVariable(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	for _, k := range []string{SNRManager, SBRManager, SBRAgent, FARManager, MDRManager, NMOManager} {
+	for _, k := range []string{NHCConsole, SNRManager, SBRManager, SBRAgent, FARManager, MDRManager, NMOManager} {
 		if !strings.Contains(err.Error(), k) {
 			t.Errorf("error %q does not name %s", err, k)
 		}

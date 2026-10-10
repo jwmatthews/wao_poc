@@ -9,11 +9,18 @@ components:
   nhc:
     version: v0.12.0
     source: https://github.com/medik8s/node-healthcheck-operator/tree/v0.12.0
-    bundle: quay.io/medik8s/node-healthcheck-operator-bundle@sha256:2a2ad916a9f827015474b4220b089ba61313112e697d45a50610186b620e1dba
+    # The OKD community bundle that medik8s' release workflow builds from the same tag (community-operators-prod
+    # pipeline). Verified identical to the published k8s bundle
+    # quay.io/medik8s/node-healthcheck-operator-bundle@sha256:2a2ad916a9f827015474b4220b089ba61313112e697d45a50610186b620e1dba
+    # except for the console backend Deployment, Service and ServiceAccount it adds (design brief D11).
+    bundle: quay.io/community-operator-pipeline-prod/node-healthcheck-operator@sha256:e7684ebbcc543d8077fd218c7a1c9ce6c7ee622cce9d1806cd2672d792fcec72
     images:
       RELATED_IMAGE_NHC_MANAGER:
         upstream: quay.io/medik8s/node-healthcheck-operator:v0.12.0
         pinned: quay.io/medik8s/node-healthcheck-operator@sha256:5b048ad5d2b8578d2120989a5a822a041d65c985f9ac88d50b000427b32b5391
+      RELATED_IMAGE_NHC_CONSOLE:
+        upstream: quay.io/medik8s/node-remediation-console:v0.12.0
+        pinned: quay.io/medik8s/node-remediation-console@sha256:f58fed1feef835bef8ddf9c7ab7edd987b87162866f68d76abd7be47ca737c2d
   snr:
     version: v0.13.0
     source: https://github.com/medik8s/self-node-remediation/tree/v0.13.0

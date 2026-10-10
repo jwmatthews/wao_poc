@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/component: node-remediation-console-plugin
+    app.kubernetes.io/name: node-healthcheck-operator
+  name: node-healthcheck-node-remediation-console-plugin
+  namespace: __WAO_NAMESPACE__
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: node-remediation-console-plugin
+      app.kubernetes.io/name: node-healthcheck-operator
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: node-remediation-console-plugin
+        app.kubernetes.io/name: node-healthcheck-operator
+        workloadavailability.medik8s.io/component: nodeHealthCheck
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - preference:
+              matchExpressions:
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+            weight: 3
+          - preference:
+              matchExpressions:
+              - key: node-role.kubernetes.io/master
+                operator: Exists
+            weight: 1
+          - preference:
+              matchExpressions:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+            weight: 1
+      containers:
+      - image: quay.io/medik8s/node-remediation-console:v0.12.0
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - /bin/true
+          preStop:
+            exec:
+              command:
+              - sleep
+              - '5'
+        livenessProbe:
+          periodSeconds: 10
+          tcpSocket:
+            port: 9443
+          timeoutSeconds: 3
+        name: node-remediation-console-plugin
+        ports:
+        - containerPort: 9443
+          name: nrc-server
+          protocol: TCP
+        readinessProbe:
+          periodSeconds: 5
+          tcpSocket:
+            port: 9443
+          timeoutSeconds: 3
+        resources:
+          requests:
+            cpu: 10m
+            memory: 50Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        startupProbe:
+          failureThreshold: 12
+          periodSeconds: 5
+          tcpSocket:
+            port: 9443
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /var/serving-cert
+          name: nrc-plugin-cert
+          readOnly: true
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: node-healthcheck-console-plugin
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
+        operator: Exists
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/infra
+        operator: Exists
+      - effect: NoExecute
+        key: node-role.kubernetes.io/infra
+        operator: Exists
+      volumes:
+      - name: nrc-plugin-cert
+        secret:
+          defaultMode: 420
+          secretName: nrc-plugin-cert

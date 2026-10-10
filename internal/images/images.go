@@ -8,6 +8,7 @@ import (
 
 const (
 	NHCManager = "RELATED_IMAGE_NHC_MANAGER"
+	NHCConsole = "RELATED_IMAGE_NHC_CONSOLE"
 	SNRManager = "RELATED_IMAGE_SNR_MANAGER"
 	SBRManager = "RELATED_IMAGE_SBR_MANAGER"
 	SBRAgent   = "RELATED_IMAGE_SBR_AGENT"
@@ -17,7 +18,7 @@ const (
 )
 
 // Required lists every image environment variable the operator needs at startup.
-var Required = []string{NHCManager, SNRManager, SBRManager, SBRAgent, FARManager, MDRManager, NMOManager}
+var Required = []string{NHCManager, NHCConsole, SNRManager, SBRManager, SBRAgent, FARManager, MDRManager, NMOManager}
 
 // Set maps RELATED_IMAGE_* names to pinned image references.
 type Set map[string]string

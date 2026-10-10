@@ -27,7 +27,7 @@ metadata:
       ]
     capabilities: Basic Install
     categories: OpenShift Optional
-    createdAt: "2026-10-05T23:35:46Z"
+    createdAt: "2026-10-10T21:33:35Z"
     description: Proof of concept single operator that installs the six medik8s workload
       availability operators (NHC, SNR, SBR, FAR, MDR, NMO) as managed operands.
     operatorframework.io/suggested-namespace: openshift-workload-availability
@@ -279,6 +279,14 @@ spec:
           - update
           - patch
           - delete
+        - apiGroups:
+          - ""
+          resourceNames:
+          - no-op-placeholder
+          resources:
+          - configmaps
+          verbs:
+          - get
         - apiGroups:
           - ""
           resources:
@@ -1174,6 +1182,8 @@ spec:
                       fieldPath: metadata.namespace
                 - name: RELATED_IMAGE_NHC_MANAGER
                   value: quay.io/medik8s/node-healthcheck-operator@sha256:5b048ad5d2b8578d2120989a5a822a041d65c985f9ac88d50b000427b32b5391
+                - name: RELATED_IMAGE_NHC_CONSOLE
+                  value: quay.io/medik8s/node-remediation-console@sha256:f58fed1feef835bef8ddf9c7ab7edd987b87162866f68d76abd7be47ca737c2d
                 - name: RELATED_IMAGE_SNR_MANAGER
                   value: quay.io/medik8s/self-node-remediation-operator@sha256:9ad002dca9ea183c72e350f72e47aff7020397fd476b4a3ac4ebc3627412a5b0
                 - name: RELATED_IMAGE_SBR_MANAGER
@@ -1186,7 +1196,7 @@ spec:
                   value: quay.io/medik8s/machine-deletion-remediation-operator@sha256:0f69367097625d7824d9b5b69de64103e19b612c9833b0b786bb32c9b7efe84d
                 - name: RELATED_IMAGE_NMO_MANAGER
                   value: quay.io/medik8s/node-maintenance-operator@sha256:5b65ec62c58b92fee3389a77ded760ce82a0a6a30f6cf89573f6e97b8f677c74
-                image: image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@sha256:6077f4265aaf49de3e445e07bd7ee1750171951cdc2d7de4a11f7d8f63328671
+                image: image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@sha256:78859f4e9ea5fdf1fcf8df3ddf1b8405e483b19784bd02fe1f3d5dc94813b5f5
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -1273,6 +1283,8 @@ spec:
   relatedImages:
   - image: quay.io/medik8s/node-healthcheck-operator@sha256:5b048ad5d2b8578d2120989a5a822a041d65c985f9ac88d50b000427b32b5391
     name: nhc-manager
+  - image: quay.io/medik8s/node-remediation-console@sha256:f58fed1feef835bef8ddf9c7ab7edd987b87162866f68d76abd7be47ca737c2d
+    name: nhc-console
   - image: quay.io/medik8s/self-node-remediation-operator@sha256:9ad002dca9ea183c72e350f72e47aff7020397fd476b4a3ac4ebc3627412a5b0
     name: snr-manager
   - image: quay.io/medik8s/storage-based-remediation-operator@sha256:c390b6b011458985823829049afd47f4a85b90cbc020d8527803cce58da8bd04

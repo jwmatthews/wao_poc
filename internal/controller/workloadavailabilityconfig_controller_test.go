@@ -103,7 +103,7 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 			c := component(getWAC(ctx), v1alpha1.ComponentKeyNodeHealthCheck)
 			g.Expect(c).NotTo(BeNil())
 			g.Expect(c.Phase).To(Equal(v1alpha1.ComponentPhaseProgressing)) // envtest has no kubelet or service-ca
-			g.Expect(c.Deployments).To(HaveLen(1))
+			g.Expect(c.Deployments).To(HaveLen(2))                          // the manager and the console backend (issue #4)
 			g.Expect(c.AdmissionReady).To(Equal(ptr.To(false)))
 		}).Should(Succeed())
 		dep := &appsv1.Deployment{}

@@ -1,0 +1,14 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: node-healthcheck-console-plugin
+  namespace: __WAO_NAMESPACE__
+rules:
+- apiGroups:
+  - ''
+  resourceNames:
+  - no-op-placeholder
+  resources:
+  - configmaps
+  verbs:
+  - get
