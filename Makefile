@@ -120,6 +120,17 @@ fbc: bundle-check opm ## Render the OLM v1 file-based catalog for BUNDLE_IMG (di
 	$(PYTHON) hack/fbc-catalog.py --bundle bundle --bundle-image $(BUNDLE_IMG) --out $(FBC_DIR)
 	$(OPM) validate $(FBC_DIR)
 
+# The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).
+CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:v$(VERSION)
+
+.PHONY: catalog-build
+catalog-build: fbc ## Build the OLM v1 catalog image (FROM scratch, FBC at /configs) for BUNDLE_IMG.
+	$(CONTAINER_TOOL) build -f catalog.Dockerfile -t $(CATALOG_IMG) .
+
+.PHONY: catalog-push
+catalog-push: ## Push the catalog image.
+	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+
 .PHONY: test-offline
 test-offline: ## Run every offline Python test and syntax-check the live-cluster scripts (no cluster needed).
 	$(PYTHON) -m unittest hack/extract_operand_manifests_test.py hack/e2e_runner_test.py hack/fbc_catalog_test.py hack/check_bundle_test.py

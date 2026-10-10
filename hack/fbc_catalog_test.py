@@ -69,6 +69,12 @@ class FBCTest(unittest.TestCase):
             self.assertEqual(proc.returncode, 2)
             self.assertIn("exactly one CSV", proc.stderr)
 
+    def test_catalog_dockerfile_serves_configs(self):
+        text = (HERE.parent / "catalog.Dockerfile").read_text()
+        self.assertIn("FROM scratch", text)
+        self.assertIn("LABEL operators.operatorframework.io.index.configs.v1=/configs", text)
+        self.assertIn("COPY dist/catalog /configs", text)
+
 
 if __name__ == "__main__":
     unittest.main()
