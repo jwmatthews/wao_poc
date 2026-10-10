@@ -6,6 +6,8 @@ bin/
 evidence/
 .venv/
 dist/
+# The rendered file-based catalog is the only dist/ content an image needs (catalog.Dockerfile).
+!dist/catalog
 __pycache__/
 *.kubeconfig
 kubeconfig*

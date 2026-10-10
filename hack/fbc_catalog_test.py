@@ -74,6 +74,8 @@ class FBCTest(unittest.TestCase):
         self.assertIn("FROM scratch", text)
         self.assertIn("LABEL operators.operatorframework.io.index.configs.v1=/configs", text)
         self.assertIn("COPY dist/catalog /configs", text)
+        dockerignore = (HERE.parent / ".dockerignore").read_text()
+        self.assertIn("!dist/catalog", dockerignore)
 
 
 if __name__ == "__main__":
