@@ -1,8 +1,15 @@
 # NHC platform integration handoff
 
-Updated 2026-10-10 UTC. The investigation is complete; the console and metrics
-fixes have **not** been implemented or deployed. The next work is to implement
-the two issues below and make WAO's platform packaging requirements explicit.
+Updated 2026-10-10 UTC. Metrics (issue #3) and the console backend (issue #4)
+are implemented on branch `node-remediation-console`: `a9c43a6` renders NHC from the
+OKD community bundle with the console backend; `3dad6f5` applies the OpenShift metrics
+overlay from pinned upstream files; `a0c449d` watches the CA ConfigMap; `2ea29d5`
+makes parity assert the platform contract; `d2d987e` and `5730432` add live checks;
+`75cd62b` documents the supplements (D11); `9f8b87e` points the bundle at the rebuilt
+image; `85793c0` fixes the harness. The work was validated on 2026-10-10 on a
+disposable OpenShift 5.0.0-rc.5 cluster: all 19 install cases passed. The browser
+check of the console pages is still manual (KI-7). Remaining items are tracked in
+[docs/known-issues.md](docs/known-issues.md).
 
 ## Start here
 
@@ -93,15 +100,14 @@ Use `release-set.yaml` as the authoritative selection. At investigation time:
 | NHC | v0.12.0; source `a49ec14c47c5c1f0e5b81c68bf2880ff17ec4a5f` |
 | NHC bundle | `quay.io/medik8s/node-healthcheck-operator-bundle@sha256:2a2ad916a9f827015474b4220b089ba61313112e697d45a50610186b620e1dba` |
 | NHC manager | `quay.io/medik8s/node-healthcheck-operator@sha256:5b048ad5d2b8578d2120989a5a822a041d65c985f9ac88d50b000427b32b5391` |
-| Candidate console image | `quay.io/medik8s/node-remediation-console@sha256:f58fed1feef835bef8ddf9c7ab7edd987b87162866f68d76abd7be47ca737c2d` |
+| Console image (pinned in `release-set.yaml`, validated on a disposable cluster) | `quay.io/medik8s/node-remediation-console@sha256:f58fed1feef835bef8ddf9c7ab7edd987b87162866f68d76abd7be47ca737c2d` |
 | Matching frontend tag/source | v0.12.0; `d44d9cac99d8ef3af8b8ff59051dfe6a5439600d` |
 | Newer NHC context guide | Describes source `f15aa15d7f07f1bca7e2a2a4c05e4c53801c4dd5`, not the pinned manager. |
 
 The console digest was resolved from the published v0.12.0 tag. Image inspection
 confirmed linux/amd64 and a plugin manifest declaring version 0.12.0 and
-`@console/pluginAPI >=4.16.0-0`. **This is a candidate, not a validated deployment:**
-trusted TLS, asset loading, and browser compatibility on the inspected OpenShift
-release remain untested. Do not infer frontend source provenance from inherited
+`@console/pluginAPI >=4.16.0-0`. Trusted TLS and asset serving are validated live; browser compatibility is
+untested (KI-7). Do not infer frontend source provenance from inherited
 nginx image labels or assume current `main` dependencies match this image.
 
 Upstream checkouts are available locally under `~/git/medik8s/`, including
@@ -111,51 +117,10 @@ Relevant NHC inputs are `config/manifests/{ocp,okd,k8s}/`,
 `config/optional/{console-plugin,prometheus-ocp,kube-system-rbac}/`, the Makefile,
 and `.github/workflows/release.yaml` at the pinned commit.
 
-## Recommended next steps
+## Remaining work
 
-The order below is a recommendation, not an already implemented design.
-
-1. **Define reproducible platform inputs and lifecycle behavior.** Inventory
-   the selected bundle, platform additions, runtime-created objects, effective
-   permissions, certificates, image references, readiness, and disable behavior
-   for NHC. Choose a suitable published platform bundle or a supplement sourced
-   from an immutable upstream revision. Keep provenance reviewable and generated
-   output reproducible; do not hand-edit generated operand manifests. Decide how
-   to handle fixed namespaces, injected fields, registration cleanup, and
-   separate manager/admission, monitoring, and console readiness signals.
-2. **Implement metrics repair (#3).** Supply the injected
-   `node-healthcheck-ca-bundle`, the metrics Service label
-   `app.kubernetes.io/instance=metrics`, the serving-certificate request for
-   `node-healthcheck-tls`, and its nonoptional manager mount at
-   `/etc/tls/private`. Confirm the exact resource names against pinned source.
-   Verify the client-CA permissions and discovery mode/grants. Preserve webhook
-   certificates and failure policies. Test CA injection ownership, drift,
-   certificate recreation/rotation, and the absence of side effects when NHC is
-   Disabled.
-3. **Implement the console operand (#4).** Add a reviewed, digest-pinned image
-   to the release set, image bindings, and related images. Manage the frontend
-   Deployment, Service, and supporting resources with enabled NHC. Putting the
-   frontend directly in WAO's CSV install strategy would bypass component
-   enablement and violate the all-Disabled default. Match the runtime backend
-   contract: `node-healthcheck-node-remediation-console-plugin`, port `9443`,
-   install namespace, `nrc-plugin-cert`, and `/var/serving-cert`. Preserve the
-   upstream service account's `automountServiceAccountToken: false` and inspect
-   the selected image's filesystem requirements. Add readiness, ownership,
-   conflict, drift, and disable coverage.
-4. **Validate end to end on a confirmed disposable cluster.** Test all-Disabled
-   installation first, then enabled NHC. Check successful metrics scrape targets
-   and resolution of the rejected-ServiceMonitor alert. Verify service-ca
-   issuance, endpoints, trusted HTTPS access to the plugin manifest/assets, and
-   browser list/details loading. Define the administrator enablement flow and
-   only enable the plugin after its backend is ready, preserving other
-   `Console/cluster.spec.plugins` entries. A CSV plugin annotation advertises the
-   integration; it is not evidence of an enabled or functioning plugin. Exercise
-   restart, drift, disable, and cleanup without adopting NHC-created objects or
-   creating real remediation policies/requests.
-5. **Extend the platform inventory to SNR, SBR, FAR, MDR, and NMO.** Compare
-   pinned packaging inputs and runtime assumptions, then add checks for confirmed
-   gaps. Track diagnostics and upgrade-only requirements separately from the two
-   current NHC defects.
+See KI-1 through KI-7 in [docs/known-issues.md](docs/known-issues.md) and the
+[design spec](docs/superpowers/specs/2026-10-09-nhc-platform-integration-design.md).
 
 Likely implementation and verification touchpoints:
 
