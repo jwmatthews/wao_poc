@@ -66,7 +66,7 @@ def main(bundle_dir="bundle", release_set="release-set.yaml"):
     if csv["metadata"]["annotations"].get("operatorframework.io/suggested-namespace") != "openshift-workload-availability":
         problems.append("suggested-namespace annotation missing or wrong")
     if extra:
-        problems.append(f"bundle contains objects a ConfigMap catalog cannot carry: {extra}")
+        problems.append(f"bundle contains objects beyond the POC contract (one CSV, thirteen CRDs): {extra}")
     if problems:
         print("\n".join(problems)); sys.exit(1)
     print(f"bundle OK: {csv['metadata']['name']} owns {len(owned)} CRDs, {len(pinned)} pinned operand images")
