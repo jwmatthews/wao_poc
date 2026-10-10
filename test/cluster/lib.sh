@@ -78,7 +78,7 @@ export -f component_field
 # snapshot LABEL : persist the objects every case compares. Never captures Secrets.
 snapshot() {
   local l="$1"
-  record "${l}-csv" get csv -n "$NS" -o json >/dev/null || true
+  record "${l}-ce" get clusterextension "$CE_NAME" -o json >/dev/null || true
   record "${l}-deploy" get deployment -n "$NS" -o json >/dev/null || true
   record "${l}-ds" get daemonset -n "$NS" -o json >/dev/null || true
   record "${l}-pods" get pods -n "$NS" -o wide >/dev/null || true
@@ -108,6 +108,7 @@ found() { local out; out=$(k get "$@" -o name) || return 1; [ -n "$out" ]; }
 
 # absent ARGS... : the named object does not exist. Any other API error fails.
 absent() { local out; out=$(k get "$@" --ignore-not-found -o name) || return 1; [ -z "$out" ]; }
+source "$(dirname "${BASH_SOURCE[0]}")/olmv1.sh"
 
 # deployment_available NAME : Deployment NAME in $NS has condition Available=True.
 deployment_available() { k wait "deployment/$1" -n "$NS" --for=condition=Available --timeout=10s >/dev/null; }
