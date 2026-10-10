@@ -2,14 +2,15 @@
 # test/cluster/full-run.sh — run the POC on a disposable cluster, in phases or end to end:
 #
 #   build    confirm the cluster, workstation checks, read-only preflight, build the WAO image on the
-#            cluster from `git archive HEAD`, point the bundle at it, render dist/wao-poc-catalog.yaml
-#   install  confirm, then WAO-INST-00..02: catalog, install WAO through OLM, approve the InstallPlan.
+#            cluster from `git archive HEAD`, point the bundle at it, build the bundle and catalog images, render
+#            dist/wao-poc-clustercatalog.yaml
+#   install  confirm, then WAO-INST-00..02: ClusterCatalog, namespace and installer RBAC, ClusterExtension
 #            Leaves WAO installed with every component Disabled, ready for `oc patch`.
 #   run      confirm, then WAO-INST-00..18 (install, enable all six, parity, restart, drift, disable,
 #            uninstall) and write a sanitized REPORT.md skeleton
 #   all      build, then run (the default)
 #
-# `install` and `run` need the image in the cluster and dist/wao-poc-catalog.yaml from `build`.
+# `install` and `run` need the image in the cluster and dist/wao-poc-clustercatalog.yaml from `build`.
 # Clean up after `install` with `bash test/cluster/run-all.sh 18`. Never commits or pushes.
 # It is the scripted form of docs/agent-test-run.md.
 #
@@ -20,13 +21,13 @@
 #   SKIP_BUILD=1       build: reuse the image already in the cluster (istag wao:latest in BUILD_NS)
 #   ALLOW_DIRTY=1      build: proceed with uncommitted changes (the build ships `git archive HEAD`)
 #   WAO_VERSION=0.1.0  bundle version; must match CSV_NAME in env.sh
-#   RUN_DIR, BUILD_NS, CATALOG_FILE, STOP_ON_FAIL, SKIP_CLEANUP as in run-all.sh and env.sh
+#   RUN_DIR, BUILD_NS, CLUSTERCATALOG_FILE, STOP_ON_FAIL, SKIP_CLEANUP as in run-all.sh and env.sh
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PHASE="${1:-all}"
 case "$PHASE" in
   build|install|run|all) ;;
-  -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
+  -h|--help) sed -n '2,27p' "$0"; exit 0 ;;
   *) echo "usage: $0 [build|install|run|all]" >&2; exit 2 ;;
 esac
 : "${KUBECONFIG:?set KUBECONFIG to a disposable OpenShift cluster you are authorized to modify}"
@@ -42,6 +43,22 @@ step() { echo; echo "######## $(date -u +%FT%TZ) $*"; }
 die() { echo "ERROR: $*" >&2; exit 2; }
 # oc without the 30s request timeout `k` applies, for the build log stream.
 oc_long() { "${OC}" --kubeconfig "${KUBECONFIG}" "$@"; }
+
+BUNDLE_BC="${BUNDLE_BC:-wao-bundle}"
+CATALOG_BC="${CATALOG_BC:-wao-catalog}"
+
+# binary_build NAME DIR : run (creating if needed) the binary Docker BuildConfig NAME in $BUILD_NS from DIR,
+# which must contain a Dockerfile and only the files it copies. Prints the image digest reference.
+binary_build() {
+  local name="$1" dir="$2" digest
+  if absent buildconfig "$name" -n "$BUILD_NS"; then
+    record "build-new-build-$name" new-build --binary --name "$name" -n "$BUILD_NS" --strategy docker >/dev/null
+  fi
+  oc_long start-build "$name" -n "$BUILD_NS" --from-dir="$dir" --follow --wait >&2
+  digest=$(k get istag "$name:latest" -n "$BUILD_NS" -o jsonpath='{.image.metadata.name}')
+  case "$digest" in sha256:*) ;; *) die "no image digest for istag $name:latest in $BUILD_NS (got '$digest')" ;; esac
+  echo "${REGISTRY}/${BUILD_NS}/${name}@${digest}"
+}
 
 # ---- confirm the cluster (every phase) ----------------------------------------------------------
 confirm() {
@@ -59,11 +76,11 @@ evidence   : $RUN_DIR (git-ignored; raw output contains cluster-identifying deta
 EOF
   case "$PHASE" in
     build) echo "This phase MUTATES the cluster: it builds an image in namespace $BUILD_NS." ;;
-    install) echo "This phase MUTATES the cluster: it applies the catalog and installs WAO through OLM in $NS."
+    install) echo "This phase MUTATES the cluster: it applies the catalog and installs WAO through OLM v1 (ClusterExtension) in $NS."
              echo "Clean up afterwards with: bash test/cluster/run-all.sh 18" ;;
     run|all) cat <<EOF
 This run MUTATES the cluster: it builds an image in namespace $BUILD_NS (build phase), installs WAO through
-OLM in $NS, enables all six components (WAO-INST-06 starts privileged SNR agents on every eligible node),
+OLM v1 (ClusterExtension) in $NS, enables all six components (WAO-INST-06 starts privileged SNR agents on every eligible node),
 then uninstalls WAO and deletes the thirteen medik8s CRDs and every custom resource of those kinds.
 EOF
     ;;
@@ -118,6 +135,12 @@ phase_build() {
   fi
   digest=$(k get istag wao:latest -n "$BUILD_NS" -o jsonpath='{.image.metadata.name}')
   case "$digest" in sha256:*) ;; *) die "no image digest for istag wao:latest in $BUILD_NS (got '$digest')" ;; esac
+  # catalogd unpacks the catalog image and operator-controller unpacks the bundle image, each from its own
+  # namespace, so both need pull access to the build namespace (as does the install namespace, granted above).
+  record build-image-puller-catalogd policy add-role-to-group system:image-puller \
+    system:serviceaccounts:openshift-catalogd -n "$BUILD_NS" >/dev/null
+  record build-image-puller-operator-controller policy add-role-to-group system:image-puller \
+    system:serviceaccounts:openshift-operator-controller -n "$BUILD_NS" >/dev/null
   img="${REGISTRY}/${BUILD_NS}/wao@${digest}"
   echo "image: $img"
   { echo; echo "## Build $(date -u +%FT%TZ)"; echo "- Commit: ${commit}"; echo "- Image: ${img}"; } >> "$RUN_DIR/RUN.md"
@@ -146,13 +169,34 @@ config/manager/kustomization.yaml"
     git checkout -- "$csv"; echo "bundle CSV: only createdAt changed, restored"
   fi
   echo "bundle changes:"; git diff --stat -- README.md bundle config/manager
-  make catalog-configmap DEFAULT_CHANNEL=alpha
+  step "build the bundle image in $BUILD_NS"
+  stage=$(mktemp -d)
+  cp bundle.Dockerfile "$stage/Dockerfile"
+  cp -R bundle "$stage/bundle"
+  bundle_img=$(binary_build "$BUNDLE_BC" "$stage")
+  rm -rf "$stage"
+  echo "bundle image: $bundle_img"
+
+  step "render and validate the file-based catalog for $bundle_img"
+  make fbc BUNDLE_IMG="$bundle_img"
+
+  step "build the catalog image in $BUILD_NS"
+  stage=$(mktemp -d)
+  cp catalog.Dockerfile "$stage/Dockerfile"
+  mkdir -p "$stage/dist"
+  cp -R dist/catalog "$stage/dist/catalog"
+  catalog_img=$(binary_build "$CATALOG_BC" "$stage")
+  rm -rf "$stage"
+  echo "catalog image: $catalog_img"
+  make clustercatalog CATALOG_IMG="$catalog_img"
+  { echo "- Bundle image: ${bundle_img}"; echo "- Catalog image: ${catalog_img}"; } >> "$RUN_DIR/RUN.md"
   cat <<EOF
 
 ######## build done
 image   : $img
-catalog : $CATALOG_FILE
-bundle  : now references the image above (git diff -- README.md bundle config/manager)
+bundle  : $bundle_img
+catalog : $catalog_img -> $CLUSTERCATALOG_FILE
+bundle/ : now references the operator image above (git diff -- README.md bundle config/manager)
 Next    : bash test/cluster/full-run.sh install   (WAO only)   or   bash test/cluster/full-run.sh run   (all cases)
 To commit the bundle update after review (never evidence/):
   git add README.md bundle/manifests/workload-availability-operator.clusterserviceversion.yaml config/manager/kustomization.yaml
@@ -161,7 +205,7 @@ EOF
 }
 
 need_catalog() {
-  [ -f "$CATALOG_FILE" ] || die "$CATALOG_FILE missing; run \`bash test/cluster/full-run.sh build\` first"
+  [ -f "$CLUSTERCATALOG_FILE" ] || die "$CLUSTERCATALOG_FILE missing; run \`bash test/cluster/full-run.sh build\` first"
 }
 
 # ---- install: WAO-INST-00..02, leave WAO installed ----------------------------------------------
@@ -170,7 +214,7 @@ phase_install() {
   step "install WAO (WAO-INST-00..02)"
   bash "$HERE/run-all.sh" 00 01 02
   step "installed"
-  k get csv -n "$NS"
+  k get clusterextension "$CE_NAME"
   k get workloadavailabilityconfig cluster -o jsonpath='{range .status.components[*]}{.name}{"\t"}{.phase}{"\n"}{end}' || true
   cat <<EOF
 
