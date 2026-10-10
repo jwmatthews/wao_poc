@@ -297,8 +297,9 @@ console_plugin_enabled() {
 
 # enable_console_plugin LABEL NAME : the administrator step. Appends NAME, preserving existing entries.
 enable_console_plugin() {
-  console_plugin_enabled "$2" && return 0
-  if [ "$(console_plugins)" = "[]" ]; then
+  local p; p=$(console_plugins) || return 1
+  python3 -c 'import json, sys; sys.exit(0 if sys.argv[2] in json.loads(sys.argv[1]) else 1)' "$p" "$2" && return 0
+  if [ "$p" = "[]" ]; then
     record "$1" patch consoles.operator.openshift.io cluster --type json \
       -p "[{\"op\":\"add\",\"path\":\"/spec/plugins\",\"value\":[\"$2\"]}]" >/dev/null
   else
@@ -313,7 +314,7 @@ disable_console_plugin() {
   p=$(console_plugins) || return 1
   idx=$(python3 -c 'import json, sys; l = json.loads(sys.argv[1]); print(l.index(sys.argv[2]) if sys.argv[2] in l else -1)' "$p" "$2")
   [ "$idx" -ge 0 ] || return 0
-  record "$1" patch consoles.operator.openshift.io cluster --type json -p "[{\"op\":\"remove\",\"path\":\"/spec/plugins/$idx\"}]" >/dev/null
+  record "$1" patch consoles.operator.openshift.io cluster --type json -p "[{\"op\":\"test\",\"path\":\"/spec/plugins/$idx\",\"value\":\"$2\"},{\"op\":\"remove\",\"path\":\"/spec/plugins/$idx\"}]" >/dev/null
 }
 
 # trusted_fetch LABEL URL : fetch URL from a short-lived pod in $NS, verifying TLS against the service CA that

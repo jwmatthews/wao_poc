@@ -62,6 +62,7 @@ no_rejected_alert() { [ "$(prom_query 'ALERTS{alertname="PrometheusOperatorRejec
 wait_for 120 "the rejected-ServiceMonitor alert is not firing" no_rejected_alert
 
 # ---- console backend (issue #4): trusted fetch, then the administrator enables the plugin ----
+wait_for 60 "NHC registered its ConsolePlugin" found consoleplugin node-remediation-console-plugin
 record 05-consoleplugin get consoleplugin node-remediation-console-plugin -o json >/dev/null
 expect "ConsolePlugin backend points at the WAO-rendered Service" jcheck \
   'o["spec"]["backend"]["service"] == {"name": "node-healthcheck-node-remediation-console-plugin", "namespace": os.environ["NS"], "port": 9443, "basePath": "/"}' \
@@ -71,15 +72,21 @@ printf '%s\n' "$manifest" > "${RUN_DIR}/raw/05-plugin-manifest.json"
 expect "plugin manifest served over TLS trusted by the service CA and names the plugin" \
   python3 -c 'import json, sys; sys.exit(0 if json.loads(sys.argv[1])["name"] == "node-remediation-console-plugin" else 1)' "$manifest"
 before_plugins=$(console_plugins)
+CONSOLE_GEN_BEFORE=$(k get deployment console -n openshift-console -o jsonpath='{.metadata.generation}')
+if console_plugin_enabled node-remediation-console-plugin; then already=1; else already=0; fi
+export CONSOLE_GEN_BEFORE
 enable_console_plugin 05-enable-plugin node-remediation-console-plugin   # administrator action, not WAO (known issue KI-1)
 expect "plugin enabled in Console/cluster" console_plugin_enabled node-remediation-console-plugin
 expect "previously enabled plugins preserved" python3 -c 'import json, sys; sys.exit(0 if set(json.loads(sys.argv[1])) <= set(json.loads(sys.argv[2])) else 1)' "$before_plugins" "$(console_plugins)"
 console_rolled_out() {
+  # When this run enabled the plugin, the Deployment must also have moved past the generation seen before the patch.
+  [ "$already" = 1 ] || jcheck 'o["metadata"]["generation"] > int(os.environ["CONSOLE_GEN_BEFORE"])' get deployment console -n openshift-console || return 1
   jcheck 'o["status"].get("observedGeneration") == o["metadata"]["generation"] and o["status"].get("readyReplicas") == o["spec"]["replicas"] and o["status"].get("updatedReplicas") == o["spec"]["replicas"] and not o["status"].get("unavailableReplicas")' \
     get deployment console -n openshift-console
 }
 sleep 30   # give the console operator time to pick up the new plugin list before checking the rollout
 wait_for 600 "OpenShift console Deployment rolled out with the new plugin list" console_rolled_out
+expect "console-config mentions the plugin" jcheck '"node-remediation-console-plugin" in json.dumps(o)' get configmap console-config -n openshift-console
 record 05-console-plugins get consoles.operator.openshift.io cluster -o jsonpath='{.spec.plugins}' >/dev/null
 echo "note: browser verification of the Node Remediation UI is manual (docs/known-issues.md KI-7)"
 expect "no NodeHealthCheck policy exists" none_found nodehealthcheck
