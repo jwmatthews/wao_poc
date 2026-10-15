@@ -353,11 +353,6 @@ endef
 
 .PHONY: bundle
 bundle: verify-previous-version verify-skip-range ## Generate bundle manifests and metadata, then validate generated files.
-	# For POC we dont have a PREVIOUS_VERSION
-	#@if [ -z "$(PREVIOUS_VERSION)" ]; then \
-	#	echo "Error: PREVIOUS_VERSION must be set"; \
-	#	exit 1; \
-	#fi
 	# Validate before starting generation, including under parallel Make.
 	$(MAKE) manifests kustomize operator-sdk
 	$(OPERATOR_SDK) generate kustomize manifests -q
@@ -374,41 +369,24 @@ export ICON_BASE64 ?= ${DEFAULT_ICON_BASE64}
 export CSV=./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml
 
 .PHONY: bundle-update
-bundle-update: verify-previous-version verify-skip-range ## Update CSV fields and validate the bundle directory
-	# For POC we don't have a PREVIOUS VERSION
-	#@if [ -z "$(PREVIOUS_VERSION)" ]; then \
-	#	echo "Error: PREVIOUS_VERSION must be set"; \
-	#	exit 1; \
-	#fi
-	@set -e; \
-	tmp=$$(mktemp "${CSV}.XXXXXX"); \
-	trap 'rm -f "$$tmp"' EXIT; \
-	image=$$(printf '%s' "$$IMG" | sed 's/[\\&|]/\\&/g'); \
-	sed -e "s|containerImage: .*|containerImage: $$image|;" \
-		-e "s|createdAt: .*|createdAt: \"$$(date '+%Y-%m-%d %T')\"|;" \
-		-e "s|base64data:.*|base64data: $$ICON_BASE64|;" \
-		-e "s|replaces: .*|replaces: $(BASE_NAME).v${PREVIOUS_VERSION}|;" \
-		"${CSV}" > "$$tmp"; \
-	if [ -n "$(SKIP_RANGE_LOWER)" ]; then \
-		if grep -q '^    olm\.skipRange:' "$$tmp"; then \
-			sed -r -i "s|olm.skipRange: .*|olm.skipRange: '>=${SKIP_RANGE_LOWER} <${VERSION}'|;" "$$tmp"; \
-		else \
-			sed -r -i "/^  annotations:/ a\    olm.skipRange: '>=${SKIP_RANGE_LOWER} <${VERSION}'" "$$tmp"; \
-		fi; \
+bundle-update: verify-previous-version verify-skip-range yq ## Update CSV fields and validate the bundle directory
+	@if [ -n "$(PREVIOUS_VERSION)" ]; then \
+		$(YQ) -i '.spec.replaces = "$(OPERATOR_NAME).v$(PREVIOUS_VERSION)"' "$(CSV)"; \
 	else \
-		sed -r -i "/    olm.skipRange:.*/d" "$$tmp"; \
-	fi; \
-	chmod 644 "$$tmp"; \
-	mv "$$tmp" "${CSV}"
+		$(YQ) -i 'del(.spec.replaces)' "$(CSV)"; \
+	fi
+	@if [ -n "$(SKIP_RANGE_LOWER)" ]; then \
+		$(YQ) -i '.metadata.annotations."olm.skipRange" = ">=$(SKIP_RANGE_LOWER) <$(VERSION)"' "$(CSV)"; \
+	else \
+		$(YQ) -i 'del(.metadata.annotations."olm.skipRange")' "$(CSV)"; \
+	fi
 	$(MAKE) bundle-validate
 
 .PHONY: bundle-reset
-bundle-reset: ## Revert all version or build date related changes
+bundle-reset: yq ## Revert all version or build date related changes
 	$(MAKE) bundle VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) IMG=$(IMAGE_TAG_BASE):v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
-	sed -r -i "s|createdAt: .*|createdAt: \"\"|;" ${CSV}
-	sed -r -i "s|base64data:.*|base64data: base64EncodedIcon|;" ${CSV}
-	sed -r -i "s|replaces: .*|replaces: $(OPERATOR_NAME).v$(DEFAULT_PREVIOUS_VERSION)|;" ${CSV}
-	sed -r -i "s|olm.skipRange: .*|olm.skipRange: '>=$(DEFAULT_SKIP_RANGE_LOWER) <$(DEFAULT_VERSION)'|;" ${CSV}
+	$(MAKE) bundle-update VERSION=$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
+	$(YQ) -i '.metadata.annotations.createdAt = ""' "$(CSV)"
 	$(MAKE) bundle-validate VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
 
 .PHONY: verify-previous-version
@@ -430,8 +408,8 @@ verify-skip-range: ## Require any skip-range lower bound to be older than the ca
 	fi
 
 .PHONY: bundle-community-okd
-bundle-community-okd: bundle ## Update displayName field in the bundle's CSV
-	sed -r -i "s|displayName: Workload Availability Operator.*|displayName: Workload Availability Operator - Community Edition|;" ${CSV}
+bundle-community-okd: bundle yq ## Update displayName field in the bundle's CSV
+	$(YQ) -i '.spec.displayName = "Workload Availability Operator - Community Edition"' "$(CSV)"
 	$(MAKE) add-ocp-annotations
 	echo -e "\n  # Annotations for OCP\n  com.redhat.openshift.versions: \"v${OCP_VERSION}\"" >> bundle/metadata/annotations.yaml
 	$(MAKE) bundle-update
