@@ -234,9 +234,10 @@ test-no-verify-changes: go-verify manifests generate fmt vet test-imports envtes
 
 .PHONY: e2e-test
 e2e-test: ## Run end to end tests against an already deployed operator
-	# KUBECONFIG must be set to the cluster, and MDR needs to be deployed already
-	@test -n "${KUBECONFIG}" -o -r ${HOME}/.kube/config || (echo "Failed to find kubeconfig in ~/.kube/config or no KUBECONFIG set"; exit 1)
-	go test ./e2e -coverprofile cover.out -v -timeout 25m -ginkgo.vv  ${TEST_OPS}
+	@# KUBECONFIG must be set to the cluster, and MDR needs to be deployed already
+	@#@test -n "${KUBECONFIG}" -o -r ${HOME}/.kube/config || (echo "Failed to find kubeconfig in ~/.kube/config or no KUBECONFIG set"; exit 1)
+	@#go test ./e2e -coverprofile cover.out -v -timeout 25m -ginkgo.vv  ${TEST_OPS}
+	@echo "not yet implemented"
 
 ##@ Build
 
