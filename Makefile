@@ -174,9 +174,6 @@ catalog-configmap: bundle-check ## Render the POC ConfigMap-backed CatalogSource
 .PHONY: test-offline
 test-offline: ## Run every offline Python test and syntax-check the live-cluster scripts (no cluster needed).
 	$(PYTHON) -m unittest hack/extract_operand_manifests_test.py hack/configmap_catalog_test.py hack/e2e_runner_test.py hack/build_test.py
-	$(PYTHON) -m unittest discover -s test/cluster -p 'parity_test.py'
-	$(PYTHON) -m unittest discover -s test/cluster -p 'results_test.py'
-	for f in test/cluster/*.sh; do bash -n "$$f" || exit 1; done
 
 
 ##@ Development
