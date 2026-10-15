@@ -27,16 +27,16 @@ metadata:
       ]
     capabilities: Basic Install
     categories: OpenShift Optional
-    createdAt: "2026-10-05T23:35:46Z"
+    createdAt: "2026-10-15T01:19:58Z"
     description: Proof of concept single operator that installs the six medik8s workload
       availability operators (NHC, SNR, SBR, FAR, MDR, NMO) as managed operands.
     operatorframework.io/suggested-namespace: openshift-workload-availability
     operatorframework.io/suggested-namespace-template: '{"kind":"Namespace","apiVersion":"v1","metadata":{"name":"openshift-workload-availability","annotations":{"openshift.io/node-selector":""}}}'
-    operators.operatorframework.io/builder: operator-sdk-v1.42.3
+    operators.operatorframework.io/builder: operator-sdk-v1.42.3+git
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://github.com/jwmatthews/wao_poc
     support: Proof of concept, unsupported
-  name: workload-availability-operator.v0.1.0
+  name: workload-availability-operator.v0.0.1
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -1186,7 +1186,7 @@ spec:
                   value: quay.io/medik8s/machine-deletion-remediation-operator@sha256:0f69367097625d7824d9b5b69de64103e19b612c9833b0b786bb32c9b7efe84d
                 - name: RELATED_IMAGE_NMO_MANAGER
                   value: quay.io/medik8s/node-maintenance-operator@sha256:5b65ec62c58b92fee3389a77ded760ce82a0a6a30f6cf89573f6e97b8f677c74
-                image: image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@sha256:6077f4265aaf49de3e445e07bd7ee1750171951cdc2d7de4a11f7d8f63328671
+                image: controller:latest
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -1285,4 +1285,4 @@ spec:
     name: mdr-manager
   - image: quay.io/medik8s/node-maintenance-operator@sha256:5b65ec62c58b92fee3389a77ded760ce82a0a6a30f6cf89573f6e97b8f677c74
     name: nmo-manager
-  version: 0.1.0
+  version: 0.0.1

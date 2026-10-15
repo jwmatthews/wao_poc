@@ -1,8 +1,8 @@
 package components
 
 import (
-	"github.com/jwmatthews/wao_poc/api/v1alpha1"
-	"github.com/jwmatthews/wao_poc/internal/images"
+	"github.com/medik8s/workload-availability-operator/api/v1alpha1"
+	"github.com/medik8s/workload-availability-operator/internal/images"
 )
 
 func SBR() Definition {

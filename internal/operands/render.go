@@ -8,8 +8,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
 
-	"github.com/jwmatthews/wao_poc/internal/components"
-	"github.com/jwmatthews/wao_poc/internal/images"
+	"github.com/medik8s/workload-availability-operator/internal/components"
+	"github.com/medik8s/workload-availability-operator/internal/images"
 )
 
 const (

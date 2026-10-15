@@ -20,9 +20,9 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/jwmatthews/wao_poc/api/v1alpha1"
-	"github.com/jwmatthews/wao_poc/internal/images"
-	"github.com/jwmatthews/wao_poc/internal/operands"
+	"github.com/medik8s/workload-availability-operator/api/v1alpha1"
+	"github.com/medik8s/workload-availability-operator/internal/images"
+	"github.com/medik8s/workload-availability-operator/internal/operands"
 )
 
 const ns = "wao-test"

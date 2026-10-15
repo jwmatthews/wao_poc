@@ -4,6 +4,7 @@
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= 0.0.1
+export VERSION
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
@@ -121,7 +122,7 @@ catalog-configmap: bundle-check ## Render the POC ConfigMap-backed CatalogSource
 
 .PHONY: test-offline
 test-offline: ## Run every offline Python test and syntax-check the live-cluster scripts (no cluster needed).
-	$(PYTHON) -m unittest hack/extract_operand_manifests_test.py hack/configmap_catalog_test.py hack/e2e_runner_test.py
+	$(PYTHON) -m unittest hack/extract_operand_manifests_test.py hack/configmap_catalog_test.py hack/e2e_runner_test.py hack/build_test.py
 	$(PYTHON) -m unittest discover -s test/cluster -p 'parity_test.py'
 	$(PYTHON) -m unittest discover -s test/cluster -p 'results_test.py'
 	for f in test/cluster/*.sh; do bash -n "$$f" || exit 1; done
@@ -172,7 +173,7 @@ lint-config: golangci-lint ## Verify golangci-lint linter configuration
 
 .PHONY: build
 build: manifests generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/main.go
+	./hack/build.sh
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.

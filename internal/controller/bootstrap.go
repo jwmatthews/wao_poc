@@ -7,7 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/jwmatthews/wao_poc/api/v1alpha1"
+	"github.com/medik8s/workload-availability-operator/api/v1alpha1"
 )
 
 // EnsureDefaultConfig creates the all-Disabled singleton when it does not exist (D4).

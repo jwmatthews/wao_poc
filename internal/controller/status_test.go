@@ -8,7 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/jwmatthews/wao_poc/api/v1alpha1"
+	"github.com/medik8s/workload-availability-operator/api/v1alpha1"
 )
 
 func cond(conds []metav1.Condition, t string) metav1.ConditionStatus {

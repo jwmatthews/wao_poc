@@ -29,10 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/jwmatthews/wao_poc/api/v1alpha1"
-	"github.com/jwmatthews/wao_poc/internal/components"
-	"github.com/jwmatthews/wao_poc/internal/images"
-	"github.com/jwmatthews/wao_poc/internal/operands"
+	"github.com/medik8s/workload-availability-operator/api/v1alpha1"
+	"github.com/medik8s/workload-availability-operator/internal/components"
+	"github.com/medik8s/workload-availability-operator/internal/images"
+	"github.com/medik8s/workload-availability-operator/internal/operands"
 )
 
 var _ = Describe("All-Disabled install", Ordered, func() {

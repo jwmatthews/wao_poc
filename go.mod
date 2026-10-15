@@ -1,4 +1,4 @@
-module github.com/jwmatthews/wao_poc
+module github.com/medik8s/workload-availability-operator
 
 go 1.24.0
 
