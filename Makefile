@@ -380,6 +380,7 @@ bundle-update: verify-previous-version verify-skip-range yq ## Update CSV fields
 	else \
 		$(YQ) -i 'del(.metadata.annotations."olm.skipRange")' "$(CSV)"; \
 	fi
+	$(YQ) -i '.spec.icon = [{"base64data": strenv(ICON_BASE64), "mediatype": "image/png"}]' "$(CSV)"
 	$(MAKE) bundle-validate
 
 .PHONY: bundle-reset

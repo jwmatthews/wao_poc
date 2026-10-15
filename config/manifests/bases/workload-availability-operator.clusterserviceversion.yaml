@@ -117,6 +117,7 @@ spec:
   - availability
   - medik8s
   maturity: alpha
+  minKubeVersion: 1.25.0
   provider:
     name: wao_poc
   relatedImages:
