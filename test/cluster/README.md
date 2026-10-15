@@ -1,7 +1,7 @@
 # Live-cluster install verification
 
 Scripts for the install case in
-[implementation-plan.md section 4](../../docs/implementation-plan.md#4-live-cluster-verification-install-case).
+[implementation-plan.md section 4](../../docs/archive/bootstrap/implementation-plan.md#4-live-cluster-verification-install-case).
 Each case `WAO-INST-NN` has one script `NN-<slug>.sh`. The scripts mutate a real cluster, so read
 [AGENTS.md](../../AGENTS.md) first.
 

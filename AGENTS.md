@@ -4,13 +4,6 @@ This repository is a proof of concept for a single Workload Availability Operato
 (WAO) that installs the six upstream medik8s operators (NHC, SNR, SBR, FAR, MDR and NMO)
 as operands in one namespace.
 
-## Read first
-
-1. [docs/design-brief.md](docs/design-brief.md): what we are proving and the decisions D1–D10.
-2. [docs/operands.md](docs/operands.md): the facts each task relies on.
-3. [docs/implementation-plan.md](docs/implementation-plan.md): execute it task by task.
-   Each task is test-first and ends with a commit. Do not skip the failing-test step.
-
 ## Hard constraints
 
 - Do not modify, fork or rebuild the component operators. Consume the upstream
@@ -24,8 +17,9 @@ as operands in one namespace.
 ## Cluster work
 
 Live-cluster tests need a **disposable** OpenShift cluster with
-classic OLM that you are authorized to modify, selected through the `KUBECONFIG`
-environment variable. The repository never contains cluster credentials or
+classic OLM that you are authorized to modify.
+ 
+The repository never contains cluster credentials or
 cluster-identifying details. Do not run cluster tests unless the person you are
 working for has confirmed which cluster to use in the current session.
 
@@ -39,5 +33,6 @@ working for has confirmed which cluster to use in the current session.
 
 ## Commits
 
-Small commits per task with a `wao:` prefix. Run `make test` and `make test-offline`
+Small commits per task.
+Run `make test` and `make test-offline`
 before each commit.
