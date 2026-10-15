@@ -2,6 +2,7 @@
 FROM quay.io/konveyor/builder:ubi9-latest AS builder
 ARG TARGETOS
 ARG TARGETARCH
+ARG VERSION
 
 WORKDIR /workspace
 
@@ -16,6 +17,7 @@ COPY api/ api/
 COPY internal/ internal/
 COPY version/ version/
 COPY hack/ hack/
+COPY Makefile ./
 
 # for getting version info
 COPY .git/ .git/

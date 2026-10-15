@@ -248,7 +248,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 
 .PHONY: docker-build
 docker-build: test-no-verify-changes ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build --platform $(PLATFORM) -t ${IMG} .
+	$(CONTAINER_TOOL) build --platform $(PLATFORM) --build-arg VERSION="$(VERSION)" -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
