@@ -97,7 +97,7 @@ spec:
     upstream images.
     Every component is Disabled after installation. Enabling selfNodeRemediation starts node
     agents exactly as a standalone SNR installation does.
-  displayName: Workload Availability Operator (POC)
+  displayName: Workload Availability Operator
   install:
     spec:
       deployments: null

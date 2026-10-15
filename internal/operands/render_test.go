@@ -5,11 +5,12 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
 	"github.com/medik8s/workload-availability-operator/api/v1alpha1"
 	"github.com/medik8s/workload-availability-operator/internal/components"
 	"github.com/medik8s/workload-availability-operator/internal/images"
 	"github.com/medik8s/workload-availability-operator/internal/operands"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const testNamespace = "wao-ns"

@@ -20,23 +20,16 @@ as operands in one namespace.
 - Never change a component webhook `failurePolicy`, in particular never `Fail` to `Ignore`.
 - WAO never adopts an existing object it did not create. It reports the conflict instead.
 - No public API field may override a component image.
-- Keep `.cache/`, `evidence/`, `.venv/` and any kubeconfig out of Git.
 
 ## Cluster work
 
-Live-cluster tests (plan section 4) need a **disposable** OpenShift cluster with
+Live-cluster tests need a **disposable** OpenShift cluster with
 classic OLM that you are authorized to modify, selected through the `KUBECONFIG`
 environment variable. The repository never contains cluster credentials or
 cluster-identifying details. Do not run cluster tests unless the person you are
 working for has confirmed which cluster to use in the current session.
 
-Disposable OpenShift clusters you may use for testing are described in the local
-file `DISPOSABLE_OPENSHIFT_CLUSTERS.md`, which points to their kubeconfig files.
-Still confirm which one to use before running cluster tests.
-
 - Always pass the kubeconfig explicitly; never rely on the current context.
-- Write raw cluster output only to `evidence/<UTC-date>-<run>/`, which is git-ignored.
-  Raw output contains API URLs, node names and addresses.
 - Commit only sanitized summaries (`results.json`, `REPORT.md`) and only after review.
 - Never capture Secret values.
 - Use server-side dry-run for admission checks. Never create a real

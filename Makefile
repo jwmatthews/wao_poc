@@ -1,16 +1,66 @@
-# VERSION defines the project version for the bundle.
+# SHELL defines bash so all the inline scripts here will work as expected.
+SHELL := /bin/bash
+OPERATOR_NAME := workload-availability-operator
+
+# PLATFORM is the single platform docker-build targets.
+# Defaulting to linux/amd64 so that builds on Mac default to building OK for remote clusters
+PLATFORM ?= linux/amd64
+
+## Tool versions
+# OPERATOR_SDK versions at https://github.com/operator-framework/operator-sdk/releases
+# heads up: 1.37 is the last version which supports go/v3!
+OPERATOR_SDK_VERSION ?= v1.42.2
+
+# OPM versions at https://github.com/operator-framework/operator-registry/releases
+OPM_VERSION = v1.66.0
+
+# CONTROLLER_GEN versions at https://github.com/kubernetes-sigs/controller-tools/releases
+CONTROLLER_GEN_VERSION = v0.20.1
+
+# KUSTOMIZE versions at https://github.com/kubernetes-sigs/kustomize/releases
+# note: update KUSTOMIZE_VERSION and KUSTOMIZE_API_VERSION accordingly.
+KUSTOMIZE_API_VERSION = v5
+KUSTOMIZE_VERSION = v5.8.1
+
+# https://pkg.go.dev/sigs.k8s.io/controller-runtime/tools/setup-envtest/env?tab=versions
+ENVTEST_VERSION = v0.0.0-20260120065648-aebc15d7c689
+
+# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
+ENVTEST_K8S_VERSION = 1.34
+
+# GoImports versions at https://pkg.go.dev/golang.org/x/tools/cmd/goimports?tab=versions
+GOIMPORTS_VERSION ?= v0.44.0
+
+# Sort-imports versions at https://github.com/slintes/sort-imports/releases
+SORT_IMPORTS_VERSION = v0.3.0
+
+# update for major version updates to YQ_VERSION! see https://github.com/mikefarah/yq
+YQ_API_VERSION = v4
+YQ_VERSION = v4.53.2
+
+BLUE_ICON_PATH = ./config/assets/medik8s_blue_icon.png
+
+# VERSION defines the project version for the bundle. 
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
-# - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
-# - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.0.1
+# - use the VERSION as arg of the bundle target (e.g make bundle VERSION=5.8.1)
+# - use environment variables to overwrite this value (e.g export VERSION=5.8.1)
+DEFAULT_VERSION := 0.1.0
+DEFAULT_PREVIOUS_VERSION :=
+DEFAULT_SKIP_RANGE_LOWER :=
+VERSION ?= $(DEFAULT_VERSION)
+PREVIOUS_VERSION ?= $(DEFAULT_PREVIOUS_VERSION)
+SKIP_RANGE_LOWER ?= $(DEFAULT_SKIP_RANGE_LOWER)
 export VERSION
 
 # CHANNELS define the bundle channels used in the bundle.
-# Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
+# Add a new line here if you would like to change its default config. (E.g CHANNELS = "preview,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
-# - use the CHANNELS as arg of the bundle target (e.g make bundle CHANNELS=candidate,fast,stable)
-# - use environment variables to overwrite this value (e.g export CHANNELS="candidate,fast,stable")
+# - use the CHANNELS as arg of the bundle target (e.g make bundle CHANNELS=preview,fast,stable)
+# - use environment variables to overwrite this value (e.g export CHANNELS="preview,fast,stable")
+CHANNELS ?= stable
+export CHANNELS
+
 ifneq ($(origin CHANNELS), undefined)
 BUNDLE_CHANNELS := --channels=$(CHANNELS)
 endif
@@ -20,41 +70,49 @@ endif
 # To re-generate a bundle for any other default channel without changing the default setup, you can:
 # - use the DEFAULT_CHANNEL as arg of the bundle target (e.g make bundle DEFAULT_CHANNEL=stable)
 # - use environment variables to overwrite this value (e.g export DEFAULT_CHANNEL="stable")
+DEFAULT_CHANNEL ?= stable
+export DEFAULT_CHANNEL
+
+# Validate DEFAULT_CHANNEL is in CHANNELS
+# When CHANNELS contains comma-separated values (e.g., "stable,beta"), we need to convert
+# commas to spaces for filter to match. We use a variable for the comma because Make treats
+# commas as function argument delimiters, causing $(subst ,, ,$(CHANNELS)) to misparse.
+comma := ,
+ifneq (,$(DEFAULT_CHANNEL))
+  ifeq (,$(filter $(DEFAULT_CHANNEL),$(subst $(comma), ,$(CHANNELS))))
+    $(error DEFAULT_CHANNEL "$(DEFAULT_CHANNEL)" must be present in CHANNELS "$(CHANNELS)")
+  endif
+endif
+
 ifneq ($(origin DEFAULT_CHANNEL), undefined)
 BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
+MANIFESTS_DIR ?= config/manifests
+
+# IMAGE_REGISTRY used to indicate the registery/group for the operator and bundle
+IMAGE_REGISTRY ?= quay.io/medik8s
+export IMAGE_REGISTRY
+
+# Use the selected version for image tags.
+IMAGE_TAG = v$(VERSION)
+export IMAGE_TAG
 
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
-# This variable is used to construct full image tags for bundle and catalog images.
+# This variable is used to construct full image tags for bundle images.
 #
-# For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# medik8s.io/workload-availability-operator-bundle:$VERSION and medik8s.io/workload-availability-operator-catalog:$VERSION.
-IMAGE_TAG_BASE ?= medik8s.io/workload-availability-operator
+# For example, running 'make bundle-build bundle-push' will build and push the bundle image
+IMAGE_TAG_BASE ?= $(IMAGE_REGISTRY)/$(OPERATOR_NAME)
+
+# The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).
+CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:$(IMAGE_TAG)
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
+BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(IMAGE_TAG)
 
-# BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
-BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
-
-# USE_IMAGE_DIGESTS defines if images are resolved via tags or digests
-# You can enable this value if you would like to use SHA Based Digests
-# To enable set flag to true
-USE_IMAGE_DIGESTS ?= false
-ifeq ($(USE_IMAGE_DIGESTS), true)
-	BUNDLE_GEN_FLAGS += --use-image-digests
-endif
-
-# Set the Operator SDK version to use. By default, what is installed on the system is used.
-# This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
-OPERATOR_SDK_VERSION ?= v1.42.3
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
-# PLATFORM is the single platform docker-build targets. The POC cluster is amd64 while
-# workstations are often arm64, so build for amd64 unless told otherwise.
-PLATFORM ?= linux/amd64
+export IMG ?= $(IMAGE_TAG_BASE):$(IMAGE_TAG)
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -64,24 +122,17 @@ GOBIN=$(shell go env GOBIN)
 endif
 
 # CONTAINER_TOOL defines the container tool to be used for building images.
-# Be aware that the target commands are only tested with Docker which is
-# scaffolded by default. However, you might want to replace it to use other
-# tools. (i.e. podman)
-CONTAINER_TOOL ?= docker
-
-# Setting SHELL to bash allows bash commands to be executed by recipes.
-# Options are set to exit when a recipe line exits non-zero or a piped command fails.
-SHELL = /usr/bin/env bash -o pipefail
-.SHELLFLAGS = -ec
+CONTAINER_TOOL ?= podman
+export CONTAINER_TOOL
 
 .PHONY: all
-all: build
+all: manager
 
 ##@ General
 
 # The help target prints out all targets with their descriptions organized
 # beneath their categories. The categories are represented by '##@' and the
-# target descriptions by '##'. The awk command is responsible for reading the
+# target descriptions by '##'. The awk commands is responsible for reading the
 # entire set of makefiles included in this invocation, looking for lines of the
 # file as xyz: ## something, and then pretty-format the target and help. Then,
 # if there's a line with ##@ something, that gets pretty-printed as a category.
@@ -118,7 +169,7 @@ CATALOG_NS ?= openshift-marketplace
 .PHONY: catalog-configmap
 catalog-configmap: bundle-check ## Render the POC ConfigMap-backed CatalogSource into dist/wao-poc-catalog.yaml.
 	mkdir -p dist
-	$(PYTHON) hack/configmap-catalog.py --bundle bundle --package workload-availability-operator --channel $(or $(DEFAULT_CHANNEL),alpha) --name wao-poc-catalog --namespace $(CATALOG_NS) > dist/wao-poc-catalog.yaml
+	$(PYTHON) hack/configmap-catalog.py --bundle bundle --package $(OPERATOR_NAME) --channel $(or $(DEFAULT_CHANNEL),alpha) --name wao-poc-catalog --namespace $(CATALOG_NS) > dist/wao-poc-catalog.yaml
 
 .PHONY: test-offline
 test-offline: ## Run every offline Python test and syntax-check the live-cluster scripts (no cluster needed).
@@ -127,253 +178,393 @@ test-offline: ## Run every offline Python test and syntax-check the live-cluster
 	$(PYTHON) -m unittest discover -s test/cluster -p 'results_test.py'
 	for f in test/cluster/*.sh; do bash -n "$$f" || exit 1; done
 
+
 ##@ Development
 
 .PHONY: manifests
-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+manifests: controller-gen ## Generate manifests e.g. CRD, RBAC etc.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 .PHONY: generate
-generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+generate: controller-gen ## Generate code
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 .PHONY: fmt
-fmt: ## Run go fmt against code.
-	go fmt ./...
+fmt: goimports ## Run go goimports against code - goimports = go fmt + fixing imports.
+	$(GOIMPORTS) -w  ./cmd ./api ./internal
 
 .PHONY: vet
-vet: ## Run go vet against code.
+vet: ## Run go vet against code
 	go vet ./...
 
+.PHONY: go-tidy
+go-tidy: # Run go mod tidy - add missing and remove unused modules.
+	go mod tidy
+
+.PHONY: go-vendor
+go-vendor:  # Run go mod vendor - make vendored copy of dependencies.
+	go mod vendor
+
+.PHONY: go-verify
+go-verify: go-tidy go-vendor # Run go mod verify - verify dependencies have expected content
+	go mod verify
+
+.PHONY: test-imports
+test-imports: sort-imports ## Check for sorted imports
+	$(SORT_IMPORTS) .
+
+.PHONY: fix-imports
+fix-imports: sort-imports ## Sort imports
+	$(SORT_IMPORTS) -w .
+
+.PHONY: verify-no-changes
+verify-no-changes: bundle-reset ## verify no there are no un-staged changes and remove unwanted changes to bundle
+	./hack/verify-diff.sh
+
+# Run tests
+# Use TEST_OPS to pass further options to `go test` (e.g. verbosity and/or -ginkgo.focus)
+export TEST_OPS ?=
 .PHONY: test
-test: manifests generate fmt vet setup-envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
+test: test-no-verify-changes verify-no-changes ## Run tests and verify no changes
 
-# Kind E2E verifies WAO's all-Disabled install without OLM or enabled operands.
-# The runner owns a fresh cluster, an isolated kubeconfig, and teardown on failure.
-KIND_CLUSTER ?=
+.PHONY: test-no-verify-changes
+test-no-verify-changes: go-verify manifests generate fmt vet test-imports envtest ## Generate and format code, run tests, generate manifests and bundle
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(PROJECT_DIR)/testbin)" \
+	go test ./internal/controller/... -coverprofile cover.out ${TEST_OPS}
 
-.PHONY: test-e2e
-test-e2e: manifests generate fmt vet kustomize ## Run all-Disabled install tests in a fresh, disposable Kind cluster.
-	KIND="$(KIND)" KUBECTL="$(KUBECTL)" KUSTOMIZE="$(KUSTOMIZE)" KIND_CLUSTER="$(KIND_CLUSTER)" python3 test/e2e/run.py
-
-.PHONY: lint
-lint: golangci-lint ## Run golangci-lint linter
-	$(GOLANGCI_LINT) run
-
-.PHONY: lint-fix
-lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
-	$(GOLANGCI_LINT) run --fix
-
-.PHONY: lint-config
-lint-config: golangci-lint ## Verify golangci-lint linter configuration
-	$(GOLANGCI_LINT) config verify
+.PHONY: e2e-test
+e2e-test: ## Run end to end tests against an already deployed operator
+	# KUBECONFIG must be set to the cluster, and MDR needs to be deployed already
+	@test -n "${KUBECONFIG}" -o -r ${HOME}/.kube/config || (echo "Failed to find kubeconfig in ~/.kube/config or no KUBECONFIG set"; exit 1)
+	go test ./e2e -coverprofile cover.out -v -timeout 25m -ginkgo.vv  ${TEST_OPS}
 
 ##@ Build
 
-.PHONY: build
-build: manifests generate fmt vet ## Build manager binary.
-	./hack/build.sh
+.PHONY: manager
+manager: generate fmt vet ## Build manager binary
+	./hack/build.sh ./bin
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./cmd/main.go
+	go run ./main.go
 
-# If you wish to build the manager image targeting other platforms you can use the --platform flag.
-# (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
-# More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
-docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build --platform $(PLATFORM) -t $(IMG) .
+docker-build: test-no-verify-changes ## Build docker image with the manager.
+	$(CONTAINER_TOOL) build --platform $(PLATFORM) -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${IMG}
 
-# PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
-# architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
-# - be able to use docker buildx. More info: https://docs.docker.com/build/buildx/
-# - have enabled BuildKit. More info: https://docs.docker.com/develop/develop-images/build_enhancements/
-# - be able to push the image to your registry (i.e. if you do not set a valid value via IMG=<myregistry/image:<tag>> then the export will fail)
-# To adequately provide solutions that are compatible with multiple platforms, you should consider using this option.
-PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
-.PHONY: docker-buildx
-docker-buildx: ## Build and push docker image for the manager for cross-platform support
-	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
-	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	- $(CONTAINER_TOOL) buildx create --name workload-availability-operator-builder
-	$(CONTAINER_TOOL) buildx use workload-availability-operator-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
-	- $(CONTAINER_TOOL) buildx rm workload-availability-operator-builder
-	rm Dockerfile.cross
-
-.PHONY: build-installer
-build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
-	mkdir -p dist
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default > dist/install.yaml
-
 ##@ Deployment
-
-ifndef ignore-not-found
-  ignore-not-found = false
-endif
 
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | $(KUBECTL) apply -f -
+	$(KUSTOMIZE) build config/crd | kubectl apply -f -
 
 .PHONY: uninstall
-uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/crd | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+uninstall: manifests kustomize ## Uninstall CRDs from a cluster
+	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
 .PHONY: deploy
-deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+deploy: manifests kustomize ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
+	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
 .PHONY: undeploy
-undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+undeploy: ## UnDeploy controller from the configured Kubernetes cluster in ~/.kube/config
+	$(KUSTOMIZE) build config/default | kubectl delete -f -
 
-##@ Dependencies
+
+##@ Build Dependencies
 
 ## Location to install dependencies to
 LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
-## Tool Binaries
-KUBECTL ?= kubectl
-KIND ?= kind
-KUSTOMIZE ?= $(LOCALBIN)/kustomize
-CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
-ENVTEST ?= $(LOCALBIN)/setup-envtest
-GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+.PHONY: controller-gen
+CONTROLLER_GEN = $(LOCALBIN)/controller-gen
+controller-gen: ## Download controller-gen locally if necessary
+	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_GEN_VERSION))
 
-## Tool Versions
-KUSTOMIZE_VERSION ?= v5.6.0
-CONTROLLER_TOOLS_VERSION ?= v0.18.0
-#ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
-ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
-#ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
-ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
-GOLANGCI_LINT_VERSION ?= v2.1.0
 
 .PHONY: kustomize
-kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
-$(KUSTOMIZE): $(LOCALBIN)
-	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5,$(KUSTOMIZE_VERSION))
-
-.PHONY: controller-gen
-controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
-$(CONTROLLER_GEN): $(LOCALBIN)
-	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_TOOLS_VERSION))
-
-.PHONY: setup-envtest
-setup-envtest: envtest ## Download the binaries required for ENVTEST in the local bin directory.
-	@echo "Setting up envtest binaries for Kubernetes version $(ENVTEST_K8S_VERSION)..."
-	@$(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path || { \
-		echo "Error: Failed to set up envtest binaries for version $(ENVTEST_K8S_VERSION)."; \
-		exit 1; \
-	}
+KUSTOMIZE = $(LOCALBIN)/kustomize
+kustomize: ## Download kustomize locally if necessary
+	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/$(KUSTOMIZE_API_VERSION)@$(KUSTOMIZE_VERSION))
 
 .PHONY: envtest
-envtest: $(ENVTEST) ## Download setup-envtest locally if necessary.
-$(ENVTEST): $(LOCALBIN)
-	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest,$(ENVTEST_VERSION))
+ENVTEST = $(LOCALBIN)/setup-envtest
+envtest: ## Download envtest-setup locally if necessary.
+	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION))
 
-.PHONY: golangci-lint
-golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
-$(GOLANGCI_LINT): $(LOCALBIN)
-	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
+.PHONY: goimports
+GOIMPORTS = $(LOCALBIN)/goimports
+goimports: ## Download goimports locally if necessary.
+	$(call go-install-tool,$(GOIMPORTS),golang.org/x/tools/cmd/goimports@$(GOIMPORTS_VERSION))
 
-# go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
-# $1 - target path with name of binary
-# $2 - package url which can be installed
-# $3 - specific version of package
+.PHONY: sort-imports
+SORT_IMPORTS = $(LOCALBIN)/sort-imports
+sort-imports: ## Download sort-imports locally if necessary.
+	$(call go-install-tool,$(SORT_IMPORTS),github.com/slintes/sort-imports@$(SORT_IMPORTS_VERSION))
+
+.PHONY: yq
+YQ = $(LOCALBIN)/yq
+yq: ## Download yq locally if necessary.
+	@$(call go-install-tool,$(YQ),github.com/mikefarah/yq/$(YQ_API_VERSION)@$(YQ_VERSION))
+
+# go-install-tool will 'go install' any package $2 and install it to $1.
+PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 define go-install-tool
-@[ -f "$(1)-$(3)" ] || { \
-set -e; \
-package=$(2)@$(3) ;\
-echo "Downloading $${package}" ;\
-rm -f $(1) || true ;\
-GOBIN=$(LOCALBIN) go install $${package} ;\
-mv $(1) $(1)-$(3) ;\
-} ;\
-ln -sf $(1)-$(3) $(1)
+@[ -f $(1) ] || { \
+set -e ;\
+echo "Downloading $(2)" ;\
+GOBIN=$(PROJECT_DIR)/bin GOFLAGS='' go install $(2) ;\
+}
 endef
 
+.PHONY: opm
+OPM_DIR = $(LOCALBIN)/opm
+OPM = $(OPM_DIR)/$(OPM_VERSION)/opm
+opm: ## Download opm locally if necessary.
+	$(call operator-framework-tool, $(OPM), $(OPM_DIR),https://github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/$${OS}-$${ARCH}-opm )
+
 .PHONY: operator-sdk
-OPERATOR_SDK ?= $(LOCALBIN)/operator-sdk
+OPERATOR_SDK_DIR ?= $(LOCALBIN)/operator-sdk
+OPERATOR_SDK = $(OPERATOR_SDK_DIR)/$(OPERATOR_SDK_VERSION)/operator-sdk
 operator-sdk: ## Download operator-sdk locally if necessary.
-ifeq (,$(wildcard $(OPERATOR_SDK)))
-ifeq (, $(shell which operator-sdk 2>/dev/null))
-	@{ \
+	$(call operator-framework-tool, $(OPERATOR_SDK), $(OPERATOR_SDK_DIR),github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH})
+
+# operator-framework-tool will delete old package $2, then download $3 to $1.
+define operator-framework-tool
+@[ -f $(1) ] || { \
 	set -e ;\
-	mkdir -p $(dir $(OPERATOR_SDK)) ;\
+	rm -rf $(2) ;\
+	mkdir -p $(dir $(1)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPERATOR_SDK) https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH} ;\
-	chmod +x $(OPERATOR_SDK) ;\
+	echo "Downloading $(3)" ;\
+	curl -sSLo $(1) $(3) ;\
+	chmod +x $(1) ;\
 	}
-else
-OPERATOR_SDK = $(shell which operator-sdk)
-endif
-endif
+endef
+
+##@ Working with Bundle
 
 .PHONY: bundle
-bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
+bundle: verify-previous-version verify-skip-range ## Generate bundle manifests and metadata, then validate generated files.
+	# For POC we dont have a PREVIOUS_VERSION
+	#@if [ -z "$(PREVIOUS_VERSION)" ]; then \
+	#	echo "Error: PREVIOUS_VERSION must be set"; \
+	#	exit 1; \
+	#fi
+	# Validate before starting generation, including under parallel Make.
+	$(MAKE) manifests kustomize operator-sdk
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	rm -rf bundle/manifests # generate bundle --overwrite never removes stale objects
-	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
-	$(OPERATOR_SDK) bundle validate ./bundle
+	$(KUSTOMIZE) build $(MANIFESTS_DIR) | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(MAKE) bundle-validate
+
+.PHONY: bundle-k8s
+bundle-k8s: bundle ## Alias for bundle target
+
+## Some addition to bundle creation in the bundle
+DEFAULT_ICON_BASE64 := $(shell base64 < "${BLUE_ICON_PATH}" | tr -d '\n')
+export ICON_BASE64 ?= ${DEFAULT_ICON_BASE64}
+export CSV=./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml
+
+.PHONY: bundle-update
+bundle-update: verify-previous-version verify-skip-range ## Update CSV fields and validate the bundle directory
+	# For POC we don't have a PREVIOUS VERSION
+	#@if [ -z "$(PREVIOUS_VERSION)" ]; then \
+	#	echo "Error: PREVIOUS_VERSION must be set"; \
+	#	exit 1; \
+	#fi
+	@set -e; \
+	tmp=$$(mktemp "${CSV}.XXXXXX"); \
+	trap 'rm -f "$$tmp"' EXIT; \
+	image=$$(printf '%s' "$$IMG" | sed 's/[\\&|]/\\&/g'); \
+	sed -e "s|containerImage: .*|containerImage: $$image|;" \
+		-e "s|createdAt: .*|createdAt: \"$$(date '+%Y-%m-%d %T')\"|;" \
+		-e "s|base64data:.*|base64data: $$ICON_BASE64|;" \
+		-e "s|replaces: .*|replaces: $(BASE_NAME).v${PREVIOUS_VERSION}|;" \
+		"${CSV}" > "$$tmp"; \
+	if [ -n "$(SKIP_RANGE_LOWER)" ]; then \
+		if grep -q '^    olm\.skipRange:' "$$tmp"; then \
+			sed -r -i "s|olm.skipRange: .*|olm.skipRange: '>=${SKIP_RANGE_LOWER} <${VERSION}'|;" "$$tmp"; \
+		else \
+			sed -r -i "/^  annotations:/ a\    olm.skipRange: '>=${SKIP_RANGE_LOWER} <${VERSION}'" "$$tmp"; \
+		fi; \
+	else \
+		sed -r -i "/    olm.skipRange:.*/d" "$$tmp"; \
+	fi; \
+	chmod 644 "$$tmp"; \
+	mv "$$tmp" "${CSV}"
+	$(MAKE) bundle-validate
+
+.PHONY: bundle-reset
+bundle-reset: ## Revert all version or build date related changes
+	$(MAKE) bundle VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) IMG=$(IMAGE_TAG_BASE):v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
+	sed -r -i "s|createdAt: .*|createdAt: \"\"|;" ${CSV}
+	sed -r -i "s|base64data:.*|base64data: base64EncodedIcon|;" ${CSV}
+	sed -r -i "s|replaces: .*|replaces: $(OPERATOR_NAME).v$(DEFAULT_PREVIOUS_VERSION)|;" ${CSV}
+	sed -r -i "s|olm.skipRange: .*|olm.skipRange: '>=$(DEFAULT_SKIP_RANGE_LOWER) <$(DEFAULT_VERSION)'|;" ${CSV}
+	$(MAKE) bundle-validate VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
+
+.PHONY: verify-previous-version
+verify-previous-version: ## Require any previous version to be older than the candidate.
+	@if [ -n "$(PREVIOUS_VERSION)" ]; then \
+		if [ "$(PREVIOUS_VERSION)" = "$(VERSION)" ] || ! printf '%s\n' "$(PREVIOUS_VERSION)" "$(VERSION)" | sort -V -C 2>/dev/null; then \
+			echo "Error: VERSION must be greater than PREVIOUS_VERSION"; \
+			exit 1; \
+		fi; \
+	fi
+
+.PHONY: verify-skip-range
+verify-skip-range: ## Require any skip-range lower bound to be older than the candidate.
+	@if [ -n "$(SKIP_RANGE_LOWER)" ]; then \
+		if [ "$(SKIP_RANGE_LOWER)" = "$(VERSION)" ] || ! printf '%s\n' "$(SKIP_RANGE_LOWER)" "$(VERSION)" | sort -V -C 2>/dev/null; then \
+			echo "Error: VERSION must be greater than SKIP_RANGE_LOWER"; \
+			exit 1; \
+		fi; \
+	fi
+
+.PHONY: bundle-community-okd
+bundle-community-okd: bundle ## Update displayName field in the bundle's CSV
+	sed -r -i "s|displayName: Workload Availability Operator.*|displayName: Workload Availability Operator - Community Edition|;" ${CSV}
+	$(MAKE) add-ocp-annotations
+	echo -e "\n  # Annotations for OCP\n  com.redhat.openshift.versions: \"v${OCP_VERSION}\"" >> bundle/metadata/annotations.yaml
+	$(MAKE) bundle-update
+
+
+.PHONY: add-ocp-annotations
+add-ocp-annotations: yq ## Add OCP annotations
+	$(YQ) -i '.metadata.annotations."operators.openshift.io/valid-subscription" = "[\"OpenShift Kubernetes Engine\", \"OpenShift Container Platform\", \"OpenShift Platform Plus\"]"' ${CSV}
+	# new infrastructure annotations see https://docs.engineering.redhat.com/display/CFC/Best_Practices#Best_Practices-(New)RequiredInfrastructureAnnotations
+	$(YQ) -i '.metadata.annotations."features.operators.openshift.io/disconnected" = "true"' ${CSV}
+	$(YQ) -i '.metadata.annotations."features.operators.openshift.io/fips-compliant" = "false"' ${CSV}
+	$(YQ) -i '.metadata.annotations."features.operators.openshift.io/proxy-aware" = "false"' ${CSV}
+	$(YQ) -i '.metadata.annotations."features.operators.openshift.io/tls-profiles" = "true"' ${CSV}
+	$(YQ) -i '.metadata.annotations."features.operators.openshift.io/token-auth-aws" = "false"' ${CSV}
+	$(YQ) -i '.metadata.annotations."features.operators.openshift.io/token-auth-azure" = "false"' ${CSV}
+	$(YQ) -i '.metadata.annotations."features.operators.openshift.io/token-auth-gcp" = "false"' ${CSV}
+
+
+.PHONY: bundle-validate
+bundle-validate: operator-sdk ## Validate the bundle directory with additional validators (suite=operatorframework), such as Kubernetes deprecated APIs (https://kubernetes.io/docs/reference/using-api/deprecation-guide/) based on bundle.CSV.Spec.MinKubeVersion
+	$(OPERATOR_SDK) bundle validate ./bundle --select-optional suite=operatorframework
 
 .PHONY: bundle-build
-bundle-build: ## Build the bundle image.
+bundle-build: bundle ## Build the bundle image.
+	$(MAKE) bundle-update
 	$(CONTAINER_TOOL) build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
-	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
+	$(CONTAINER_TOOL) push $(BUNDLE_IMG)
 
-.PHONY: opm
-OPM = $(LOCALBIN)/opm
-opm: ## Download opm locally if necessary.
-ifeq (,$(wildcard $(OPM)))
-ifeq (,$(shell which opm 2>/dev/null))
-	@{ \
-	set -e ;\
-	mkdir -p $(dir $(OPM)) ;\
-	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.55.0/$${OS}-$${ARCH}-opm ;\
-	chmod +x $(OPM) ;\
-	}
-else
-OPM = $(shell which opm)
-endif
-endif
+.PHONY: bundle-run
+OPERATOR_NAMESPACE ?= openshift-workload-availability
+bundle-run: operator-sdk ## Run bundle image
+	$(OPERATOR_SDK) -n $(OPERATOR_NAMESPACE) run bundle $(BUNDLE_IMG)
 
-# A comma-separated list of bundle images (e.g. make catalog-build BUNDLE_IMGS=example.com/operator-bundle:v0.1.0,example.com/operator-bundle:v0.2.0).
-# These images MUST exist in a registry and be pull-able.
-BUNDLE_IMGS ?= $(BUNDLE_IMG)
+.PHONY: bundle-run-update
+bundle-run-update: operator-sdk ## Upgrade bundle image
+	$(OPERATOR_SDK) -n $(OPERATOR_NAMESPACE) run bundle-upgrade $(BUNDLE_IMG)
 
-# The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).
-CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:v$(VERSION)
+.PHONY: bundle-cleanup
+bundle-cleanup: operator-sdk ## Remove bundle installed via bundle-run
+	$(OPERATOR_SDK) -n $(OPERATOR_NAMESPACE) cleanup $(OPERATOR_NAME)
 
-# Set CATALOG_BASE_IMG to an existing catalog image tag to add $BUNDLE_IMGS to that image.
-ifneq ($(origin CATALOG_BASE_IMG), undefined)
-FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
-endif
+# Build a file-based catalog image
+# https://docs.openshift.com/container-platform/4.14/operators/admin/olm-managing-custom-catalogs.html#olm-managing-custom-catalogs-fb
+# NOTE: CATALOG_DIR and CATALOG_DOCKERFILE items won't be deleted in case of recipe's failure
+CATALOG_DIR := catalog
+CATALOG_DOCKERFILE := ${CATALOG_DIR}.Dockerfile
+CATALOG_INDEX := $(CATALOG_DIR)/index.yaml
 
-# Build a catalog image by adding bundle images to an empty catalog using the operator package manager tool, 'opm'.
-# This recipe invokes 'opm' in 'semver' bundle add mode. For more information on add modes, see:
-# https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
+# Add olm.channel entries for each channel in CHANNELS.
+# Keep the default candidate's upgrade edge in the catalog.
+.PHONY: add_channel_entry_for_the_bundle
+add_channel_entry_for_the_bundle: verify-previous-version verify-skip-range
+	@for channel in $(shell echo ${CHANNELS} | tr ',' ' '); do \
+		echo "---" >> ${CATALOG_INDEX}; \
+		echo "schema: olm.channel" >> ${CATALOG_INDEX}; \
+		echo "package: ${OPERATOR_NAME}" >> ${CATALOG_INDEX}; \
+		echo "name: $$channel" >> ${CATALOG_INDEX}; \
+		echo "entries:" >> ${CATALOG_INDEX}; \
+		echo "  - name: ${OPERATOR_NAME}.v${VERSION}" >> ${CATALOG_INDEX}; \
+		\
+		if [ -n "${PREVIOUS_VERSION}" ]; then \
+			echo "    replaces: ${OPERATOR_NAME}.v${PREVIOUS_VERSION}" >> ${CATALOG_INDEX}; \
+		fi; \
+		if [ -n "${SKIP_RANGE_LOWER}" ]; then \
+			echo "    skipRange: '>=${SKIP_RANGE_LOWER} <${VERSION}'" >> ${CATALOG_INDEX}; \
+		fi; \
+	done
+
 .PHONY: catalog-build
-catalog-build: opm ## Build a catalog image.
-	$(OPM) index add --container-tool $(CONTAINER_TOOL) --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
+catalog-build: verify-previous-version verify-skip-range ## Build a file-based catalog image.
+	$(MAKE) opm
+	# Remove the catalog directory and Dockerfile if they exist
+	-rm -r ${CATALOG_DIR} ${CATALOG_DOCKERFILE}
+	@mkdir -p ${CATALOG_DIR}
+	$(OPM) generate dockerfile ${CATALOG_DIR}
+	$(OPM) init ${OPERATOR_NAME} \
+		--default-channel=${DEFAULT_CHANNEL} \
+		--description=./README.md \
+		--icon="${BLUE_ICON_PATH}" \
+		--output yaml \
+		> ${CATALOG_INDEX}
+	$(OPM) render ${BUNDLE_IMG} --output yaml >> ${CATALOG_INDEX}
+	$(MAKE) add_channel_entry_for_the_bundle
+	$(OPM) validate ${CATALOG_DIR}
+	$(CONTAINER_TOOL) build . -f ${CATALOG_DOCKERFILE} -t ${CATALOG_IMG}
+	# Clean up the catalog directory and Dockerfile
+	rm -r ${CATALOG_DIR} ${CATALOG_DOCKERFILE}
 
-# Push the catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
-	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+	$(CONTAINER_TOOL) push $(CATALOG_IMG)
+
+##@ Targets used by CI
+
+.PHONY: container-build
+container-build: ## Build containers
+	$(MAKE) docker-build bundle-build
+
+.PHONY: container-push
+container-push: ## Push containers (NOTE: catalog can't be built before bundle is pushed)
+	$(MAKE) docker-push bundle-push catalog-build catalog-push
+
+# Shared dev environment
+# Uses a local sibling checkout if available (e.g. ../tools),
+# otherwise downloads the tools repo into .tools/ on first dev-* target use.
+#
+# IMPORTANT: Do NOT use $(shell git clone ...) here — $(shell) executes at
+# Makefile parse time, so any make invocation (make build, make test, make help)
+# would trigger a git clone. The dev-% fallback rule below is lazy: the clone
+# only runs when a dev-* target is actually invoked.
+TOOLS_DIR ?= $(shell cd .. && pwd)/tools
+DEV_MK := $(TOOLS_DIR)/dev/dev.mk
+ifeq ($(wildcard $(DEV_MK)),)
+  TOOLS_DIR := $(shell pwd)/.tools
+  DEV_MK := $(TOOLS_DIR)/dev/dev.mk
+endif
+-include $(DEV_MK)
+ifeq ($(wildcard $(DEV_MK)),)
+dev-%:
+	@echo "Downloading medik8s/tools into $(TOOLS_DIR)..."
+	@if [ -d $(TOOLS_DIR) ]; then \
+		if [ -f $(TOOLS_DIR)/.managed-by-makefile ]; then \
+			echo "  Removing stale $(TOOLS_DIR)..."; rm -rf $(TOOLS_DIR); \
+		else \
+			echo "Error: $(TOOLS_DIR) exists but was not created by this Makefile (missing .managed-by-makefile sentinel)."; \
+			echo "       Remove it manually or set TOOLS_DIR to a valid medik8s/tools checkout."; exit 1; \
+		fi; \
+	fi
+	@git clone --depth 1 https://github.com/medik8s/tools.git $(TOOLS_DIR)
+	@touch $(TOOLS_DIR)/.managed-by-makefile
+	@test -f $(DEV_MK) || { echo "Error: $(DEV_MK) not found after clone."; exit 1; }
+	@$(MAKE) $@
+endif
