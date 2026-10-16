@@ -150,6 +150,24 @@ help: ## Display this help.
 PYTHON ?= .venv/bin/python
 BUNDLE_CACHE ?= .cache/bundles
 
+.PHONY: python-env
+python-env: ## Prepare the default Python environment and its pinned dependencies.
+
+# A custom interpreter is managed by the caller; only bootstrap our local venv.
+ifeq ($(PYTHON),.venv/bin/python)
+python-env: .venv/.requirements-installed
+
+.venv/bin/python:
+	python3 -m venv .venv
+
+.venv/.requirements-installed: hack/requirements.txt .venv/bin/python
+	$(PYTHON) -m pip install -r hack/requirements.txt
+	touch $@
+endif
+
+# Order-only prerequisites keep environment setup out of target freshness checks.
+bundles operand-manifests operand-manifests-check bundle-check catalog-configmap test-offline: | python-env
+
 .PHONY: bundles
 bundles: ## Fetch the pinned upstream bundles from release-set.yaml into .cache/bundles.
 	$(PYTHON) hack/fetch-bundles.py --release-set release-set.yaml --out $(BUNDLE_CACHE)

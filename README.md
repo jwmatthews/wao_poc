@@ -91,8 +91,7 @@ Run from the repository root (the `cd` command works from any directory inside t
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
-python3 -m venv .venv
-.venv/bin/python -m pip install -r hack/requirements.txt
+make python-env               # create .venv and install pinned Python requirements
 
 make bundles                  # fetch the pinned bundles into .cache/bundles and verify digests
 make operand-manifests-check  # committed manifests, CRDs and union role match the bundles
@@ -105,6 +104,10 @@ GOTOOLCHAIN=go1.24.13 make lint # match the Go 1.24 toolchain used by CI's pinne
 GitHub Actions runs the Go suites, lint, and offline tests. The offline job fetches
 the pinned bundles first so extraction and parity tests run instead of skipping
 because `.cache/bundles` is missing.
+
+Python Make targets automatically run `python-env` first. It creates `.venv` if
+missing and reinstalls dependencies when `hack/requirements.txt` changes. With
+`PYTHON=/path/to/python`, you manage that interpreter and its dependencies yourself.
 
 `make test-e2e` requires Docker, Kind, kubectl and Python 3. It creates a new disposable Kind
 cluster with a dedicated kubeconfig, builds WAO, and tests the all-Disabled install:
