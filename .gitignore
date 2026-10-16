@@ -18,7 +18,7 @@ coverage.*
 profile.cov
 
 # Dependency directories (remove the comment below to include it)
-# vendor/
+vendor/
 
 # Go workspace file
 go.work
@@ -32,9 +32,6 @@ go.work.sum
 # .vscode/
 
 *.kubeconfig
-
-# Local pointers to disposable test clusters (cluster-identifying)
-DISPOSABLE_OPENSHIFT_CLUSTERS.md
 
 # MacOS specifics
 .DS_store
@@ -68,11 +65,12 @@ go.work
 *.swo
 *~
 
-# WAO POC local state and generated outputs (never commit)
+# local state and generated outputs (never commit)
 .venv/
 .cache/
-evidence/
 dist/
 bin/
 kubeconfig*
 __pycache__/
+testbin
+

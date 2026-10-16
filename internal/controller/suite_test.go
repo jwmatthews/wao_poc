@@ -10,6 +10,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -20,8 +21,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	"github.com/jwmatthews/wao_poc/api/v1alpha1"
-	"github.com/jwmatthews/wao_poc/internal/images"
+	"github.com/medik8s/workload-availability-operator/api/v1alpha1"
+	"github.com/medik8s/workload-availability-operator/internal/images"
 )
 
 var (

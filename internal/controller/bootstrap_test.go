@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/jwmatthews/wao_poc/api/v1alpha1"
+	"github.com/medik8s/workload-availability-operator/api/v1alpha1"
 )
 
 func TestEnsureDefaultConfigCreatesDisabledSingleton(t *testing.T) {

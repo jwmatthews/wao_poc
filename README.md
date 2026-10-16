@@ -23,14 +23,14 @@ ownership and its own upgrade lifecycle. WAO replaces that with **one OLM packag
 that owns all the component APIs** plus a cluster-scoped `WorkloadAvailabilityConfig`
 named `cluster`. A lifecycle controller installs each component's unchanged
 controller-manager as a separate operand when an administrator enables it. Every
-component starts **Disabled**. See [docs/design-brief.md](docs/design-brief.md).
+component starts **Disabled**. See [docs/archive/bootstrap/design-brief.md](docs/archive/bootstrap/design-brief.md).
 
 ## Status
 
 | Step | State |
 | --- | --- |
 | Design brief | Written |
-| Implementation plan for the install case | Written: [docs/implementation-plan.md](docs/implementation-plan.md) |
+| Implementation plan for the install case | Written: [docs/archive/bootstrap/implementation-plan.md](docs/archive/bootstrap/implementation-plan.md) |
 | Implementation | Done: Tasks 1–10 (operator, operand manifests, bundle, image, POC catalog, live-cluster harness, docs) |
 | Live install verification | Run on a disposable OpenShift 4.22 cluster (3 nodes, `HighlyAvailable`): four full runs of 19 cases. Runs found two WAO RBAC bugs, both fixed (see [Deviations from the plan](#deviations-from-the-plan), items 3 and 8). The final run passed 17 of 19: WAO-INST-09 and WAO-INST-12 failed only because the upstream MDR manager could not start under its 30Mi memory limit, which reproduces without WAO (see [Known upstream issues](#known-upstream-issues)). Every other case passed. A fifth run on 2026-10-05 against a fresh OpenShift 5.0.0-rc.5 cluster (3 nodes, `HighlyAvailable`, classic OLM) through `test/cluster/full-run.sh` passed all 19 cases, including MDR, which started with a warm page cache that time. Raw results are not committed |
 | Upgrade scenarios | Future plan |
@@ -39,9 +39,7 @@ component starts **Disabled**. See [docs/design-brief.md](docs/design-brief.md).
 
 | Path | Contents |
 | --- | --- |
-| `docs/design-brief.md` | Approach, decisions D1–D10 and non-goals |
-| `docs/operands.md` | Facts about each upstream operand, derived from its published bundle |
-| `docs/implementation-plan.md` | Task-by-task plan with tests, written for a coding agent |
+| [docs/archive/bootstrap/](docs/archive/bootstrap/README.md) | Historical design brief, operand research and implementation plan used to bootstrap the project |
 | `release-set.yaml` | The pinned upstream bundle and image digests the POC installs |
 | `api/v1alpha1/` | The `WorkloadAvailabilityConfig` API |
 | `internal/controller/` | The lifecycle controller and the default-config bootstrap |
@@ -93,8 +91,7 @@ Run from the repository root (the `cd` command works from any directory inside t
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
-python3 -m venv .venv
-.venv/bin/python -m pip install -r hack/requirements.txt
+make python-env               # create .venv and install pinned Python requirements
 
 make bundles                  # fetch the pinned bundles into .cache/bundles and verify digests
 make operand-manifests-check  # committed manifests, CRDs and union role match the bundles
@@ -107,6 +104,10 @@ GOTOOLCHAIN=go1.24.13 make lint # match the Go 1.24 toolchain used by CI's pinne
 GitHub Actions runs the Go suites, lint, and offline tests. The offline job fetches
 the pinned bundles first so extraction and parity tests run instead of skipping
 because `.cache/bundles` is missing.
+
+Python Make targets automatically run `python-env` first. It creates `.venv` if
+missing and reinstalls dependencies when `hack/requirements.txt` changes. With
+`PYTHON=/path/to/python`, you manage that interpreter and its dependencies yourself.
 
 `make test-e2e` requires Docker, Kind, kubectl and Python 3. It creates a new disposable Kind
 cluster with a dedicated kubeconfig, builds WAO, and tests the all-Disabled install:
