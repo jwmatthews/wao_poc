@@ -4,5 +4,5 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
 - name: controller
-  newName: ttl.sh/medik8s-workload-availability-operator-a5k67lgw
-  newTag: 2h
+  newName: quay.io/medik8s/workload-availability-operator
+  newTag: v0.1.0
