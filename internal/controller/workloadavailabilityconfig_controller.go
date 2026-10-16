@@ -10,6 +10,7 @@ import (
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,6 +45,9 @@ const (
 // WorkloadAvailabilityConfigReconciler installs and removes operand components.
 type WorkloadAvailabilityConfigReconciler struct {
 	client.Client
+	// APIReader bypasses the cache for diagnostic reads after write conflicts.
+	// SetupWithManager supplies it when not explicitly injected.
+	APIReader client.Reader
 	Scheme    *runtime.Scheme
 	Namespace string
 	Images    images.Set
@@ -67,22 +71,29 @@ type WorkloadAvailabilityConfigReconciler struct {
 // +kubebuilder:rbac:groups=nodemaintenance.medik8s.io,resources=nodemaintenances,verbs=get;list;watch
 
 func (r *WorkloadAvailabilityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	started := time.Now()
 	log := logf.FromContext(ctx)
 	wac := &v1alpha1.WorkloadAvailabilityConfig{}
 	if err := r.Get(ctx, req.NamespacedName, wac); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	log.V(1).Info("read WorkloadAvailabilityConfig", "operation", "config.get",
+		"resourceVersion", wac.ResourceVersion, "generation", wac.Generation,
+		"observedGeneration", wac.Status.ObservedGeneration, "deleting", !wac.DeletionTimestamp.IsZero())
 	if wac.Name != v1alpha1.SingletonName {
 		log.Info("ignoring non-singleton WorkloadAvailabilityConfig", "name", wac.Name)
 		return ctrl.Result{}, nil
 	}
 	if !wac.DeletionTimestamp.IsZero() {
-		return r.finalize(ctx, wac)
+		return r.finalize(ctx, wac, started)
 	}
 	if controllerutil.AddFinalizer(wac, Finalizer) {
-		return ctrl.Result{Requeue: true}, r.Update(ctx, wac)
+		return ctrl.Result{Requeue: true}, r.writeConfig(ctx, wac, "finalizer.add", started, func() error {
+			return r.Update(ctx, wac)
+		})
 	}
 
+	previousStatus := wac.Status.DeepCopy()
 	statuses := make([]v1alpha1.ComponentStatus, 0, len(components.All()))
 	var errs []error
 	progressing, retained := false, false
@@ -116,8 +127,14 @@ func (r *WorkloadAvailabilityConfigReconciler) Reconcile(ctx context.Context, re
 		wac.Status.ReleaseSet = append(wac.Status.ReleaseSet, v1alpha1.ImageReference{Name: k, Image: r.Images.Get(k)})
 	}
 	wac.Status.Conditions = summarize(wac.Status.Conditions, statuses, joined, wac.Generation)
-	if err := r.Status().Update(ctx, wac); err != nil {
+	statusChanged := !equality.Semantic.DeepEqual(previousStatus, &wac.Status)
+	if err := r.writeConfig(ctx, wac, "status.update", started, func() error {
+		return r.Status().Update(ctx, wac)
+	}, "statusChanged", statusChanged); err != nil {
 		return ctrl.Result{}, err
+	}
+	if statusChanged {
+		logConfigStatus(ctx, wac)
 	}
 	if joined != nil {
 		return ctrl.Result{}, joined
@@ -333,7 +350,7 @@ func (r *WorkloadAvailabilityConfigReconciler) retainedResources(ctx context.Con
 	return out, nil
 }
 
-func (r *WorkloadAvailabilityConfigReconciler) finalize(ctx context.Context, wac *v1alpha1.WorkloadAvailabilityConfig) (ctrl.Result, error) {
+func (r *WorkloadAvailabilityConfigReconciler) finalize(ctx context.Context, wac *v1alpha1.WorkloadAvailabilityConfig, started time.Time) (ctrl.Result, error) {
 	if !controllerutil.ContainsFinalizer(wac, Finalizer) {
 		return ctrl.Result{}, nil
 	}
@@ -348,11 +365,16 @@ func (r *WorkloadAvailabilityConfigReconciler) finalize(ctx context.Context, wac
 		}
 	}
 	controllerutil.RemoveFinalizer(wac, Finalizer)
-	return ctrl.Result{}, r.Update(ctx, wac)
+	return ctrl.Result{}, r.writeConfig(ctx, wac, "finalizer.remove", started, func() error {
+		return r.Update(ctx, wac)
+	})
 }
 
 // SetupWithManager registers the controller.
 func (r *WorkloadAvailabilityConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if r.APIReader == nil {
+		r.APIReader = mgr.GetAPIReader()
+	}
 	toSingleton := handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, _ client.Object) []reconcile.Request {
 		return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: v1alpha1.SingletonName}}}
 	})
