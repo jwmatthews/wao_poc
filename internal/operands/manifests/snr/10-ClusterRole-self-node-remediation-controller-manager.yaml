@@ -54,6 +54,14 @@ rules:
   verbs:
   - update
 - apiGroups:
+  - config.openshift.io
+  resources:
+  - apiservers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - machine.openshift.io
   resources:
   - machines
@@ -72,6 +80,14 @@ rules:
   verbs:
   - get
   - patch
+  - update
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
+  verbs:
+  - create
+  - delete
   - update
 - apiGroups:
   - security.openshift.io

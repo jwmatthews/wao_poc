@@ -6,6 +6,13 @@ rules:
 - apiGroups:
   - ''
   resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ''
+  resources:
   - namespaces
   verbs:
   - create
@@ -15,6 +22,14 @@ rules:
   - ''
   resources:
   - nodes
+  verbs:
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - ''
+  resources:
   - pods
   verbs:
   - get
@@ -32,6 +47,7 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
+  - apiservers
   - clusterversions
   - featuregates
   - infrastructures

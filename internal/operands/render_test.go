@@ -45,7 +45,7 @@ func TestRenderNHCReplacesNamespaceImagesAndLabels(t *testing.T) {
 	if image != testImages().Get(images.NHCManager) {
 		t.Fatalf("manager image = %q", image)
 	}
-	if strings.Contains(image, ":v0.12.0") {
+	if strings.Contains(image, def.Images[0].Original) {
 		t.Fatalf("upstream tag was not replaced: %q", image)
 	}
 	for _, o := range objs {

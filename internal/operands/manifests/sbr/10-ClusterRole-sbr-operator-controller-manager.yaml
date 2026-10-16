@@ -4,18 +4,6 @@ metadata:
   name: sbr-operator-controller-manager
 rules:
 - apiGroups:
-  - authentication.k8s.io
-  resources:
-  - tokenreviews
-  verbs:
-  - create
-- apiGroups:
-  - authorization.k8s.io
-  resources:
-  - subjectaccessreviews
-  verbs:
-  - create
-- apiGroups:
   - ''
   resources:
   - events
@@ -23,6 +11,15 @@ rules:
   - create
   - list
   - patch
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - namespaces
+  - pods
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - ''
@@ -58,10 +55,11 @@ rules:
 - apiGroups:
   - ''
   resources:
-  - pods
+  - persistentvolumes
   verbs:
   - get
   - list
+  - update
   - watch
 - apiGroups:
   - apps
@@ -88,6 +86,14 @@ rules:
   - update
   - watch
 - apiGroups:
+  - config.openshift.io
+  resources:
+  - apiservers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - coordination.k8s.io
   resources:
   - leases
@@ -97,6 +103,16 @@ rules:
   - get
   - list
   - patch
+  - update
+  - watch
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
+  verbs:
+  - create
+  - get
+  - list
   - update
   - watch
 - apiGroups:
@@ -167,3 +183,15 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create

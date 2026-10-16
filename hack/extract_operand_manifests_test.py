@@ -156,21 +156,22 @@ class ExtractionTest(unittest.TestCase):
                     seen[ident] = comp
 
     def test_images_keep_upstream_references(self):
+        rs = yaml.safe_load(RELEASE_SET.read_text())
         text = "".join((self.out / "snr" / n).read_text() for n in self.snr)
-        self.assertIn("quay.io/medik8s/self-node-remediation-operator:v0.13.0", text)
+        self.assertIn(rs["components"]["snr"]["images"]["RELATED_IMAGE_SNR_MANAGER"]["upstream"], text)
         text = "".join((self.out / "sbr" / n).read_text() for n in self.sbr)
-        self.assertIn("quay.io/medik8s/storage-based-remediation-agent:v0.3.0", text)
+        self.assertIn(rs["components"]["sbr"]["images"]["RELATED_IMAGE_SBR_AGENT"]["upstream"], text)
 
     def test_unknown_upstream_image_fails_extraction(self):
         rs = yaml.safe_load(RELEASE_SET.read_text())
-        del rs["components"]["sbr"]["images"]["RELATED_IMAGE_SBR_AGENT"]
+        agent = rs["components"]["sbr"]["images"].pop("RELATED_IMAGE_SBR_AGENT")
         with tempfile.TemporaryDirectory() as d:
             alt = pathlib.Path(d) / "rs.yaml"
             alt.write_text(yaml.safe_dump(rs))
             r = subprocess.run([sys.executable, str(SCRIPT), "--bundles", str(CACHE), "--release-set", str(alt),
                                 "--out", f"{d}/m", "--crd-out", f"{d}/c", "--rbac-out", f"{d}/u.yaml"], capture_output=True, text=True)
             self.assertNotEqual(r.returncode, 0)
-            self.assertIn("storage-based-remediation-agent:v0.3.0", r.stdout + r.stderr)
+            self.assertIn(agent["upstream"], r.stdout + r.stderr)
 
     def test_far_and_nmo_webhooks(self):
         far_m = self.kinds(self.far, "MutatingWebhookConfiguration")[0]
