@@ -40,6 +40,13 @@ func TestRenderNHCReplacesNamespaceImagesAndLabels(t *testing.T) {
 		t.Fatal(err)
 	}
 	dep := find(t, objs, "Deployment", "node-healthcheck-controller-manager")
+	cm := find(t, objs, "ConfigMap", "node-healthcheck-ca-bundle")
+	if _, present := cm.Object["data"]; present {
+		t.Fatal("rendered CA ConfigMap must leave data ownership to service-CA")
+	}
+	if _, present := cm.Object["binaryData"]; present {
+		t.Fatal("rendered CA ConfigMap must leave binaryData ownership to service-CA")
+	}
 	containers, _, _ := unstructured.NestedSlice(dep.Object, "spec", "template", "spec", "containers")
 	image := containers[0].(map[string]interface{})["image"].(string)
 	if image != testImages().Get(images.NHCManager) {

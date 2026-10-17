@@ -22,6 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/medik8s/workload-availability-operator/api/v1alpha1"
+	"github.com/medik8s/workload-availability-operator/internal/components"
 	"github.com/medik8s/workload-availability-operator/internal/images"
 	"github.com/medik8s/workload-availability-operator/internal/operands"
 )
@@ -90,11 +91,36 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		deps := &appsv1.DeploymentList{}
 		Expect(k8sClient.List(ctx, deps, client.InNamespace(ns))).To(Succeed())
 		Expect(deps.Items).To(BeEmpty())
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns,
+			Name: "node-healthcheck-ca-bundle"}, &corev1.ConfigMap{}))).To(BeTrue())
 	})
 
 	It("does not rewrite status when nothing changes", func() {
 		rv := getWAC(ctx).ResourceVersion
 		Consistently(func() string { return getWAC(ctx).ResourceVersion }, 5*time.Second, 250*time.Millisecond).Should(Equal(rv))
+	})
+
+	It("preserves a foreign NHC CA ConfigMap on enable and disable", func() {
+		foreign := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "node-healthcheck-ca-bundle"},
+			Data: map[string]string{"sentinel": "foreign"}}
+		Expect(k8sClient.Create(ctx, foreign)).To(Succeed())
+		original := foreign.DeepCopy()
+		setState(ctx, v1alpha1.ComponentKeyNodeHealthCheck, v1alpha1.ComponentStateEnabled)
+		Eventually(func(g Gomega) {
+			c := component(getWAC(ctx), v1alpha1.ComponentKeyNodeHealthCheck)
+			g.Expect(c.Phase).To(Equal(v1alpha1.ComponentPhaseDegraded))
+			g.Expect(c.Message).To(ContainSubstring("not managed by"))
+		}).Should(Succeed())
+		setState(ctx, v1alpha1.ComponentKeyNodeHealthCheck, v1alpha1.ComponentStateDisabled)
+		Eventually(func() v1alpha1.ComponentPhase {
+			return component(getWAC(ctx), v1alpha1.ComponentKeyNodeHealthCheck).Phase
+		}).Should(Equal(v1alpha1.ComponentPhaseDisabled))
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(foreign), foreign)).To(Succeed())
+		Expect(foreign.UID).To(Equal(original.UID))
+		Expect(foreign.Data).To(Equal(original.Data))
+		Expect(foreign.Labels).To(Equal(original.Labels))
+		Expect(foreign.OwnerReferences).To(Equal(original.OwnerReferences))
+		Expect(k8sClient.Delete(ctx, foreign)).To(Succeed())
 	})
 
 	It("installs the NHC operand when enabled", func() {
@@ -132,6 +158,38 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-validating-webhook-configuration"}, vw)).To(Succeed())
 		Expect(vw.Webhooks[0].ClientConfig.Service.Namespace).To(Equal(ns))
 		Expect(vw.Annotations["service.beta.openshift.io/inject-cabundle"]).To(Equal("true"))
+		cm := &corev1.ConfigMap{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-ca-bundle"}, cm)).To(Succeed())
+		Expect(cm.Labels[operands.LabelManagedBy]).To(Equal(operands.ManagedByValue))
+		Expect(cm.Labels[operands.LabelComponent]).To(Equal(v1alpha1.ComponentKeyNodeHealthCheck))
+		Expect(cm.OwnerReferences).To(Equal(dep.OwnerReferences))
+		Expect(cm.Annotations["service.beta.openshift.io/inject-cabundle"]).To(Equal("true"))
+		Expect(cm.Data).To(BeEmpty())
+	})
+
+	It("preserves externally injected and rotated metrics CA data across apply", func() {
+		key := types.NamespacedName{Namespace: ns, Name: "node-healthcheck-ca-bundle"}
+		def, _ := components.ByKey(v1alpha1.ComponentKeyNodeHealthCheck)
+		for _, ca := range []string{"initial-test-ca", "rotated-test-ca"} {
+			cm := &corev1.ConfigMap{}
+			Expect(k8sClient.Get(ctx, key, cm)).To(Succeed())
+			base := cm.DeepCopy()
+			cm.Data = map[string]string{"service-ca.crt": ca}
+			Expect(k8sClient.Patch(ctx, cm, client.MergeFrom(base), client.FieldOwner("service-ca-test"))).To(Succeed())
+			// A new reconciler/client apply simulates restarting WAO without taking ownership of injected data.
+			r := &WorkloadAvailabilityConfigReconciler{Client: k8sClient, Scheme: k8sClient.Scheme(), Namespace: ns, Images: testImages()}
+			for i := 0; i < 2; i++ {
+				_, err := r.ensureEnabled(ctx, getWAC(ctx), def)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(k8sClient.Get(ctx, key, cm)).To(Succeed())
+				Expect(cm.Data["service-ca.crt"]).To(Equal(ca))
+				for _, managed := range cm.ManagedFields {
+					if managed.Manager == FieldOwner {
+						Expect(string(managed.FieldsV1.Raw)).NotTo(ContainSubstring("f:data"))
+					}
+				}
+			}
+		}
 	})
 
 	It("refuses to adopt a foreign object with the same name", func() {
@@ -174,6 +232,7 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager"}, &rbacv1.ClusterRole{}))).To(BeTrue())
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager-all-namespaces"}, &rbacv1.ClusterRole{}))).To(BeTrue())
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager-all-namespaces"}, &rbacv1.ClusterRoleBinding{}))).To(BeTrue())
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-ca-bundle"}, &corev1.ConfigMap{}))).To(BeTrue())
 	})
 
 	It("reports DisableIncomplete when SNR agents survive a manager-level disable", func() {
@@ -270,11 +329,16 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		Eventually(func() error {
 			return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "sbr-operator-controller-manager"}, &appsv1.Deployment{})
 		}).Should(Succeed())
+		setState(ctx, v1alpha1.ComponentKeyNodeHealthCheck, v1alpha1.ComponentStateEnabled)
+		Eventually(func() error {
+			return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-ca-bundle"}, &corev1.ConfigMap{})
+		}).Should(Succeed(), "re-enabling NHC recreates the CA ConfigMap")
 		Expect(k8sClient.Delete(ctx, getWAC(ctx))).To(Succeed())
 		Eventually(func() bool {
 			return apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: v1alpha1.SingletonName}, &v1alpha1.WorkloadAvailabilityConfig{}))
 		}).Should(BeTrue())
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "sbr-operator-controller-manager"}, &appsv1.Deployment{}))).To(BeTrue(), "explicit deletion; envtest has no garbage collector")
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "sbr-operator-sbr-agent-role"}, &rbacv1.ClusterRole{}))).To(BeTrue())
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-ca-bundle"}, &corev1.ConfigMap{}))).To(BeTrue())
 	})
 })

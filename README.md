@@ -74,25 +74,30 @@ snapshot has been checked locally and has not been tested on a live cluster.
 
 ## Generated operand manifests
 
-`make operand-manifests` writes 90 manifests to `internal/operands/manifests/`
+`make operand-manifests` writes 91 manifests to `internal/operands/manifests/`
 (plus `provenance.json`), the twelve component CRDs to `config/crd/bases/`, and the
 union role to `config/rbac/operand_union_role.yaml`:
 
 | Component | Manifests | Of which ClusterRoles / ClusterRoleBindings |
 | --- | --- | --- |
-| NHC | 12 | 3 / 2 |
+| NHC | 13 | 3 / 2 |
 | SNR | 15 | 4 / 2 |
 | SBR | 24 | 15 / 3 |
 | FAR | 15 | 4 / 2 |
 | MDR | 12 | 4 / 2 |
 | NMO | 12 | 3 / 2 |
-| **Total** | **90** | |
+| **Total** | **91** | |
 
 Each component's set includes the `<serviceaccount>-all-namespaces` ClusterRole and
 ClusterRoleBinding that copy the CSV's namespaced `permissions` cluster-wide and
 append get/list/watch on `namespaces`, as OLM does for an all-namespaces install
 (design brief D7). Never hand-edit these files;
 regenerate them.
+
+NHC's OpenShift metrics configuration includes a service-CA injection ConfigMap,
+the metrics Service's discovery label and serving-certificate annotation, and a
+required metrics certificate mount. NHC creates its own ServiceMonitor. See
+[NHC metrics verification](docs/nhc-metrics.md) for ownership and scrape checks.
 
 ## Build and test
 

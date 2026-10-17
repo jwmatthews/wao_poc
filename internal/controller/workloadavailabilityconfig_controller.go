@@ -361,6 +361,7 @@ func (r *WorkloadAvailabilityConfigReconciler) SetupWithManager(mgr ctrl.Manager
 		For(&v1alpha1.WorkloadAvailabilityConfig{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
+		Owns(&corev1.ConfigMap{}).
 		Owns(&admissionregistrationv1.ValidatingWebhookConfiguration{}).
 		Owns(&admissionregistrationv1.MutatingWebhookConfiguration{}).
 		Watches(&appsv1.DaemonSet{}, toSingleton, builder.WithPredicates(inNamespace)).

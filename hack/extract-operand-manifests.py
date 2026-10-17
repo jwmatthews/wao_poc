@@ -216,6 +216,38 @@ def matches(selector, labels):
     return bool(selector) and all(labels.get(k) == v for k, v in selector.items())
 
 
+def configure_nhc_metrics(objects, mods):
+    """Supply the pinned NHC binary's OpenShift metrics packaging contract.
+
+    NHC creates its own ServiceMonitor; service-CA owns injected CA data and
+    serving Secret contents. Keep both data fields out of WAO's apply payload.
+    """
+    objects.append({"apiVersion": "v1", "kind": "ConfigMap", "metadata": {
+        "name": "node-healthcheck-ca-bundle", "namespace": NAMESPACE_PLACEHOLDER,
+        "annotations": {INJECT_CABUNDLE_ANNOTATION: "true"},
+    }})
+    svc = next(o for o in objects if o["kind"] == "Service" and
+               o["metadata"]["name"] == "node-healthcheck-controller-manager-metrics-service")
+    svc["metadata"].setdefault("labels", {})["app.kubernetes.io/instance"] = "metrics"
+    svc["metadata"].setdefault("annotations", {})[SERVING_CERT_ANNOTATION] = "node-healthcheck-tls"
+    dep = next(o for o in objects if o["kind"] == "Deployment" and
+               o["metadata"]["name"] == "node-healthcheck-controller-manager")
+    pod = dep["spec"]["template"]["spec"]
+    pod.setdefault("volumes", []).append({"name": "tls-config", "secret": {
+        "secretName": "node-healthcheck-tls", "optional": False,
+        "items": [{"key": "tls.crt", "path": "tls.crt"}, {"key": "tls.key", "path": "tls.key"}],
+    }})
+    manager = next(c for c in pod["containers"] if c["name"] == "manager")
+    manager.setdefault("volumeMounts", []).append({
+        "name": "tls-config", "mountPath": "/etc/tls/private", "readOnly": True,
+    })
+    mods.extend([
+        "ConfigMap/node-healthcheck-ca-bundle: added service-ca injection metadata; certificate data is externally managed",
+        "Service/node-healthcheck-controller-manager-metrics-service: added metrics instance label and serving-cert annotation for node-healthcheck-tls",
+        "Deployment/node-healthcheck-controller-manager: added required metrics certificate keys at /etc/tls/private",
+    ])
+
+
 def isolate(rendered):
     """Cross-component pass (D10). rendered: {component: (objects, mods)}; mutates in place."""
     pod_labels = {}
@@ -332,6 +364,8 @@ def main():
             raise SystemExit(f"{name}: cached bundle {bundle_ref} does not match release-set.yaml; run `make bundles`")
         mods = []
         objects = rbac(csv, mods) + other_objects(others, comp, mods) + deployments(csv, comp, mods) + webhooks(csv, comp, mods)
+        if name == "nhc":
+            configure_nhc_metrics(objects, mods)
         rendered[name] = (objects, mods)
         meta[name] = (bundle_ref, csv["metadata"]["name"], inputs, crds)
         for crd_name, crd in crds:

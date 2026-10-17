@@ -1,0 +1,135 @@
+{
+  "issue": "https://github.com/jwmatthews/wao_poc/issues/3",
+  "date": "2026-10-16",
+  "branch": "issue3",
+  "baseCommit": "e6fae32",
+  "outcome": "fixed-and-live-verified",
+  "commitsCreated": 0,
+  "githubWrites": 0,
+  "secretValuesCaptured": false,
+  "componentImagePinsChanged": false,
+  "webhookFailurePoliciesChanged": false,
+  "before": {
+    "nhcReadyReplicas": 2,
+    "caConfigMapPresent": false,
+    "selectedMetricsServices": 0,
+    "mtlsConfigured": false,
+    "activeNHCTargets": 0,
+    "aggregateRejectedResourceAlertFiring": true
+  },
+  "finalMetricsVerification": {
+    "aggregate_rejection_alert": {
+      "firing": 0,
+      "pending": 0
+    },
+    "attempts": 1,
+    "conditions": {
+      "ca_populated": true,
+      "certificate_wired": true,
+      "monitor_accepted": true,
+      "mtls_enabled": true,
+      "namespace_monitored": true,
+      "permissions": true,
+      "prometheus_queries": true,
+      "rejection_checks": true,
+      "replica_readiness": true,
+      "scrape_class_present": true,
+      "service_matches": true
+    },
+    "failures": [],
+    "healthy": true,
+    "prometheus_replicas": [
+      {
+        "available": true,
+        "failures": [],
+        "index": 0,
+        "query_succeeded": true,
+        "target_count": 2,
+        "up_samples": 2
+      },
+      {
+        "available": true,
+        "failures": [],
+        "index": 1,
+        "query_succeeded": true,
+        "target_count": 2,
+        "up_samples": 2
+      }
+    ],
+    "prometheus_replicas_checked": 2,
+    "prometheus_replicas_unavailable": 0,
+    "ready_nhc_replicas": 2,
+    "started_at": "2026-10-16T22:20:48.345086Z"
+  },
+  "reconcileAndRestart": {
+    "caUIDPreserved": true,
+    "caDataPreserved": true,
+    "nhcGenerationPreserved": true,
+    "nhcTemplatePreserved": true,
+    "originalComponentSpecPreserved": true,
+    "checkedAt": "2026-10-16T22:14:17.897439+00:00"
+  },
+  "caDeletionRecovery": {
+    "recreated": true,
+    "caReinjected": true,
+    "nhcGenerationPreserved": true,
+    "observedWithinSeconds": 0.34,
+    "checkedAt": "2026-10-16T22:14:18.594354+00:00"
+  },
+  "nhcDisableCleanup": {
+    "disabledResourcesAbsent": {
+      "deployment": true,
+      "service": true,
+      "configmap": true,
+      "servicemonitor": true,
+      "secret": true
+    },
+    "secretCheckUsedNameOutputOnly": true,
+    "elapsedSeconds": 0.95,
+    "checkedAt": "2026-10-16T22:15:12.743366+00:00"
+  },
+  "finalClusterState": {
+    "checkedAt": "2026-10-16T22:18:10.313265+00:00",
+    "csvSucceeded": true,
+    "waoUsesInternalRegistryDigest": true,
+    "originalWACSpecRestored": true,
+    "allSixComponentsAvailable": true,
+    "nhcImageUnchanged": true,
+    "caOwnedByWAO": true,
+    "waoDoesNotOwnCAData": true,
+    "existingSNRConfigCount": 1,
+    "existingOperandAgentCount": 1,
+    "nhcPolicyCount": 0
+  },
+  "internalRegistry": {
+    "internalRegistryBuildComplete": true,
+    "imageDigest": "sha256:6c91a89255f220224cde77b696928c6513745b9312efb0183471ff1b12064b22",
+    "csvSelectsInternalRegistryImage": true,
+    "checkedAt": "2026-10-16T22:17:02.221154+00:00"
+  },
+  "localChecks": {
+    "makeTestOffline": {
+      "passed": true,
+      "tests": 61,
+      "skipped": 0
+    },
+    "makeTest": {
+      "testSuitesPassed": true,
+      "controllerCoveragePercent": 87.8,
+      "overallExitCode": 1,
+      "exitReason": "verify-no-changes rejects required uncommitted work"
+    },
+    "operandManifestsCheckPassed": true,
+    "bundleCheckPassed": true,
+    "apiAndRendererTestsPassed": true,
+    "diffCheckPassed": true,
+    "finalCodeReview": "clean including scoped historical-samples correction"
+  },
+  "coverageLimits": {
+    "freshAllDisabledClassicOLMInstallLive": false,
+    "wholeWACFinalizationLive": false,
+    "defaultAndFinalizationEnvtest": true,
+    "forcedPlatformCertificateRotation": false,
+    "catalogRepublished": false
+  }
+}

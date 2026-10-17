@@ -109,6 +109,9 @@ spec:
         - mountPath: /tmp/k8s-webhook-server/serving-certs
           name: webhook-server-cert
           readOnly: true
+        - mountPath: /etc/tls/private
+          name: tls-config
+          readOnly: true
       priorityClassName: system-cluster-critical
       securityContext:
         runAsNonRoot: true
@@ -142,3 +145,12 @@ spec:
         secret:
           defaultMode: 420
           secretName: node-healthcheck-webhook-server-cert
+      - name: tls-config
+        secret:
+          items:
+          - key: tls.crt
+            path: tls.crt
+          - key: tls.key
+            path: tls.key
+          optional: false
+          secretName: node-healthcheck-tls

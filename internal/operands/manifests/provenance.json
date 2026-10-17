@@ -103,16 +103,20 @@
         "nhc/11-ClusterRoleBinding-node-healthcheck-controller-manager.yaml": "aeb21d9b91f11813a5d165356622852beca956a8e05d093b20f9924d823a3395",
         "nhc/20-Role-node-healthcheck-controller-manager.yaml": "6892fd3c6e2b4f4ab0e7f8bb0798e294ff9e2b359498deb0a507b267017c7ff4",
         "nhc/21-RoleBinding-node-healthcheck-controller-manager.yaml": "9997d7d9eed0e9258427e217c38653403077dca94b47d3cadab6b983bc14aed0",
-        "nhc/40-Service-node-healthcheck-controller-manager-metrics-service.yaml": "d09653e14ea55b4571236ab7ee73105ca4981a2ea8714671b8618969e06e5f8a",
+        "nhc/30-ConfigMap-node-healthcheck-ca-bundle.yaml": "b9fa31b0162fe5deea7c5b96f8eb18647aa45f707db9921a734f38cdc8c7a240",
+        "nhc/40-Service-node-healthcheck-controller-manager-metrics-service.yaml": "1deec391f4fbe8a7cd94932f99d157bfeaab582ba2b611f4488d67ee93fb369a",
         "nhc/40-Service-node-healthcheck-webhook-service.yaml": "cd2b3fd83be0c232d489b4aa2fa67fcee965d2b319624334cd1f5d788c1e74d6",
-        "nhc/50-Deployment-node-healthcheck-controller-manager.yaml": "faaebc091c2f95211710b86ef181a232440b8d875cb74fcdbbb5738dcda6e54b",
+        "nhc/50-Deployment-node-healthcheck-controller-manager.yaml": "6cc146da284c841b2980714746a46b026b418895f62d7fc9a587325103794e7e",
         "nhc/60-ValidatingWebhookConfiguration-node-healthcheck-validating-webhook-configuration.yaml": "a20d2901420f6d0de879abedebff203a46ccdd7eed2615ad1ca62292c3bcfd1e"
       },
       "wao_modifications": [
         "CSV permissions for node-healthcheck-controller-manager also rendered as ClusterRole/ClusterRoleBinding node-healthcheck-controller-manager-all-namespaces, as OLM grants them for an AllNamespaces OperatorGroup, plus OLM's appended get/list/watch rule on namespaces",
         "CSV permissions/clusterPermissions rendered as Role/RoleBinding/ClusterRole/ClusterRoleBinding named after each ServiceAccount",
+        "ConfigMap/node-healthcheck-ca-bundle: added service-ca injection metadata; certificate data is externally managed",
+        "Deployment/node-healthcheck-controller-manager: added required metrics certificate keys at /etc/tls/private",
         "Deployment/node-healthcheck-controller-manager: added service-ca webhook certificate volume node-healthcheck-webhook-server-cert at /tmp/k8s-webhook-server/serving-certs",
         "Deployment/node-healthcheck-controller-manager: pod template labeled workloadavailability.medik8s.io/component=nodeHealthCheck",
+        "Service/node-healthcheck-controller-manager-metrics-service: added metrics instance label and serving-cert annotation for node-healthcheck-tls",
         "Service/node-healthcheck-webhook-service: added service.beta.openshift.io/serving-cert-secret-name",
         "ValidatingWebhookConfiguration: generated from CSV webhookdefinitions with service-ca CA bundle injection"
       ]

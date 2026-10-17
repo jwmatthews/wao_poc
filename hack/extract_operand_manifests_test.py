@@ -1,5 +1,5 @@
 # hack/extract_operand_manifests_test.py
-import hashlib, json, pathlib, subprocess, sys, tempfile, unittest
+import copy, hashlib, json, pathlib, subprocess, sys, tempfile, unittest
 
 import yaml
 
@@ -65,6 +65,72 @@ class ExtractionTest(unittest.TestCase):
                           "vselfnoderemediationtemplate.kb.io": "Fail"})
         self.assertEqual([w["name"] for w in mw["webhooks"]], ["mselfnoderemediationtemplate.kb.io"])
         self.assertEqual(mw["metadata"]["name"], "self-node-remediation-mutating-webhook-configuration")
+
+    def test_nhc_openshift_metrics_contract(self):
+        cms = self.kinds(self.nhc, "ConfigMap")
+        self.assertEqual([c["metadata"]["name"] for c in cms], ["node-healthcheck-ca-bundle"])
+        cm = cms[0]
+        self.assertEqual(cm["metadata"]["namespace"], "__WAO_NAMESPACE__")
+        self.assertEqual(cm["metadata"]["annotations"], {"service.beta.openshift.io/inject-cabundle": "true"})
+        self.assertNotIn("data", cm, "WAO must not own service-CA injected data")
+        self.assertNotIn("binaryData", cm)
+        svc = next(d for d in self.kinds(self.nhc, "Service")
+                   if d["metadata"]["name"] == "node-healthcheck-controller-manager-metrics-service")
+        # These are the actual selector labels in the pinned NHC-created ServiceMonitor.
+        for key, value in {"app.kubernetes.io/component": "controller-manager",
+                           "app.kubernetes.io/name": "node-healthcheck-operator",
+                           "app.kubernetes.io/instance": "metrics"}.items():
+            self.assertEqual(svc["metadata"]["labels"].get(key), value)
+        self.assertEqual(svc["metadata"]["annotations"]["service.beta.openshift.io/serving-cert-secret-name"],
+                         "node-healthcheck-tls")
+        pod = self.kinds(self.nhc, "Deployment")[0]["spec"]["template"]["spec"]
+        volume = next(v for v in pod["volumes"] if v["name"] == "tls-config")
+        self.assertEqual(volume["secret"], {"secretName": "node-healthcheck-tls", "optional": False,
+                         "items": [{"key": "tls.crt", "path": "tls.crt"}, {"key": "tls.key", "path": "tls.key"}]})
+        manager = next(c for c in pod["containers"] if c["name"] == "manager")
+        self.assertEqual(next(m for m in manager["volumeMounts"] if m["name"] == "tls-config"),
+                         {"name": "tls-config", "mountPath": "/etc/tls/private", "readOnly": True})
+        self.assertEqual(self.kinds(self.nhc, "Secret") + self.kinds(self.nhc, "ServiceMonitor"), [])
+
+    def test_nhc_manager_can_watch_metrics_client_ca_in_kube_system(self):
+        roles = {d["metadata"]["name"]: d for d in self.kinds(self.nhc, "ClusterRole")}
+        subject = {"kind": "ServiceAccount", "name": "node-healthcheck-controller-manager",
+                   "namespace": "__WAO_NAMESPACE__"}
+        granted = [roles[b["roleRef"]["name"]] for b in self.kinds(self.nhc, "ClusterRoleBinding")
+                   if subject in b["subjects"] and b["roleRef"]["name"] in roles]
+        self.assertTrue(any("" in r["apiGroups"] and "configmaps" in r["resources"]
+                            and {"get", "list", "watch"} <= set(r["verbs"])
+                            and (not r.get("resourceNames") or "extension-apiserver-authentication" in r["resourceNames"])
+                            for role in granted for r in role["rules"]), "NHC lacks client-CA read/watch access")
+
+    def test_nhc_metrics_changes_preserve_upstream_deployment_and_service(self):
+        dep = copy.deepcopy(self.kinds(self.nhc, "Deployment")[0])
+        pod = dep["spec"]["template"]["spec"]
+        # Allow only WAO's two certificate mounts and cross-component pod label.
+        pod["volumes"] = [v for v in pod.get("volumes", []) if v["name"] not in {"webhook-server-cert", "tls-config"}]
+        if not pod["volumes"]:
+            del pod["volumes"]
+        manager = next(c for c in pod["containers"] if c["name"] == "manager")
+        manager["volumeMounts"] = [m for m in manager.get("volumeMounts", [])
+                                  if m["name"] not in {"webhook-server-cert", "tls-config"}]
+        if not manager["volumeMounts"]:
+            del manager["volumeMounts"]
+        dep["spec"]["template"]["metadata"]["labels"].pop("workloadavailability.medik8s.io/component")
+        self.assertEqual(dep["spec"], self.csv("nhc")["spec"]["install"]["spec"]["deployments"][0]["spec"])
+        svc = copy.deepcopy(next(s for s in self.kinds(self.nhc, "Service")
+                                 if s["metadata"]["name"] == "node-healthcheck-controller-manager-metrics-service"))
+        svc["metadata"]["labels"].pop("app.kubernetes.io/instance", None)
+        svc["metadata"].get("annotations", {}).pop("service.beta.openshift.io/serving-cert-secret-name", None)
+        if not svc["metadata"].get("annotations"):
+            svc["metadata"].pop("annotations", None)
+        upstream_docs = [yaml.safe_load(f.read_text()) for f in (CACHE / "nhc/manifests").glob("*.yaml")]
+        upstream = next(d for d in upstream_docs if d["kind"] == "Service"
+                        and d["metadata"]["name"] == svc["metadata"]["name"])
+        svc["metadata"].pop("namespace", None)
+        upstream["metadata"].pop("namespace", None)
+        upstream["metadata"].pop("creationTimestamp", None)
+        upstream.pop("status", None)
+        self.assertEqual(svc, upstream)
 
     def test_webhook_deployments_mount_service_ca_certificate(self):
         for docs, dep, secret in ((self.nhc, "node-healthcheck-controller-manager", "node-healthcheck-webhook-server-cert"),
