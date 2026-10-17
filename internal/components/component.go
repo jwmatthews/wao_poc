@@ -1,10 +1,20 @@
 package components
 
-// ImageBinding maps an operator image variable to the literal upstream image reference found in
-// the extracted manifests; the renderer replaces Original with the pinned value from the image set.
+// ImageBinding maps an operator image variable to the tagged reference from release-set.yaml
+// that the runtime overlay writes into the embedded manifests;
+// the renderer replaces Original with the pinned value from the image set.
 type ImageBinding struct {
 	Env      string
 	Original string
+}
+
+// imageBinding uses the generated release-set reference so tag updates need no manual Go edits.
+func imageBinding(env string) ImageBinding {
+	original := taggedImageReferences[env]
+	if original == "" {
+		panic("no generated image binding for " + env + "; run make operand-manifests")
+	}
+	return ImageBinding{Env: env, Original: original}
 }
 
 // WebhookConfiguration names an admission configuration rendered for the component.

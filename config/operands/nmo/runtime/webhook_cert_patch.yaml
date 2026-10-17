@@ -1,0 +1,15 @@
+# OpenShift service-ca wiring, which OLM would do for a standalone install. The Service asks
+# service-ca for a serving certificate in Secret node-maintenance-operator-webhook-server-cert; the
+# Deployment mounts it where controller-runtime expects it; the webhook configuration gets the CA.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-maintenance-operator-controller-manager
+spec:
+  template:
+    spec:
+      volumes:
+      - name: cert
+        secret:
+          secretName: node-maintenance-operator-webhook-server-cert
+          defaultMode: 420

@@ -69,6 +69,8 @@ go.work
 .venv/
 .cache/
 dist/
+/catalog/
+/catalog.Dockerfile
 bin/
 kubeconfig*
 __pycache__/

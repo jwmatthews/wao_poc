@@ -1,0 +1,4 @@
+# Written by hack/update-operand-manifests.sh. Do not edit; run make update-operand-manifests.
+repo: https://github.com/medik8s/machine-deletion-remediation
+tag: latest
+commit: 51dd254fd825cfc28e0f55e3c8164b4b3e048bfb

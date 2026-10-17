@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- service.yaml
+- service_account.yaml
+- deployment.yaml
+- role.yaml
+- role_binding.yaml
+# not supported by OLM :/ Created in code for now
+#- consoleplugin.yaml
+
+components:
+- ../../patches/affinity
+- ../../patches/common
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+images:
+- name: console-plugin
+  newName: quay.io/medik8s/node-remediation-console
+  newTag: latest

@@ -19,18 +19,18 @@ const (
 	LabelComponent       = "workloadavailability.medik8s.io/component"
 )
 
-var namespacedKinds = map[string]bool{"Deployment": true, "Service": true, "ConfigMap": true, "Role": true,
-	"RoleBinding": true, "ServiceAccount": true, "Secret": true}
+var namespacedKinds = map[string]bool{"Deployment": true, "Service": true, "ConfigMap": true}
 
-var kindOrder = map[string]int{"ServiceAccount": 0, "ClusterRole": 10, "ClusterRoleBinding": 11, "Role": 20,
-	"RoleBinding": 21, "ConfigMap": 30, "Service": 40, "Deployment": 50,
+// Only workload and admission kinds are rendered. Operand RBAC is part of the WAO CSV
+// (config/operands/<k>/rbac) and is created by OLM at install time.
+var kindOrder = map[string]int{"ConfigMap": 30, "Service": 40, "Deployment": 50,
 	"ValidatingWebhookConfiguration": 60, "MutatingWebhookConfiguration": 61}
 
 // IsNamespaced reports whether a rendered kind lives in the install namespace.
 func IsNamespaced(kind string) bool { return namespacedKinds[kind] }
 
 // Render produces the component's objects for one install namespace and image set,
-// sorted so that RBAC precedes workloads and admission configurations come last.
+// sorted so that Services precede Deployments and admission configurations come last.
 func Render(def components.Definition, namespace string, imgs images.Set) ([]*unstructured.Unstructured, error) {
 	files, err := Load(def.ManifestDir)
 	if err != nil {

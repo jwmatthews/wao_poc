@@ -10,7 +10,7 @@ func SNR() Definition {
 		Key: v1alpha1.ComponentKeySelfNodeRemediation, ShortName: "snr", ManifestDir: "snr",
 		Deployments: []string{"self-node-remediation-controller-manager"},
 		Images: []ImageBinding{
-			{Env: images.SNRManager, Original: "quay.io/medik8s/self-node-remediation-operator:latest"},
+			imageBinding(images.SNRManager),
 		},
 		Webhooks: []WebhookConfiguration{
 			{Kind: "ValidatingWebhookConfiguration", Name: "self-node-remediation-validating-webhook-configuration"},

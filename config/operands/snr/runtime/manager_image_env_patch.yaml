@@ -1,0 +1,14 @@
+# Upstream leaves ${IMG} for envsubst; WAO sets the tagged reference, which the renderer
+# replaces with RELATED_IMAGE_SNR_MANAGER. `make operand-manifests` keeps the value current.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: self-node-remediation-controller-manager
+spec:
+  template:
+    spec:
+      containers:
+        - name: manager
+          env:
+            - name: SELF_NODE_REMEDIATION_IMAGE
+              value: quay.io/medik8s/self-node-remediation-operator:latest
