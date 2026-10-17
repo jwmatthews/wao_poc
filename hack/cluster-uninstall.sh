@@ -3,6 +3,8 @@
 # Usage: hack/cluster-uninstall.sh /path/to/kubeconfig
 set -euo pipefail
 KC=${1:?usage: $0 KUBECONFIG}
+KC=$(cd "$(dirname "$KC")" 2>/dev/null && pwd)/$(basename "$KC")
+[ -f "$KC" ] || { echo "kubeconfig not found: $KC" >&2; exit 1; }
 NS=openshift-workload-availability
 oc() { command oc --kubeconfig="$KC" "$@"; }
 oc delete workloadavailabilityconfig cluster --ignore-not-found --timeout=120s || true

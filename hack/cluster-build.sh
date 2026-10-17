@@ -5,6 +5,8 @@
 # The kubeconfig is always passed explicitly; the current context is never used.
 set -euo pipefail
 KC=${1:?usage: $0 KUBECONFIG}
+KC=$(cd "$(dirname "$KC")" 2>/dev/null && pwd)/$(basename "$KC")
+[ -f "$KC" ] || { echo "kubeconfig not found: $KC" >&2; exit 1; }
 BUILD_NS=${BUILD_NS:-wao-poc-build}
 INSTALL_NS=${INSTALL_NS:-openshift-workload-availability}
 REG=image-registry.openshift-image-registry.svc:5000
@@ -18,13 +20,18 @@ for who in "system:serviceaccounts:$INSTALL_NS" system:serviceaccounts:openshift
   oc policy add-role-to-group system:image-puller "$who" -n "$BUILD_NS" >/dev/null
 done
 ensure_bc() { oc get bc "$1" -n "$BUILD_NS" >/dev/null 2>&1 || oc new-build --binary --name "$1" -n "$BUILD_NS" --strategy docker >/dev/null; }
-digest_of() { oc get istag "$1:latest" -n "$BUILD_NS" -o jsonpath='{.image.metadata.name}'; }
+digest_of() {
+  local d
+  d=$(oc get istag "$1:latest" -n "$BUILD_NS" -o jsonpath='{.image.metadata.name}')
+  [[ "$d" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "no image digest for $1:latest in $BUILD_NS" >&2; exit 1; }
+  echo "$d"
+}
 
 # 1. Operator image from a clean archive of HEAD (never the working tree).
 ensure_bc wao
 SRC=$(mktemp -d); trap 'rm -rf "$SRC"' EXIT
 git archive HEAD | tar -x -C "$SRC"
-oc start-build wao -n "$BUILD_NS" --from-dir="$SRC" --follow >/dev/null
+oc start-build wao -n "$BUILD_NS" --from-dir="$SRC" --follow
 IMG="$REG/$BUILD_NS/wao@$(digest_of wao)"
 echo "IMG=$IMG"
 
@@ -34,7 +41,7 @@ make bundle-update VERSION="$VERSION"
 ensure_bc wao-bundle
 BSRC=$(mktemp -d); mkdir -p "$BSRC/bundle"
 cp -R bundle/manifests bundle/metadata bundle/tests "$BSRC/bundle/"; cp bundle.Dockerfile "$BSRC/Dockerfile"
-oc start-build wao-bundle -n "$BUILD_NS" --from-dir="$BSRC" --follow >/dev/null; rm -rf "$BSRC"
+oc start-build wao-bundle -n "$BUILD_NS" --from-dir="$BSRC" --follow; rm -rf "$BSRC"
 BUNDLE_IMG="$REG/$BUILD_NS/wao-bundle@$(digest_of wao-bundle)"
 echo "BUNDLE_IMG=$BUNDLE_IMG"
 
@@ -42,7 +49,7 @@ echo "BUNDLE_IMG=$BUNDLE_IMG"
 make catalog-fbc BUNDLE_IMG="$BUNDLE_IMG" VERSION="$VERSION"
 ensure_bc wao-catalog
 CSRC=$(mktemp -d); cp -R catalog "$CSRC/catalog"; cp catalog.Dockerfile "$CSRC/Dockerfile"
-oc start-build wao-catalog -n "$BUILD_NS" --from-dir="$CSRC" --follow >/dev/null; rm -rf "$CSRC"
+oc start-build wao-catalog -n "$BUILD_NS" --from-dir="$CSRC" --follow; rm -rf "$CSRC"
 CATALOG_IMG="$REG/$BUILD_NS/wao-catalog@$(digest_of wao-catalog)"
 echo "CATALOG_IMG=$CATALOG_IMG"
 make catalog-source CATALOG_IMG="$CATALOG_IMG"
