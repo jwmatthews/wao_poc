@@ -22,6 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/medik8s/workload-availability-operator/api/v1alpha1"
+	"github.com/medik8s/workload-availability-operator/internal/components"
 	"github.com/medik8s/workload-availability-operator/internal/images"
 	"github.com/medik8s/workload-availability-operator/internal/operands"
 )
@@ -162,6 +163,42 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		}).Should(Succeed())
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-controller-manager"}, &appsv1.Deployment{}))).To(BeTrue())
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-validating-webhook-configuration"}, &admissionregistrationv1.ValidatingWebhookConfiguration{}))).To(BeTrue())
+	})
+
+	It("creates no RBAC for any component and removes every runtime object on disable", func() {
+		for _, key := range v1alpha1.AllComponentKeys {
+			setState(ctx, key, v1alpha1.ComponentStateEnabled)
+		}
+		Eventually(func(g Gomega) {
+			for _, key := range v1alpha1.AllComponentKeys {
+				c := component(getWAC(ctx), key)
+				g.Expect(c).NotTo(BeNil())
+				g.Expect(c.Phase).To(Equal(v1alpha1.ComponentPhaseProgressing))
+			}
+		}).Should(Succeed())
+		for _, def := range components.All() {
+			for _, name := range def.Deployments {
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, &appsv1.Deployment{})).To(Succeed())
+				Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, &corev1.ServiceAccount{}))).To(BeTrue(), name)
+				Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: name}, &rbacv1.ClusterRole{}))).To(BeTrue(), name)
+			}
+		}
+		for _, key := range v1alpha1.AllComponentKeys {
+			setState(ctx, key, v1alpha1.ComponentStateDisabled)
+		}
+		Eventually(func(g Gomega) {
+			for _, def := range components.All() {
+				for _, name := range def.Deployments {
+					g.Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, &appsv1.Deployment{}))).To(BeTrue())
+				}
+			}
+		}).Should(Succeed())
+		// Status is written after the deletes; wait for it so the next spec does not see a stale Progressing phase.
+		Eventually(func(g Gomega) {
+			for _, key := range v1alpha1.AllComponentKeys {
+				g.Expect(component(getWAC(ctx), key).Phase).To(Equal(v1alpha1.ComponentPhaseDisabled), key)
+			}
+		}).Should(Succeed())
 	})
 
 	It("reports DisableIncomplete when SNR agents survive a manager-level disable", func() {
