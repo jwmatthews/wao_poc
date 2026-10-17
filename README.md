@@ -71,7 +71,6 @@ snapshot has been checked locally and has not been tested on a live cluster.
 | envtest | Kubernetes 1.33.0 | Downloaded into `bin/k8s/` by `make test` |
 | kustomize, yq, opm | Pinned in the Makefile | Downloaded into `bin/` on demand; render manifests and the catalog |
 | jq | On PATH | Generate Go image bindings from `release-set.yaml` |
-| python3 | 3, standard library only | Script and operand-generation tests under `make test-offline` |
 | podman | 5.7.0 | Installed but not used; the operator image is built on the cluster |
 
 ## Operand manifests
@@ -97,7 +96,7 @@ cd "$(git rev-parse --show-toplevel)"
 make verify-operand-manifests # offline: copies, pins, ServiceAccount coverage and bundle shape agree
 make generate manifests       # controller-gen: deepcopy, CRD and RBAC
 make test                     # Go unit and envtest suites
-make test-offline             # verify-operand-manifests plus the remaining script tests (no cluster)
+make test-offline             # verify-operand-manifests plus the operand pipeline regression tests (no cluster)
 GOTOOLCHAIN=go1.24.13 make lint # match the Go 1.24 toolchain used by CI's pinned linter
 ```
 
@@ -106,22 +105,6 @@ Install the required tools and populate the Go module cache with `go mod downloa
 (or use an existing `vendor/` directory). The operand regression tests disable module and
 toolchain downloads; with those prerequisites available, offline checks need no network or
 cluster. CI prepares the module cache before running them.
-
-`make test-e2e` requires Docker, Kind, kubectl and python3. It creates a new disposable Kind
-cluster with a dedicated kubeconfig, builds WAO, and tests the all-Disabled install:
-manager readiness, the default config, and absence of operands and native resources.
-It uses `config/e2e` to select the locally built WAO image without editing the
-committed image pin. It does not enable operands or require cert-manager or metrics.
-The full OLM and enabled-operand checks are done by hand on a confirmed
-disposable OpenShift cluster (see the next section).
-
-The Kind runner generates a unique cluster name by default. An explicit
-`KIND_CLUSTER` is locked against concurrent runs and must not already exist.
-Cleanup deletes the default config
-while WAO is still running, then removes the install manifests; the runner deletes
-its Kind cluster on success or failure. Raw output and the isolated kubeconfig stay
-under `evidence/<UTC-date>-kind-e2e-<pid>/`. CI saves only `e2e.log` as the
-`kind-e2e-logs` artifact, never the kubeconfig.
 
 Operand manifests are copied from each upstream checkout, following OADP's non-admin-controller
 pattern. `make update-release-set` records the latest release tag, image digests and the git

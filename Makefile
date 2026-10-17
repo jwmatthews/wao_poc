@@ -216,8 +216,8 @@ bump-operands: ## Resolve images, copy source config, generate manifests and Go 
 	@#git status --short release-set.yaml config/operands config/manager internal/operands internal/components/zz_generated.images.go
 
 .PHONY: test-offline
-test-offline: verify-operand-manifests ## Offline checks: operand manifests, bundle shape, and the remaining script tests (no cluster, no network).
-	python3 -m unittest hack/e2e_runner_test.py hack/build_test.py hack/operand_manifests_test.py
+test-offline: verify-operand-manifests ## Offline checks: operand manifests, bundle shape, and the operand pipeline regression tests (no cluster, no network).
+	go test ./test/offline/ -count=1
 
 
 ##@ Development

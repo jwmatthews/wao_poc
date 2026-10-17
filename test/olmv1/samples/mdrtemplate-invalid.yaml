@@ -1,9 +1,0 @@
-# exp0001 CONTROL: missing required spec.template -> API server schema error
-#   "spec.template: Required value" (bundle CRD machinedeletionremediationtemplates.yaml:57-58).
-# Not a webhook rejection (MDR has none).
-apiVersion: machine-deletion-remediation.medik8s.io/v1alpha1
-kind: MachineDeletionRemediationTemplate
-metadata:
-  name: exp0001-mdr-template
-  namespace: openshift-workload-availability
-spec: {}
