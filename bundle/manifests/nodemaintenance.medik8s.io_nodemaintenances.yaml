@@ -4,8 +4,6 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.20.1
   creationTimestamp: null
-  labels:
-    node-maintenance-operator: ""
   name: nodemaintenances.nodemaintenance.medik8s.io
 spec:
   group: nodemaintenance.medik8s.io

@@ -49,15 +49,16 @@ type WorkloadAvailabilityConfigReconciler struct {
 	Images    images.Set
 }
 
-// RBAC for WAO's own objects. Operand permissions come from config/rbac/operand_union_role.yaml.
+// RBAC for WAO's own objects. Operand RBAC is not created here: it is part of the WAO CSV
+// (config/operands/<k>/rbac) and OLM creates it at install time, as OLM does for OADP's
+// non-admin controller.
 // +kubebuilder:rbac:groups=workloadavailability.medik8s.io,resources=workloadavailabilityconfigs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=workloadavailability.medik8s.io,resources=workloadavailabilityconfigs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=workloadavailability.medik8s.io,resources=workloadavailabilityconfigs/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch
-// +kubebuilder:rbac:groups="",resources=services;serviceaccounts;configmaps,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=services;configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
-// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings;clusterroles;clusterrolebindings,verbs=get;list;watch;create;update;patch;delete;bind
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations;mutatingwebhookconfigurations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=self-node-remediation.medik8s.io,resources=selfnoderemediationconfigs;selfnoderemediations,verbs=get;list;watch
 // +kubebuilder:rbac:groups=storage-based-remediation.medik8s.io,resources=storagebasedremediationconfigs;storagebasedremediations,verbs=get;list;watch

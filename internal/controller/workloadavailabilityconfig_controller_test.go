@@ -117,6 +117,7 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 
 		// Operand RBAC comes from the WAO CSV (installed by OLM), never from the operand renderer.
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager"}, &rbacv1.ClusterRole{}))).To(BeTrue())
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-controller-manager"}, &rbacv1.Role{}))).To(BeTrue())
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-controller-manager"}, &corev1.ServiceAccount{}))).To(BeTrue())
 		vw := &admissionregistrationv1.ValidatingWebhookConfiguration{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-validating-webhook-configuration"}, vw)).To(Succeed())
@@ -161,9 +162,6 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		}).Should(Succeed())
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-controller-manager"}, &appsv1.Deployment{}))).To(BeTrue())
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-validating-webhook-configuration"}, &admissionregistrationv1.ValidatingWebhookConfiguration{}))).To(BeTrue())
-		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager"}, &rbacv1.ClusterRole{}))).To(BeTrue())
-		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager-all-namespaces"}, &rbacv1.ClusterRole{}))).To(BeTrue())
-		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager-all-namespaces"}, &rbacv1.ClusterRoleBinding{}))).To(BeTrue())
 	})
 
 	It("reports DisableIncomplete when SNR agents survive a manager-level disable", func() {
@@ -265,6 +263,5 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 			return apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: v1alpha1.SingletonName}, &v1alpha1.WorkloadAvailabilityConfig{}))
 		}).Should(BeTrue())
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "sbr-operator-controller-manager"}, &appsv1.Deployment{}))).To(BeTrue(), "explicit deletion; envtest has no garbage collector")
-		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "sbr-operator-sbr-agent-role"}, &rbacv1.ClusterRole{}))).To(BeTrue())
 	})
 })

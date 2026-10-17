@@ -88,6 +88,9 @@ ifneq ($(origin DEFAULT_CHANNEL), undefined)
 BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
+# Operand ServiceAccounts whose Roles and ClusterRoles operator-sdk folds into the CSV. A name
+# missing here silently becomes dozens of standalone bundle files; verify-operand-manifests checks it.
+OPERAND_SERVICE_ACCOUNTS := node-healthcheck-controller-manager,self-node-remediation-controller-manager,sbr-operator-controller-manager,sbr-operator-sbr-agent,fence-agents-remediation-controller-manager,machine-deletion-remediation-controller-manager,node-maintenance-operator-controller-manager
 MANIFESTS_DIR ?= config/manifests
 
 # IMAGE_REGISTRY used to indicate the registery/group for the operator and bundle
@@ -416,7 +419,7 @@ bundle: verify-previous-version verify-skip-range ## Generate bundle manifests a
 	$(MAKE) manifests kustomize operator-sdk
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build $(MANIFESTS_DIR) | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(KUSTOMIZE) build $(MANIFESTS_DIR) | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) --extra-service-accounts $(OPERAND_SERVICE_ACCOUNTS) $(BUNDLE_METADATA_OPTS)
 	$(MAKE) bundle-validate
 
 .PHONY: bundle-k8s
