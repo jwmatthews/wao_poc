@@ -3,6 +3,8 @@
 # hack/build.sh, which passes version.GitCommit=$(git rev-parse HEAD) through -ldflags; the binary
 # keeps that string, and `go version -m` prints it without running anything. OCI labels such as
 # vcs-ref are inherited from the UBI base image and are NOT used.
+# Exit codes: 0 commit printed; 2 image pulled but no version.GitCommit in any binary;
+# 1 any other failure (missing tool, pull or network error).
 # Usage: hack/image-commit.sh quay.io/medik8s/node-healthcheck-operator:v0.12.0
 set -euo pipefail
 ref=${1:?usage: $0 IMAGE}
@@ -20,8 +22,8 @@ candidates=()
 [ -n "$entry" ] && [ -f "$tmp/root/$entry" ] && candidates+=("$tmp/root/$entry")
 while IFS= read -r f; do candidates+=("$f"); done < <(find "$tmp/root" -type f -perm -u+x -size +1M 2>/dev/null | head -50)
 for bin in "${candidates[@]}"; do
-  commit=$(go version -m "$bin" 2>/dev/null | sed -n 's/.*version\.GitCommit=\([0-9a-f]\{40\}\).*/\1/p' | head -1)
+  commit=$(go version -m "$bin" 2>/dev/null | sed -n 's/.*version\.GitCommit=\([0-9a-f]\{40\}\).*/\1/p' | head -1) || true
   if [ -n "$commit" ]; then echo "$commit"; exit 0; fi
 done
 echo "no version.GitCommit found in $ref" >&2
-exit 1
+exit 2

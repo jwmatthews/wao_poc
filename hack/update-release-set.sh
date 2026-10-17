@@ -36,8 +36,14 @@ for k in $("$YQ" '.components | keys | .[]' "$RS"); do
     base=$("$YQ" ".components.$k.images.$env.upstream" "$RS"); base=${base%:*}
     upstream="$base:$tag"
     pinned=$(digest_ref "$upstream")
-    c=$(hack/image-commit.sh "$upstream" 2>/dev/null || true)
-    if [ -z "$c" ]; then echo "   $env: no embedded commit (skipping commit check for this image)"; fi
+    errf=$(mktemp)
+    set +e; c=$(hack/image-commit.sh "$upstream" 2>"$errf"); rc=$?; set -e
+    case $rc in
+      0) ;;
+      2) c=""; echo "   $env: no embedded commit (skipping commit check for this image)" ;;
+      *) cat "$errf" >&2; rm -f "$errf"; echo "   $env: hack/image-commit.sh failed (rc=$rc) for $upstream" >&2; exit 1 ;;
+    esac
+    rm -f "$errf"
     if [ -n "$c" ] && [ -n "$commit" ] && [ "$c" != "$commit" ]; then
       echo "   $env: embedded commit $c differs from $commit" >&2; exit 1
     fi
@@ -49,7 +55,7 @@ for k in $("$YQ" '.components | keys | .[]' "$RS"); do
   echo "   commit: $commit"
   # A release tag is also the version label; a `latest` build keeps the label already in the file.
   "$YQ" -i ".components.$k.tag = \"$tag\" | .components.$k.commit = \"$commit\"" "$RS"
-  [[ "$tag" =~ ^v[0-9] ]] && "$YQ" -i ".components.$k.version = \"$tag\"" "$RS"
+  if [[ "$tag" =~ ^v[0-9] ]]; then "$YQ" -i ".components.$k.version = \"$tag\"" "$RS"; fi
 done
 "$YQ" -i ".resolvedAt = \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"" "$RS"
 echo "updated $RS; next: make update-operand-manifests"
