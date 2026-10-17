@@ -11,6 +11,8 @@ SRC_DIR=${OPERAND_SRC_DIR:-.cache/operands}
 # Directories config/default never needs; everything else is kept so kustomize bases resolve.
 PRUNE="samples scorecard manifests manifests-k8s manifests-ocp assets"
 
+work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
+
 for k in $("$YQ" '.components | keys | .[]' "$RS"); do
   K=$(tr '[:lower:]' '[:upper:]' <<<"$k"); path_var="${K}_PATH"
   repo=$("$YQ" ".components.$k.repo" "$RS")
@@ -27,11 +29,12 @@ for k in $("$YQ" '.components | keys | .[]' "$RS"); do
     git -C "$dir" cat-file -e "$commit^{commit}" 2>/dev/null || { echo "$k: commit $commit not in $dir" >&2; exit 1; }
   fi
   echo "== $k: copying config/ at $commit ($version) from $dir"
-  tmp=$(mktemp -d)
+  tmp=$work/$k; rm -rf "$tmp"; mkdir -p "$tmp"
   git -C "$dir" archive "$commit" config | tar -x -C "$tmp"
   for d in $PRUNE; do rm -rf "$tmp/config/$d"; done
-  rm -rf "config/operands/$k/upstream"; mkdir -p "config/operands/$k/upstream"
-  mv "$tmp/config" "config/operands/$k/upstream/config"; rm -rf "$tmp"
+  mkdir -p "config/operands/$k/upstream"
+  rm -rf "config/operands/$k/upstream/config"
+  mv "$tmp/config" "config/operands/$k/upstream/config"
   cat > "config/operands/$k/UPSTREAM.yaml" <<EOF
 # Written by hack/update-operand-manifests.sh. Do not edit; run make update-operand-manifests.
 repo: $repo
