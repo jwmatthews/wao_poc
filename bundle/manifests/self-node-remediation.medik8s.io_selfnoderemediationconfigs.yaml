@@ -116,9 +116,10 @@ spec:
                     operator:
                       description: |-
                         Operator represents a key's relationship to the value.
-                        Valid operators are Exists and Equal. Defaults to Equal.
+                        Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
                         Exists is equivalent to wildcard for value, so that a pod can
                         tolerate all taints of a particular category.
+                        Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
                       type: string
                     tolerationSeconds:
                       description: |-
@@ -160,6 +161,17 @@ spec:
                   its peers.
                 minimum: 1
                 type: integer
+              maxTimeForNoPeersResponse:
+                default: 30s
+                description: |-
+                  How long to keep waiting for peer responses before concluding the node is isolated
+                  and self-fencing. Peers are contacted in batches, so on large clusters the time to
+                  finish all batches can exceed the default, and a node may fence itself before its
+                  peers have had a chance to answer. Raising this trades isolation-fencing latency for
+                  resistance to slow or unanswered peer requests.
+                  Valid time units are "ms", "s", "m", "h".
+                pattern: ^([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$
+                type: string
               minPeersForRemediation:
                 default: 1
                 description: "Minimum number of peer workers/control nodes to attempt
@@ -199,6 +211,23 @@ spec:
                   Valid time units are "ms", "s", "m", "h".
                 pattern: ^([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$
                 type: string
+              preferredAddressTypes:
+                description: |-
+                  PreferredAddressTypes is a list of node address types, that self node remediation agents which run on control-plane nodes will use to try to access the kubelet if they can't contact their peers.
+                  Takes the values accepted on `node.status.addresses.type`, or the special value `"NodeName"`, in which case the node's `metadata.name` will be used.
+                  Addresses are currently only read on startup, so a pod restart is required if node addresses change.
+                  This is a part of self diagnostics which will decide whether the node should be remediated or not.
+                  If empty, it will be equivalent to ["NodeName"] (the previous behaviour).
+                items:
+                  enum:
+                  - NodeName
+                  - Hostname
+                  - InternalDNS
+                  - ExternalDNS
+                  - InternalIP
+                  - ExternalIP
+                  type: string
+                type: array
               safeTimeToAssumeNodeRebootedSeconds:
                 description: |-
                   SafeTimeToAssumeNodeRebootedSeconds is the time after which the healthy self node remediation

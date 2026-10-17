@@ -10,7 +10,7 @@ func FAR() Definition {
 		Key: v1alpha1.ComponentKeyFenceAgentsRemediation, ShortName: "far", ManifestDir: "far",
 		Deployments: []string{"fence-agents-remediation-controller-manager"},
 		Images: []ImageBinding{
-			{Env: images.FARManager, Original: "quay.io/medik8s/fence-agents-remediation-operator:v0.8.0"},
+			{Env: images.FARManager, Original: "quay.io/medik8s/fence-agents-remediation-operator:latest"},
 		},
 		Webhooks: []WebhookConfiguration{
 			{Kind: "ValidatingWebhookConfiguration", Name: "fence-agents-remediation-validating-webhook-configuration"},

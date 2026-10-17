@@ -7,14 +7,20 @@ It is not a supported product, not a migration tool and not the final design.
 
 The POC installs all six upstream components as managed operands:
 
-| Component | Upstream release | What it does |
-| --- | --- | --- |
-| Node Health Check (NHC) | [v0.12.0](https://github.com/medik8s/node-healthcheck-operator/releases/tag/v0.12.0) | Watches node health and creates remediation requests from templates |
-| Self Node Remediation (SNR) | [v0.13.0](https://github.com/medik8s/self-node-remediation/releases/tag/v0.13.0) | Remediates unhealthy nodes with per-node agents that reboot themselves |
-| Storage Based Remediation (SBR) | [v0.3.0](https://github.com/medik8s/storage-based-remediation/releases/tag/v0.3.0) | Remediates nodes through shared-storage messaging and per-node agents |
-| Fence Agents Remediation (FAR) | [v0.8.0](https://github.com/medik8s/fence-agents-remediation/releases/tag/v0.8.0) | Remediates nodes by running fence agents against their management interfaces |
-| Machine Deletion Remediation (MDR) | [v0.7.0](https://github.com/medik8s/machine-deletion-remediation/releases/tag/v0.7.0) | Remediates nodes by deleting their Machine so the Machine API replaces it |
-| Node Maintenance (NMO) | [v0.21.0](https://github.com/medik8s/node-maintenance-operator/releases/tag/v0.21.0) | Cordons and drains a node on explicit request |
+| Component | What it does |
+| --- | --- |
+| [Node Health Check (NHC)](https://github.com/medik8s/node-healthcheck-operator) | Watches node health and creates remediation requests from templates |
+| [Self Node Remediation (SNR)](https://github.com/medik8s/self-node-remediation) | Remediates unhealthy nodes with per-node agents that reboot themselves |
+| [Storage Based Remediation (SBR)](https://github.com/medik8s/storage-based-remediation) | Remediates nodes through shared-storage messaging and per-node agents |
+| [Fence Agents Remediation (FAR)](https://github.com/medik8s/fence-agents-remediation) | Remediates nodes by running fence agents against their management interfaces |
+| [Machine Deletion Remediation (MDR)](https://github.com/medik8s/machine-deletion-remediation) | Remediates nodes by deleting their Machine so the Machine API replaces it |
+| [Node Maintenance (NMO)](https://github.com/medik8s/node-maintenance-operator) | Cordons and drains a node on explicit request |
+
+The selected component versions, bundle digests and operand image digests are in
+[release-set.yaml](release-set.yaml). A snapshot may include development bundles;
+the CSV version alone does not establish a published release. Floating tags such
+as `latest` are resolved only when refreshing that file. WAO deploys the recorded
+digests, including those passed to operands for their agents.
 
 ## The idea in one paragraph
 
@@ -26,6 +32,9 @@ controller-manager as a separate operand when an administrator enables it. Every
 component starts **Disabled**. See [docs/archive/bootstrap/design-brief.md](docs/archive/bootstrap/design-brief.md).
 
 ## Status
+
+The live install results below describe earlier release sets. The current image
+snapshot has been checked locally and has not been tested on a live cluster.
 
 | Step | State |
 | --- | --- |

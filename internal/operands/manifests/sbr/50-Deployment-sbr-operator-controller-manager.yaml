@@ -45,8 +45,8 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         - name: RELATED_IMAGE_AGENT
-          value: quay.io/medik8s/storage-based-remediation-agent:v0.3.0
-        image: quay.io/medik8s/storage-based-remediation-operator:v0.3.0
+          value: quay.io/medik8s/storage-based-remediation-agent:latest
+        image: quay.io/medik8s/storage-based-remediation-operator:latest
         livenessProbe:
           httpGet:
             path: /healthz
@@ -54,6 +54,10 @@ spec:
           initialDelaySeconds: 15
           periodSeconds: 20
         name: manager
+        ports:
+        - containerPort: 8443
+          name: https
+          protocol: TCP
         readinessProbe:
           httpGet:
             path: /readyz

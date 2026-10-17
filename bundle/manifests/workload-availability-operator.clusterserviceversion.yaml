@@ -309,6 +309,15 @@ spec:
                 - ""
               resources:
                 - namespaces
+                - pods
+              verbs:
+                - get
+                - list
+                - watch
+            - apiGroups:
+                - ""
+              resources:
+                - namespaces
               verbs:
                 - create
                 - get
@@ -324,15 +333,6 @@ spec:
                 - ""
               resources:
                 - namespaces
-              verbs:
-                - get
-                - list
-                - watch
-            - apiGroups:
-                - ""
-              resources:
-                - nodes
-                - pods
               verbs:
                 - get
                 - list
@@ -377,6 +377,15 @@ spec:
               verbs:
                 - get
                 - list
+                - patch
+                - watch
+            - apiGroups:
+                - ""
+              resources:
+                - nodes
+              verbs:
+                - get
+                - list
                 - watch
             - apiGroups:
                 - ""
@@ -397,6 +406,15 @@ spec:
                 - get
                 - list
                 - patch
+                - update
+                - watch
+            - apiGroups:
+                - ""
+              resources:
+                - persistentvolumes
+              verbs:
+                - get
+                - list
                 - update
                 - watch
             - apiGroups:
@@ -557,9 +575,18 @@ spec:
             - apiGroups:
                 - config.openshift.io
               resources:
+                - apiservers
                 - clusterversions
                 - featuregates
                 - infrastructures
+              verbs:
+                - get
+                - list
+                - watch
+            - apiGroups:
+                - config.openshift.io
+              resources:
+                - apiservers
               verbs:
                 - get
                 - list
@@ -777,6 +804,24 @@ spec:
               verbs:
                 - create
                 - get
+            - apiGroups:
+                - networking.k8s.io
+              resources:
+                - networkpolicies
+              verbs:
+                - create
+                - delete
+                - update
+            - apiGroups:
+                - networking.k8s.io
+              resources:
+                - networkpolicies
+              verbs:
+                - create
+                - get
+                - list
+                - update
+                - watch
             - apiGroups:
                 - nodemaintenance.medik8s.io
               resources:
@@ -1171,19 +1216,19 @@ spec:
                           fieldRef:
                             fieldPath: metadata.namespace
                       - name: RELATED_IMAGE_NHC_MANAGER
-                        value: quay.io/medik8s/node-healthcheck-operator@sha256:5b048ad5d2b8578d2120989a5a822a041d65c985f9ac88d50b000427b32b5391
+                        value: quay.io/medik8s/node-healthcheck-operator@sha256:663b732436fb0da81098502d6844321ec9d098b89186bbef47ee1ac3debb3ec4
                       - name: RELATED_IMAGE_SNR_MANAGER
-                        value: quay.io/medik8s/self-node-remediation-operator@sha256:9ad002dca9ea183c72e350f72e47aff7020397fd476b4a3ac4ebc3627412a5b0
+                        value: quay.io/medik8s/self-node-remediation-operator@sha256:c75e3787fd8c3ca373d7d39fd889af2703c0c47a42a07418f5ff215912e37c11
                       - name: RELATED_IMAGE_SBR_MANAGER
-                        value: quay.io/medik8s/storage-based-remediation-operator@sha256:c390b6b011458985823829049afd47f4a85b90cbc020d8527803cce58da8bd04
+                        value: quay.io/medik8s/storage-based-remediation-operator@sha256:ebb3f7550968953c6a0c2f56ed2e1b5b57462fcf32d383d67ff25e0ca77fd718
                       - name: RELATED_IMAGE_SBR_AGENT
-                        value: quay.io/medik8s/storage-based-remediation-agent@sha256:c9fba79e070fdcb5595994d4daab5051c54088bd7565a34b2d19775016db6421
+                        value: quay.io/medik8s/storage-based-remediation-agent@sha256:1689514e537d1f2dbc19f27047fee80fa755e74f5c263eecb900500b49b92f56
                       - name: RELATED_IMAGE_FAR_MANAGER
-                        value: quay.io/medik8s/fence-agents-remediation-operator@sha256:fab0089a9d656a21c8d0a43622ebe0d6b64a6a76e586d6cb4a06f5ce21c0b583
+                        value: quay.io/medik8s/fence-agents-remediation-operator@sha256:d1289cfa144169d1c8af67c03129c1cf6a5283906c10b481ceb1d299f7bb5d4c
                       - name: RELATED_IMAGE_MDR_MANAGER
-                        value: quay.io/medik8s/machine-deletion-remediation-operator@sha256:0f69367097625d7824d9b5b69de64103e19b612c9833b0b786bb32c9b7efe84d
+                        value: quay.io/medik8s/machine-deletion-remediation-operator@sha256:421090014368c5c29bd96a6e99a4062570de9d3dbfe91cb12d3fd0a9420b1b01
                       - name: RELATED_IMAGE_NMO_MANAGER
-                        value: quay.io/medik8s/node-maintenance-operator@sha256:5b65ec62c58b92fee3389a77ded760ce82a0a6a30f6cf89573f6e97b8f677c74
+                        value: quay.io/medik8s/node-maintenance-operator@sha256:d0ae352a382193ed587b9fe6c4d1b24586ca007f98417e8ebae33b31f540c235
                     image: quay.io/medik8s/workload-availability-operator:v0.1.0
                     livenessProbe:
                       httpGet:
@@ -1270,19 +1315,19 @@ spec:
   provider:
     name: wao_poc
   relatedImages:
-    - image: quay.io/medik8s/node-healthcheck-operator@sha256:5b048ad5d2b8578d2120989a5a822a041d65c985f9ac88d50b000427b32b5391
+    - image: quay.io/medik8s/node-healthcheck-operator@sha256:663b732436fb0da81098502d6844321ec9d098b89186bbef47ee1ac3debb3ec4
       name: nhc-manager
-    - image: quay.io/medik8s/self-node-remediation-operator@sha256:9ad002dca9ea183c72e350f72e47aff7020397fd476b4a3ac4ebc3627412a5b0
+    - image: quay.io/medik8s/self-node-remediation-operator@sha256:c75e3787fd8c3ca373d7d39fd889af2703c0c47a42a07418f5ff215912e37c11
       name: snr-manager
-    - image: quay.io/medik8s/storage-based-remediation-operator@sha256:c390b6b011458985823829049afd47f4a85b90cbc020d8527803cce58da8bd04
+    - image: quay.io/medik8s/storage-based-remediation-operator@sha256:ebb3f7550968953c6a0c2f56ed2e1b5b57462fcf32d383d67ff25e0ca77fd718
       name: sbr-manager
-    - image: quay.io/medik8s/storage-based-remediation-agent@sha256:c9fba79e070fdcb5595994d4daab5051c54088bd7565a34b2d19775016db6421
+    - image: quay.io/medik8s/storage-based-remediation-agent@sha256:1689514e537d1f2dbc19f27047fee80fa755e74f5c263eecb900500b49b92f56
       name: sbr-agent
-    - image: quay.io/medik8s/fence-agents-remediation-operator@sha256:fab0089a9d656a21c8d0a43622ebe0d6b64a6a76e586d6cb4a06f5ce21c0b583
+    - image: quay.io/medik8s/fence-agents-remediation-operator@sha256:d1289cfa144169d1c8af67c03129c1cf6a5283906c10b481ceb1d299f7bb5d4c
       name: far-manager
-    - image: quay.io/medik8s/machine-deletion-remediation-operator@sha256:0f69367097625d7824d9b5b69de64103e19b612c9833b0b786bb32c9b7efe84d
+    - image: quay.io/medik8s/machine-deletion-remediation-operator@sha256:421090014368c5c29bd96a6e99a4062570de9d3dbfe91cb12d3fd0a9420b1b01
       name: mdr-manager
-    - image: quay.io/medik8s/node-maintenance-operator@sha256:5b65ec62c58b92fee3389a77ded760ce82a0a6a30f6cf89573f6e97b8f677c74
+    - image: quay.io/medik8s/node-maintenance-operator@sha256:d0ae352a382193ed587b9fe6c4d1b24586ca007f98417e8ebae33b31f540c235
       name: nmo-manager
   version: 0.1.0
   icon:

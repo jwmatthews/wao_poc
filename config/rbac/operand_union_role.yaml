@@ -49,6 +49,15 @@ rules:
   - ''
   resources:
   - namespaces
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - namespaces
   verbs:
   - create
   - get
@@ -64,15 +73,6 @@ rules:
   - ''
   resources:
   - namespaces
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ''
-  resources:
-  - nodes
-  - pods
   verbs:
   - get
   - list
@@ -117,6 +117,15 @@ rules:
   verbs:
   - get
   - list
+  - patch
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - ''
@@ -137,6 +146,15 @@ rules:
   - get
   - list
   - patch
+  - update
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - persistentvolumes
+  verbs:
+  - get
+  - list
   - update
   - watch
 - apiGroups:
@@ -297,9 +315,18 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
+  - apiservers
   - clusterversions
   - featuregates
   - infrastructures
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - apiservers
   verbs:
   - get
   - list
@@ -517,6 +544,24 @@ rules:
   verbs:
   - create
   - get
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
+  verbs:
+  - create
+  - delete
+  - update
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
+  verbs:
+  - create
+  - get
+  - list
+  - update
+  - watch
 - apiGroups:
   - nodemaintenance.medik8s.io
   resources:
