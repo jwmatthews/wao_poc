@@ -22,6 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/medik8s/workload-availability-operator/api/v1alpha1"
+	"github.com/medik8s/workload-availability-operator/internal/components"
 	"github.com/medik8s/workload-availability-operator/internal/images"
 	"github.com/medik8s/workload-availability-operator/internal/operands"
 )
@@ -115,19 +116,10 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		Expect(dep.OwnerReferences[0].Kind).To(Equal("WorkloadAvailabilityConfig"))
 		Expect(*dep.OwnerReferences[0].Controller).To(BeTrue())
 
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager"}, &rbacv1.ClusterRole{})).To(Succeed())
-		// OLM AllNamespaces behaviour: the CSV's namespaced permissions are also granted cluster-wide,
-		// with OLM's get/list/watch rule on namespaces appended.
-		allNSRole := &rbacv1.ClusterRole{}
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager-all-namespaces"}, allNSRole)).To(Succeed())
-		nsRole := &rbacv1.Role{}
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-controller-manager"}, nsRole)).To(Succeed())
-		Expect(allNSRole.Rules).To(Equal(append(append([]rbacv1.PolicyRule{}, nsRole.Rules...),
-			rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"namespaces"}, Verbs: []string{"get", "list", "watch"}})))
-		allNS := &rbacv1.ClusterRoleBinding{}
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager-all-namespaces"}, allNS)).To(Succeed())
-		Expect(allNS.Subjects).To(ConsistOf(rbacv1.Subject{Kind: "ServiceAccount", Name: "node-healthcheck-controller-manager", Namespace: ns}))
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-controller-manager"}, &corev1.ServiceAccount{})).To(Succeed())
+		// Operand RBAC comes from the WAO CSV (installed by OLM), never from the operand renderer.
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager"}, &rbacv1.ClusterRole{}))).To(BeTrue())
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-controller-manager"}, &rbacv1.Role{}))).To(BeTrue())
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-controller-manager"}, &corev1.ServiceAccount{}))).To(BeTrue())
 		vw := &admissionregistrationv1.ValidatingWebhookConfiguration{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-validating-webhook-configuration"}, vw)).To(Succeed())
 		Expect(vw.Webhooks[0].ClientConfig.Service.Namespace).To(Equal(ns))
@@ -171,9 +163,42 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		}).Should(Succeed())
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-controller-manager"}, &appsv1.Deployment{}))).To(BeTrue())
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-validating-webhook-configuration"}, &admissionregistrationv1.ValidatingWebhookConfiguration{}))).To(BeTrue())
-		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager"}, &rbacv1.ClusterRole{}))).To(BeTrue())
-		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager-all-namespaces"}, &rbacv1.ClusterRole{}))).To(BeTrue())
-		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager-all-namespaces"}, &rbacv1.ClusterRoleBinding{}))).To(BeTrue())
+	})
+
+	It("creates no RBAC for any component and removes every runtime object on disable", func() {
+		for _, key := range v1alpha1.AllComponentKeys {
+			setState(ctx, key, v1alpha1.ComponentStateEnabled)
+		}
+		Eventually(func(g Gomega) {
+			for _, key := range v1alpha1.AllComponentKeys {
+				c := component(getWAC(ctx), key)
+				g.Expect(c).NotTo(BeNil())
+				g.Expect(c.Phase).To(Equal(v1alpha1.ComponentPhaseProgressing))
+			}
+		}).Should(Succeed())
+		for _, def := range components.All() {
+			for _, name := range def.Deployments {
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, &appsv1.Deployment{})).To(Succeed())
+				Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, &corev1.ServiceAccount{}))).To(BeTrue(), name)
+				Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: name}, &rbacv1.ClusterRole{}))).To(BeTrue(), name)
+			}
+		}
+		for _, key := range v1alpha1.AllComponentKeys {
+			setState(ctx, key, v1alpha1.ComponentStateDisabled)
+		}
+		Eventually(func(g Gomega) {
+			for _, def := range components.All() {
+				for _, name := range def.Deployments {
+					g.Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, &appsv1.Deployment{}))).To(BeTrue())
+				}
+			}
+		}).Should(Succeed())
+		// Status is written after the deletes; wait for it so the next spec does not see a stale Progressing phase.
+		Eventually(func(g Gomega) {
+			for _, key := range v1alpha1.AllComponentKeys {
+				g.Expect(component(getWAC(ctx), key).Phase).To(Equal(v1alpha1.ComponentPhaseDisabled), key)
+			}
+		}).Should(Succeed())
 	})
 
 	It("reports DisableIncomplete when SNR agents survive a manager-level disable", func() {
@@ -275,6 +300,5 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 			return apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: v1alpha1.SingletonName}, &v1alpha1.WorkloadAvailabilityConfig{}))
 		}).Should(BeTrue())
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "sbr-operator-controller-manager"}, &appsv1.Deployment{}))).To(BeTrue(), "explicit deletion; envtest has no garbage collector")
-		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "sbr-operator-sbr-agent-role"}, &rbacv1.ClusterRole{}))).To(BeTrue())
 	})
 })

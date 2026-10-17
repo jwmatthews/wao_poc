@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/component: node-remediation-console-plugin
+  name: node-remediation-console-plugin
+  namespace: system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: node-remediation-console-plugin
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: node-remediation-console-plugin
+    spec:
+      containers:
+      - image: console-plugin:latest
+        name: node-remediation-console-plugin
+        ports:
+        - containerPort: 9443
+          name: nrc-server
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 10m
+            memory: 50Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        livenessProbe:
+          tcpSocket:
+            port: 9443
+          periodSeconds: 10
+          timeoutSeconds: 3
+        readinessProbe:
+          tcpSocket:
+            port: 9443
+          periodSeconds: 5
+          timeoutSeconds: 3
+        startupProbe:
+          tcpSocket:
+            port: 9443
+          failureThreshold: 12
+          periodSeconds: 5
+        lifecycle:
+          postStart:
+            exec:
+              command: ["/bin/true"]
+          preStop:
+            exec:
+              command: ["sleep", "5"]
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /var/serving-cert
+          name: nrc-plugin-cert
+          readOnly: true
+        - mountPath: /opt/app-root/etc/passwd
+          name: nrc-nss-passwd
+          subPath: passwd
+        - mountPath: /var/log/nginx
+          name: nrc-nginx-log
+        - mountPath: /var/lib/nginx/tmp
+          name: nrc-nginx-tmp
+        - mountPath: /run
+          name: nrc-nginx-run
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: console-plugin
+      volumes:
+      - name: nrc-plugin-cert
+        secret:
+          defaultMode: 420
+          secretName: nrc-plugin-cert
+      - name: nrc-nss-passwd
+        emptyDir: {}
+      - name: nrc-nginx-log
+        emptyDir: {}
+      - name: nrc-nginx-tmp
+        emptyDir: {}
+      - name: nrc-nginx-run
+        emptyDir: {}

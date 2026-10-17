@@ -1,67 +1,66 @@
-# Snapshot of published upstream medik8s bundles and operands. Everything is pinned by digest.
-# NHC uses v5.8.0 because its latest tag is older; the other bundles use latest.
+# Upstream medik8s builds of the six components WAO installs. Everything is pinned by digest.
 #
-# bundle: the published OLM bundle image the operand manifests are extracted from.
-# images: "upstream" is the reference in that bundle CSV; "pinned" is the same
-#   image resolved by digest at resolvedAt. The renderer replaces upstream with pinned.
-# source: upstream source repository; the snapshot version does not imply a Git tag.
-# Floating tags are resolved only when deliberately refreshing this file.
-resolvedAt: '2026-10-16T19:11:31Z'
+# tag: the image tag the snapshot was resolved from: `latest` (post-submit main build) or a
+#   release tag. commit: the git commit the published operator image was built from, read from
+#   the binary's embedded version.GitCommit by hack/image-commit.sh. The manifests under
+#   config/operands/<k>/upstream are copied from this commit, so they describe the image that runs.
+# images: "tagged" is the tag reference written into the embedded runtime manifests; "pinned"
+#   is the same image by digest. The operator Deployment carries the pinned digests as
+#   RELATED_IMAGE_* and the renderer substitutes them for the tagged references.
+#
+# Update with `make update-release-set` (OPERAND_TAG defaults to latest, the main build), or
+# `make update-release-set OPERAND_TAG=release`, `OPERAND_TAG=v0.12.0`, `NHC_TAG=...`.
+# `OPERAND_TAG=pinned` keeps every tag and only re-resolves digests and commits.
+resolvedAt: '2026-10-17T23:03:38Z'
 components:
   nhc:
-    version: v5.8.0
-    source: https://github.com/medik8s/node-healthcheck-operator
-    # Resolved from quay.io/medik8s/node-healthcheck-operator-bundle:v5.8.0
-    bundle: quay.io/medik8s/node-healthcheck-operator-bundle@sha256:adb56ef51c843b7ff9de2021ec4ceb138bbe2c549cc1412fb02526ec4dd11fb6
+    repo: https://github.com/medik8s/node-healthcheck-operator
+    tag: latest
+    commit: "c6d9ef2dc960cf0af04ce1b89cf1ee5153fe5fd7"
     images:
       RELATED_IMAGE_NHC_MANAGER:
-        upstream: quay.io/medik8s/node-healthcheck-operator:v5.8.0
-        pinned: quay.io/medik8s/node-healthcheck-operator@sha256:663b732436fb0da81098502d6844321ec9d098b89186bbef47ee1ac3debb3ec4
+        tagged: quay.io/medik8s/node-healthcheck-operator:latest
+        pinned: quay.io/medik8s/node-healthcheck-operator@sha256:fd290f730d5a6fc8fdb3aac8e528d3932a1186027606387c9d69a7db2783b3a5
   snr:
-    version: v5.8.0
-    source: https://github.com/medik8s/self-node-remediation
-    # Resolved from quay.io/medik8s/self-node-remediation-operator-bundle:latest
-    bundle: quay.io/medik8s/self-node-remediation-operator-bundle@sha256:75239094f2987d3f03439e3a344fa2a59c7433d771c2bc34a7940c9544b4da8c
+    repo: https://github.com/medik8s/self-node-remediation
+    tag: latest
+    commit: "7baef3b210ea5d69dd08c1def063fb5a57eb2c21"
     images:
       RELATED_IMAGE_SNR_MANAGER:
-        upstream: quay.io/medik8s/self-node-remediation-operator:latest
+        tagged: quay.io/medik8s/self-node-remediation-operator:latest
         pinned: quay.io/medik8s/self-node-remediation-operator@sha256:c75e3787fd8c3ca373d7d39fd889af2703c0c47a42a07418f5ff215912e37c11
   sbr:
-    version: v5.8.0
-    source: https://github.com/medik8s/storage-based-remediation
-    # Resolved from quay.io/medik8s/storage-based-remediation-operator-bundle:latest
-    bundle: quay.io/medik8s/storage-based-remediation-operator-bundle@sha256:65ee9f425d7931c43c97bb0fbd96119627d6ff0e6126abe26ddd901d61be19ab
+    repo: https://github.com/medik8s/storage-based-remediation
+    tag: latest
+    commit: "50d20b524e1b16fe895e30f7bd52c868a569b125"
     images:
       RELATED_IMAGE_SBR_MANAGER:
-        upstream: quay.io/medik8s/storage-based-remediation-operator:latest
+        tagged: quay.io/medik8s/storage-based-remediation-operator:latest
         pinned: quay.io/medik8s/storage-based-remediation-operator@sha256:ebb3f7550968953c6a0c2f56ed2e1b5b57462fcf32d383d67ff25e0ca77fd718
       RELATED_IMAGE_SBR_AGENT:
-        upstream: quay.io/medik8s/storage-based-remediation-agent:latest
+        tagged: quay.io/medik8s/storage-based-remediation-agent:latest
         pinned: quay.io/medik8s/storage-based-remediation-agent@sha256:1689514e537d1f2dbc19f27047fee80fa755e74f5c263eecb900500b49b92f56
   far:
-    version: v5.8.0
-    source: https://github.com/medik8s/fence-agents-remediation
-    # Resolved from quay.io/medik8s/fence-agents-remediation-operator-bundle:latest
-    bundle: quay.io/medik8s/fence-agents-remediation-operator-bundle@sha256:a1b9c8c61cbce89202d16047bce95ddce665c66ce53c56f6a724212916d4b434
+    repo: https://github.com/medik8s/fence-agents-remediation
+    tag: latest
+    commit: "f3e85bf5d104ea7d96bf95b701ad3d58e3aea3fc"
     images:
       RELATED_IMAGE_FAR_MANAGER:
-        upstream: quay.io/medik8s/fence-agents-remediation-operator:latest
+        tagged: quay.io/medik8s/fence-agents-remediation-operator:latest
         pinned: quay.io/medik8s/fence-agents-remediation-operator@sha256:d1289cfa144169d1c8af67c03129c1cf6a5283906c10b481ceb1d299f7bb5d4c
   mdr:
-    version: v5.8.0
-    source: https://github.com/medik8s/machine-deletion-remediation
-    # Resolved from quay.io/medik8s/machine-deletion-remediation-operator-bundle:latest
-    bundle: quay.io/medik8s/machine-deletion-remediation-operator-bundle@sha256:15520a16dff3990209dacba9e5c9104f845cff108c6b640a593f054954378bb0
+    repo: https://github.com/medik8s/machine-deletion-remediation
+    tag: latest
+    commit: "51dd254fd825cfc28e0f55e3c8164b4b3e048bfb"
     images:
       RELATED_IMAGE_MDR_MANAGER:
-        upstream: quay.io/medik8s/machine-deletion-remediation-operator:latest
+        tagged: quay.io/medik8s/machine-deletion-remediation-operator:latest
         pinned: quay.io/medik8s/machine-deletion-remediation-operator@sha256:421090014368c5c29bd96a6e99a4062570de9d3dbfe91cb12d3fd0a9420b1b01
   nmo:
-    version: v5.8.0
-    source: https://github.com/medik8s/node-maintenance-operator
-    # Resolved from quay.io/medik8s/node-maintenance-operator-bundle:latest
-    bundle: quay.io/medik8s/node-maintenance-operator-bundle@sha256:5162d04c4d784c773e61bf9208be6ce01a3193a1dd4d0cc62dcb5cdf32ea2223
+    repo: https://github.com/medik8s/node-maintenance-operator
+    tag: latest
+    commit: "dce77e869f202b51a5885078d51baf9b98cd2b66"
     images:
       RELATED_IMAGE_NMO_MANAGER:
-        upstream: quay.io/medik8s/node-maintenance-operator:latest
+        tagged: quay.io/medik8s/node-maintenance-operator:latest
         pinned: quay.io/medik8s/node-maintenance-operator@sha256:d0ae352a382193ed587b9fe6c4d1b24586ca007f98417e8ebae33b31f540c235

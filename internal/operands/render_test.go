@@ -1,7 +1,6 @@
 package operands_test
 
 import (
-	"reflect"
 	"strings"
 	"testing"
 
@@ -46,7 +45,7 @@ func TestRenderNHCReplacesNamespaceImagesAndLabels(t *testing.T) {
 		t.Fatalf("manager image = %q", image)
 	}
 	if strings.Contains(image, def.Images[0].Original) {
-		t.Fatalf("upstream tag was not replaced: %q", image)
+		t.Fatalf("tagged image was not replaced: %q", image)
 	}
 	for _, o := range objs {
 		if o.GetLabels()[operands.LabelManagedBy] != operands.ManagedByValue || o.GetLabels()[operands.LabelComponent] != def.Key {
@@ -64,7 +63,7 @@ func TestRenderNHCReplacesNamespaceImagesAndLabels(t *testing.T) {
 	}
 }
 
-func TestRenderOrdersRBACBeforeWorkloadsAndWebhooksLast(t *testing.T) {
+func TestRenderOrdersServicesBeforeDeploymentsAndWebhooksLast(t *testing.T) {
 	def, _ := components.ByKey(v1alpha1.ComponentKeySelfNodeRemediation)
 	objs, err := operands.Render(def, testNamespace, testImages())
 	if err != nil {
@@ -76,12 +75,92 @@ func TestRenderOrdersRBACBeforeWorkloadsAndWebhooksLast(t *testing.T) {
 			pos[o.GetKind()] = i
 		}
 	}
-	if pos["ServiceAccount"] >= pos["ClusterRole"] ||
-		pos["ClusterRole"] >= pos["ClusterRoleBinding"] ||
-		pos["Service"] >= pos["Deployment"] ||
+	if pos["Service"] >= pos["Deployment"] ||
 		pos["Deployment"] >= pos["ValidatingWebhookConfiguration"] ||
 		pos["Deployment"] >= pos["MutatingWebhookConfiguration"] {
 		t.Fatalf("unexpected order: %v", pos)
+	}
+}
+
+// RBAC is created by OLM from the WAO CSV (config/operands/<k>/rbac); the renderer must never emit it.
+func TestRenderEmitsNoRBAC(t *testing.T) {
+	for _, def := range components.All() {
+		objs, err := operands.Render(def, testNamespace, testImages())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(objs) == 0 {
+			t.Fatalf("%s: nothing rendered", def.Key)
+		}
+		for _, o := range objs {
+			switch o.GetKind() {
+			case "ServiceAccount", "Role", "RoleBinding", "ClusterRole", "ClusterRoleBinding":
+				t.Errorf("%s: rendered %s/%s; RBAC belongs to the CSV", def.Key, o.GetKind(), o.GetName())
+			}
+		}
+	}
+}
+
+// Design brief D10: all six managers share a namespace, so every pod template and every Service
+// selector carries the component label; otherwise MDR's metrics Service would select every manager.
+func TestRenderLabelsPodTemplatesAndServiceSelectors(t *testing.T) {
+	for _, def := range components.All() {
+		objs, err := operands.Render(def, testNamespace, testImages())
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, o := range objs {
+			switch o.GetKind() {
+			case "Deployment":
+				labels, _, _ := unstructured.NestedStringMap(o.Object, "spec", "template", "metadata", "labels")
+				if labels[operands.LabelComponent] != def.Key {
+					t.Errorf("%s: Deployment/%s pod template label = %q", def.Key, o.GetName(), labels[operands.LabelComponent])
+				}
+			case "Service":
+				sel, _, _ := unstructured.NestedStringMap(o.Object, "spec", "selector")
+				if sel[operands.LabelComponent] != def.Key {
+					t.Errorf("%s: Service/%s selector = %v", def.Key, o.GetName(), sel)
+				}
+			}
+		}
+	}
+}
+
+// Webhook operands mount exactly one service-ca certificate volume at the controller-runtime path.
+func TestRenderWebhookOperandsMountOneCertVolume(t *testing.T) {
+	for _, def := range components.All() {
+		if len(def.Webhooks) == 0 {
+			continue
+		}
+		objs, err := operands.Render(def, testNamespace, testImages())
+		if err != nil {
+			t.Fatal(err)
+		}
+		dep := find(t, objs, "Deployment", def.Deployments[0])
+		containers, _, _ := unstructured.NestedSlice(dep.Object, "spec", "template", "spec", "containers")
+		mounts := 0
+		for _, c := range containers {
+			vms, _, _ := unstructured.NestedSlice(c.(map[string]interface{}), "volumeMounts")
+			for _, vm := range vms {
+				if vm.(map[string]interface{})["mountPath"] == "/tmp/k8s-webhook-server/serving-certs" {
+					mounts++
+				}
+			}
+		}
+		if mounts != 1 {
+			t.Errorf("%s: %d mounts at the serving-certs path, want 1", def.Key, mounts)
+		}
+		vols, _, _ := unstructured.NestedSlice(dep.Object, "spec", "template", "spec", "volumes")
+		certVols := 0
+		for _, v := range vols {
+			secret, _, _ := unstructured.NestedString(v.(map[string]interface{}), "secret", "secretName")
+			if strings.HasSuffix(secret, "-webhook-server-cert") {
+				certVols++
+			}
+		}
+		if certVols != 1 {
+			t.Errorf("%s: %d cert volumes, want 1 (volumes: %v)", def.Key, certVols, vols)
+		}
 	}
 }
 
@@ -106,11 +185,6 @@ func TestRenderSNRReplacesAgentImageEnv(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("SELF_NODE_REMEDIATION_IMAGE env not rendered")
-	}
-	crb := find(t, objs, "ClusterRoleBinding", "self-node-remediation-controller-manager")
-	subjects, _, _ := unstructured.NestedSlice(crb.Object, "subjects")
-	if subjects[0].(map[string]interface{})["namespace"] != testNamespace {
-		t.Fatalf("subject namespace not rewritten: %v", subjects[0])
 	}
 }
 
@@ -148,54 +222,11 @@ func TestRenderReplacesEveryUpstreamImage(t *testing.T) {
 			b, _ := o.MarshalJSON()
 			for _, img := range def.Images {
 				if strings.Contains(string(b), img.Original) {
-					t.Errorf("%s: %s/%s still references upstream image %s", def.Key, o.GetKind(), o.GetName(), img.Original)
+					t.Errorf("%s: %s/%s still references tagged image %s", def.Key, o.GetKind(), o.GetName(), img.Original)
 				}
 			}
 			if strings.Contains(string(b), "quay.io/medik8s/") {
-				t.Errorf("%s: %s/%s references an unbound upstream image", def.Key, o.GetKind(), o.GetName())
-			}
-		}
-	}
-}
-
-// olmNamespacesRule is the rule OLM appends to the cluster-wide copy of a CSV's namespaced permissions.
-var olmNamespacesRule = map[string]interface{}{
-	"apiGroups": []interface{}{""},
-	"resources": []interface{}{"namespaces"},
-	"verbs":     []interface{}{"get", "list", "watch"},
-}
-
-// OLM grants a CSV's namespaced permissions cluster-wide for an AllNamespaces OperatorGroup and appends
-// get/list/watch on namespaces; every component's manager ServiceAccount must get the same ClusterRole and binding.
-func TestRenderGrantsCSVNamespacedPermissionsClusterWide(t *testing.T) {
-	for _, def := range components.All() {
-		objs, err := operands.Render(def, "wao-ns", testImages())
-		if err != nil {
-			t.Fatal(err)
-		}
-		sa := def.Deployments[0]
-		name := sa + "-all-namespaces"
-		role := find(t, objs, "Role", sa)
-		cr := find(t, objs, "ClusterRole", name)
-		roleRules, _, _ := unstructured.NestedSlice(role.Object, "rules")
-		crRules, _, _ := unstructured.NestedSlice(cr.Object, "rules")
-		want := append(append([]interface{}{}, roleRules...), olmNamespacesRule)
-		if len(roleRules) == 0 || !reflect.DeepEqual(crRules, want) {
-			t.Errorf("%s: ClusterRole/%s rules %v, want Role/%s rules plus OLM's namespaces rule %v", def.Key, name, crRules, sa, want)
-		}
-		crb := find(t, objs, "ClusterRoleBinding", name)
-		ref, _, _ := unstructured.NestedStringMap(crb.Object, "roleRef")
-		subjects, _, _ := unstructured.NestedSlice(crb.Object, "subjects")
-		if ref["kind"] != "ClusterRole" || ref["name"] != name || len(subjects) != 1 {
-			t.Fatalf("%s: ClusterRoleBinding/%s = %v %v", def.Key, name, ref, subjects)
-		}
-		s := subjects[0].(map[string]interface{})
-		if s["kind"] != "ServiceAccount" || s["name"] != sa || s["namespace"] != "wao-ns" {
-			t.Errorf("%s: ClusterRoleBinding/%s subject = %v", def.Key, name, s)
-		}
-		for _, o := range []*unstructured.Unstructured{cr, crb} {
-			if o.GetLabels()[operands.LabelManagedBy] != operands.ManagedByValue || o.GetLabels()[operands.LabelComponent] != def.Key {
-				t.Errorf("%s/%s missing WAO labels: %v", o.GetKind(), o.GetName(), o.GetLabels())
+				t.Errorf("%s: %s/%s references an unbound tagged image", def.Key, o.GetKind(), o.GetName())
 			}
 		}
 	}

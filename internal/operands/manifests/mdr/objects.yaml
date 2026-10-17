@@ -1,0 +1,99 @@
+apiVersion: v1
+data:
+  controller_manager_config.yaml: |
+    apiVersion: controller-runtime.sigs.k8s.io/v1alpha1
+    kind: ControllerManagerConfig
+    health:
+      healthProbeBindAddress: :8081
+    metrics:
+      bindAddress: 127.0.0.1:8080
+    webhook:
+      port: 9443
+    leaderElection:
+      leaderElect: true
+      resourceName: 285d4098.example.com
+kind: ConfigMap
+metadata:
+  labels:
+    workloadavailability.medik8s.io/component: machineDeletionRemediation
+  name: machine-deletion-remediation-manager-config
+  namespace: __WAO_NAMESPACE__
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    control-plane: controller-manager
+    workloadavailability.medik8s.io/component: machineDeletionRemediation
+  name: machine-deletion-remediation-controller-manager-metrics-service
+  namespace: __WAO_NAMESPACE__
+spec:
+  ports:
+    - name: https
+      port: 8443
+      targetPort: https
+  selector:
+    control-plane: controller-manager
+    workloadavailability.medik8s.io/component: machineDeletionRemediation
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    control-plane: controller-manager
+    workloadavailability.medik8s.io/component: machineDeletionRemediation
+  name: machine-deletion-remediation-controller-manager
+  namespace: __WAO_NAMESPACE__
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+        workloadavailability.medik8s.io/component: machineDeletionRemediation
+    spec:
+      containers:
+        - args:
+            - --health-probe-bind-address=:8081
+            - --metrics-bind-address=:8443
+            - --leader-elect
+          command:
+            - /manager
+          image: quay.io/medik8s/machine-deletion-remediation-operator:latest
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          name: manager
+          ports:
+            - containerPort: 8443
+              name: https
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: 100m
+              memory: 30Mi
+            requests:
+              cpu: 100m
+              memory: 20Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: machine-deletion-remediation-controller-manager
+      terminationGracePeriodSeconds: 10

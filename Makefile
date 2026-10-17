@@ -40,7 +40,7 @@ YQ_VERSION = v4.53.2
 
 BLUE_ICON_PATH = ./config/assets/medik8s_blue_icon.png
 
-# VERSION defines the project version for the bundle. 
+# VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=5.8.1)
@@ -88,6 +88,15 @@ ifneq ($(origin DEFAULT_CHANNEL), undefined)
 BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
+# Operand ServiceAccounts whose Roles and ClusterRoles operator-sdk folds into the CSV. A name
+# missing here silently becomes dozens of standalone bundle files; verify-operand-manifests checks it.
+OPERAND_SERVICE_ACCOUNTS := node-healthcheck-controller-manager,self-node-remediation-controller-manager,sbr-operator-controller-manager,fence-agents-remediation-controller-manager,machine-deletion-remediation-controller-manager,node-maintenance-operator-controller-manager
+# Operand ServiceAccounts deliberately NOT folded: operator-sdk emits their ServiceAccount, ClusterRole
+# and ClusterRoleBinding as standalone bundle objects with their upstream names, as upstream's own
+# bundle does. The SBR manager creates ClusterRoleBindings to ClusterRole sbr-operator-sbr-agent-role
+# by name at runtime; folding it into the CSV would give it an OLM-generated name and leave the
+# binding dangling. verify-operand-manifests checks both lists.
+OPERAND_STANDALONE_SERVICE_ACCOUNTS := sbr-operator-sbr-agent
 MANIFESTS_DIR ?= config/manifests
 
 # IMAGE_REGISTRY used to indicate the registery/group for the operator and bundle
@@ -147,51 +156,76 @@ help: ## Display this help.
 
 ##@ Operands
 
-PYTHON ?= .venv/bin/python
-BUNDLE_CACHE ?= .cache/bundles
+OPERANDS := nhc snr sbr far mdr nmo
+# Checkouts used by update-operand-manifests. Override all with OPERAND_SRC_DIR or one with NHC_PATH etc.
+OPERAND_SRC_DIR ?= .cache/operands
+# Tag that update-release-set and bump-operands resolve for every component:
+#   latest   the post-submit main build (default; the committed snapshot tracks main)
+#   release  the latest GitHub release of each repo
+#   pinned   keep the tag already in release-set.yaml and only re-resolve digests and commits
+#   <tag>    an explicit tag such as v0.12.0
+# Override one component with NHC_TAG=..., SNR_TAG=..., etc. Note that upstream releases can lag
+# files the config/operands wrappers rely on (for example SBR's privileged SCC ClusterRole).
+OPERAND_TAG ?= latest
 
-.PHONY: python-env
-python-env: ## Prepare the default Python environment and its pinned dependencies.
+.PHONY: update-release-set
+update-release-set: yq ## Rewrite release-set.yaml from published images (OPERAND_TAG=latest|release|pinned|<tag>, default latest; or NHC_TAG=...).
+	YQ=$(YQ) OPERAND_TAG=$(OPERAND_TAG) hack/update-release-set.sh
 
-# A custom interpreter is managed by the caller; only bootstrap our local venv.
-ifeq ($(PYTHON),.venv/bin/python)
-python-env: .venv/.requirements-installed
+.PHONY: update-operand-manifests
+update-operand-manifests: yq ## Copy upstream config/ at the commits in release-set.yaml into config/operands/<k>/upstream, then render.
+	YQ=$(YQ) OPERAND_SRC_DIR=$(OPERAND_SRC_DIR) hack/update-operand-manifests.sh
 
-.venv/bin/python:
-	python3 -m venv .venv
+# Kinds the Go renderer applies at enable time. Everything else in the upstream default build
+# (Namespace, CRDs, RBAC) is either shipped in the CSV or not WAO's to create.
+RUNTIME_KINDS := Deployment Service ConfigMap ValidatingWebhookConfiguration MutatingWebhookConfiguration
+RUNTIME_FILTER := select($(foreach k,$(RUNTIME_KINDS),.kind == "$(k)" or) false)
 
-.venv/.requirements-installed: hack/requirements.txt .venv/bin/python
-	$(PYTHON) -m pip install -r hack/requirements.txt
-	touch $@
-endif
+.PHONY: operand-manifests
+operand-manifests: kustomize yq ## Generate runtime manifests, Go image bindings, CRD list and RELATED_IMAGE_* (offline).
+	YQ=$(YQ) hack/generate-image-bindings.sh
+	@set -e; for k in $(OPERANDS); do \
+	  for env in $$($(YQ) ".components.$$k.images | keys | .[]" release-set.yaml); do \
+	    tagged=$$($(YQ) ".components.$$k.images.$$env.tagged" release-set.yaml); \
+	    case $$env in \
+	      RELATED_IMAGE_SBR_AGENT) $(YQ) -i "(.spec.template.spec.containers[] | select(.name == \"manager\") | .env[] | select(.name == \"RELATED_IMAGE_AGENT\") | .value) = \"$$tagged\"" config/operands/sbr/runtime/agent_image_env_patch.yaml ;; \
+	      *) name=$$($(YQ) '.images[0].name' config/operands/$$k/runtime/kustomization.yaml); \
+	         (cd config/operands/$$k/runtime && $(KUSTOMIZE) edit set image $$name=$$tagged) ;; \
+	    esac; \
+	    if [ $$k = snr ]; then $(YQ) -i "(.spec.template.spec.containers[] | select(.name == \"manager\") | .env[] | select(.name == \"SELF_NODE_REMEDIATION_IMAGE\") | .value) = \"$$tagged\"" config/operands/snr/runtime/manager_image_env_patch.yaml; fi; \
+	  done; \
+	  mkdir -p internal/operands/manifests/$$k; \
+	  $(KUSTOMIZE) build config/operands/$$k/runtime | $(YQ) '$(RUNTIME_FILTER)' > internal/operands/manifests/$$k/objects.yaml; \
+	  test -s internal/operands/manifests/$$k/objects.yaml; \
+	  if grep -q '\$${' internal/operands/manifests/$$k/objects.yaml; then echo "$$k: unreplaced placeholder"; exit 1; fi; \
+	done
+	@{ echo '# Generated by make operand-manifests: the operand CRDs shipped in the WAO CSV (kustomize forbids file references outside its root, so it points at the upstream crd directories).'; \
+	   echo 'apiVersion: kustomize.config.k8s.io/v1beta1'; echo 'kind: Kustomization'; echo 'resources:'; \
+	   for k in $(OPERANDS); do echo "- ../$$k/upstream/config/crd"; done; } > config/operands/crd/kustomization.yaml
+	@set -e; for env in $$($(YQ) '[.components[].images | keys | .[]] | .[]' release-set.yaml); do \
+	  img=$$($(YQ) ".components[].images.$$env.pinned // \"\"" release-set.yaml | grep . || true); \
+	  if ! echo "$$img" | grep -Eq '^.+@sha256:[0-9a-f]{64}$$'; then echo "operand-manifests: release-set.yaml has no pinned digest for $$env"; exit 1; fi; \
+	  cur=$$($(YQ) "select(.kind == \"Deployment\") | .spec.template.spec.containers[0].env[] | select(.name == \"$$env\") | .value" config/manager/manager.yaml | grep . || echo __MISSING__); \
+	  if [ "$$cur" = __MISSING__ ]; then echo "operand-manifests: $$env not found in config/manager/manager.yaml"; exit 1; fi; \
+	  [ "$$cur" = "$$img" ] || \
+	  $(YQ) -i "(select(.kind == \"Deployment\") | .spec.template.spec.containers[0].env[] | select(.name == \"$$env\") | .value) = \"$$img\"" config/manager/manager.yaml; \
+	done
 
-# Order-only prerequisites keep environment setup out of target freshness checks.
-bundles operand-manifests operand-manifests-check bundle-check catalog-configmap test-offline: | python-env
+.PHONY: verify-operand-manifests
+verify-operand-manifests: kustomize yq ## Offline check that config/operands, release-set.yaml, manager.yaml and the bundle shape agree (CI). Bundle freshness: make test (verify-no-changes) or VERIFY_BUNDLE=1.
+	YQ=$(YQ) KUSTOMIZE=$(KUSTOMIZE) hack/verify-operand-manifests.sh
 
-.PHONY: bundles
-bundles: ## Fetch the pinned upstream bundles from release-set.yaml into .cache/bundles.
-	$(PYTHON) hack/fetch-bundles.py --release-set release-set.yaml --out $(BUNDLE_CACHE)
-
-EXTRACT = $(PYTHON) hack/extract-operand-manifests.py --bundles $(BUNDLE_CACHE) --release-set release-set.yaml --out internal/operands/manifests --crd-out config/crd/bases --rbac-out config/rbac/operand_union_role.yaml
-.PHONY: operand-manifests operand-manifests-check
-operand-manifests: ## Regenerate operand manifests, component CRDs and the union role from the fetched bundles.
-	$(EXTRACT)
-operand-manifests-check: ## Verify the committed operand manifests, CRDs and union role are current.
-	$(EXTRACT) --check
-
-.PHONY: bundle-check
-bundle-check: ## Verify the generated bundle against the POC contract and release-set.yaml.
-	$(PYTHON) hack/check-bundle.py bundle release-set.yaml
-
-CATALOG_NS ?= openshift-marketplace
-.PHONY: catalog-configmap
-catalog-configmap: bundle-check ## Render the POC ConfigMap-backed CatalogSource into dist/wao-poc-catalog.yaml.
-	mkdir -p dist
-	$(PYTHON) hack/configmap-catalog.py --bundle bundle --package $(OPERATOR_NAME) --channel $(or $(DEFAULT_CHANNEL),alpha) --name wao-poc-catalog --namespace $(CATALOG_NS) > dist/wao-poc-catalog.yaml
+.PHONY: bump-operands
+bump-operands: ## Resolve images (OPERAND_TAG, default latest), copy source config, generate manifests and Go bindings, then verify consistency.
+	$(MAKE) update-release-set
+	$(MAKE) update-operand-manifests
+	$(MAKE) verify-operand-manifests
+	go test ./internal/components ./internal/operands -count=1
+	@#git status --short release-set.yaml config/operands config/manager internal/operands internal/components/zz_generated.images.go
 
 .PHONY: test-offline
-test-offline: ## Run every offline Python test and syntax-check the live-cluster scripts (no cluster needed).
-	$(PYTHON) -m unittest hack/extract_operand_manifests_test.py hack/configmap_catalog_test.py hack/e2e_runner_test.py hack/build_test.py
+test-offline: verify-operand-manifests ## Offline checks: operand manifests, bundle shape, and the operand pipeline regression tests (no cluster, no network).
+	go test ./test/offline/ -count=1
 
 
 ##@ Development
@@ -249,9 +283,6 @@ test-no-verify-changes: go-verify manifests generate fmt vet test-imports envtes
 
 .PHONY: e2e-test
 e2e-test: ## Run end to end tests against an already deployed operator
-	@# KUBECONFIG must be set to the cluster, and MDR needs to be deployed already
-	@#@test -n "${KUBECONFIG}" -o -r ${HOME}/.kube/config || (echo "Failed to find kubeconfig in ~/.kube/config or no KUBECONFIG set"; exit 1)
-	@#go test ./e2e -coverprofile cover.out -v -timeout 25m -ginkgo.vv  ${TEST_OPS}
 	@echo "not yet implemented"
 
 ##@ Build
@@ -373,7 +404,8 @@ bundle: verify-previous-version verify-skip-range ## Generate bundle manifests a
 	$(MAKE) manifests kustomize operator-sdk
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build $(MANIFESTS_DIR) | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	# LoadRestrictionsNone: config/operands/sbr/rbac lists an upstream file that upstream's own kustomization omits.
+	$(KUSTOMIZE) build --load-restrictor LoadRestrictionsNone $(MANIFESTS_DIR) | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) --extra-service-accounts $(OPERAND_SERVICE_ACCOUNTS) $(BUNDLE_METADATA_OPTS)
 	$(MAKE) bundle-validate
 
 .PHONY: bundle-k8s
@@ -471,56 +503,43 @@ bundle-run-update: operator-sdk ## Upgrade bundle image
 bundle-cleanup: operator-sdk ## Remove bundle installed via bundle-run
 	$(OPERATOR_SDK) -n $(OPERATOR_NAMESPACE) cleanup $(OPERATOR_NAME)
 
-# Build a file-based catalog image
-# https://docs.openshift.com/container-platform/4.14/operators/admin/olm-managing-custom-catalogs.html#olm-managing-custom-catalogs-fb
-# NOTE: CATALOG_DIR and CATALOG_DOCKERFILE items won't be deleted in case of recipe's failure
+# File-based catalog (FBC). https://olm.operatorframework.io/docs/reference/file-based-catalogs/
+# catalog-fbc renders the local ./bundle directory, so it needs no registry access, and stamps
+# BUNDLE_IMG into the olm.bundle blob: that is the reference OLM pulls at install time.
+# NOTE: CATALOG_DIR and CATALOG_DOCKERFILE are left in place if a recipe fails, for inspection.
 CATALOG_DIR := catalog
 CATALOG_DOCKERFILE := ${CATALOG_DIR}.Dockerfile
 CATALOG_INDEX := $(CATALOG_DIR)/index.yaml
 
-# Add olm.channel entries for each channel in CHANNELS.
-# Keep the default candidate's upgrade edge in the catalog.
-.PHONY: add_channel_entry_for_the_bundle
-add_channel_entry_for_the_bundle: verify-previous-version verify-skip-range
+.PHONY: catalog-fbc
+catalog-fbc: opm yq verify-previous-version verify-skip-range ## Render ./bundle into a validated FBC under catalog/ for BUNDLE_IMG.
+	rm -rf ${CATALOG_DIR} ${CATALOG_DOCKERFILE}
+	mkdir -p ${CATALOG_DIR}
+	$(OPM) generate dockerfile ${CATALOG_DIR}
+	$(OPM) init ${OPERATOR_NAME} --default-channel=${DEFAULT_CHANNEL} --description=./README.md --icon="${BLUE_ICON_PATH}" --output yaml > ${CATALOG_INDEX}
+	$(OPM) render ./bundle --output yaml | $(YQ) '(select(.schema == "olm.bundle") | .image) = "$(BUNDLE_IMG)"' >> ${CATALOG_INDEX}
 	@for channel in $(shell echo ${CHANNELS} | tr ',' ' '); do \
-		echo "---" >> ${CATALOG_INDEX}; \
-		echo "schema: olm.channel" >> ${CATALOG_INDEX}; \
-		echo "package: ${OPERATOR_NAME}" >> ${CATALOG_INDEX}; \
-		echo "name: $$channel" >> ${CATALOG_INDEX}; \
-		echo "entries:" >> ${CATALOG_INDEX}; \
-		echo "  - name: ${OPERATOR_NAME}.v${VERSION}" >> ${CATALOG_INDEX}; \
-		\
-		if [ -n "${PREVIOUS_VERSION}" ]; then \
-			echo "    replaces: ${OPERATOR_NAME}.v${PREVIOUS_VERSION}" >> ${CATALOG_INDEX}; \
-		fi; \
-		if [ -n "${SKIP_RANGE_LOWER}" ]; then \
-			echo "    skipRange: '>=${SKIP_RANGE_LOWER} <${VERSION}'" >> ${CATALOG_INDEX}; \
-		fi; \
+		printf '%s\n' '---' 'schema: olm.channel' 'package: ${OPERATOR_NAME}' "name: $$channel" 'entries:' '  - name: ${OPERATOR_NAME}.v${VERSION}' >> ${CATALOG_INDEX}; \
+		if [ -n "${PREVIOUS_VERSION}" ]; then printf '%s\n' '    replaces: ${OPERATOR_NAME}.v${PREVIOUS_VERSION}' >> ${CATALOG_INDEX}; fi; \
+		if [ -n "${SKIP_RANGE_LOWER}" ]; then printf '%s\n' "    skipRange: '>=${SKIP_RANGE_LOWER} <${VERSION}'" >> ${CATALOG_INDEX}; fi; \
 	done
+	$(OPM) validate ${CATALOG_DIR}
+	@test "$$($(YQ) 'select(.schema == "olm.bundle") | .image' ${CATALOG_INDEX})" = "$(BUNDLE_IMG)" || { echo "catalog-fbc: bundle image not stamped"; exit 1; }
 
 .PHONY: catalog-build
-catalog-build: verify-previous-version verify-skip-range ## Build a file-based catalog image.
-	$(MAKE) opm
-	# Remove the catalog directory and Dockerfile if they exist
-	-rm -r ${CATALOG_DIR} ${CATALOG_DOCKERFILE}
-	@mkdir -p ${CATALOG_DIR}
-	$(OPM) generate dockerfile ${CATALOG_DIR}
-	$(OPM) init ${OPERATOR_NAME} \
-		--default-channel=${DEFAULT_CHANNEL} \
-		--description=./README.md \
-		--icon="${BLUE_ICON_PATH}" \
-		--output yaml \
-		> ${CATALOG_INDEX}
-	$(OPM) render ${BUNDLE_IMG} --output yaml >> ${CATALOG_INDEX}
-	$(MAKE) add_channel_entry_for_the_bundle
-	$(OPM) validate ${CATALOG_DIR}
+catalog-build: catalog-fbc ## Build the FBC image CATALOG_IMG from catalog/ (needs CONTAINER_TOOL).
 	$(CONTAINER_TOOL) build . -f ${CATALOG_DOCKERFILE} -t ${CATALOG_IMG}
-	# Clean up the catalog directory and Dockerfile
-	rm -r ${CATALOG_DIR} ${CATALOG_DOCKERFILE}
 
 .PHONY: catalog-push
-catalog-push: ## Push a catalog image.
+catalog-push: ## Push the catalog image.
 	$(CONTAINER_TOOL) push $(CATALOG_IMG)
+
+.PHONY: catalog-source
+catalog-source: yq ## Write dist/catalogsource.yaml pointing at CATALOG_IMG.
+	@test -n "$(CATALOG_IMG)" || { echo "catalog-source: set CATALOG_IMG"; exit 1; }
+	mkdir -p dist
+	$(YQ) '.spec.image = "$(CATALOG_IMG)"' config/catalog/catalogsource.yaml > dist/catalogsource.yaml
+	@grep -q CATALOG_IMG_PLACEHOLDER dist/catalogsource.yaml && { echo "catalog-source: placeholder left"; exit 1; } || true
 
 ##@ Targets used by CI
 

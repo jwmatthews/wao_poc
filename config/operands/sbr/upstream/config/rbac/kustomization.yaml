@@ -1,0 +1,53 @@
+resources:
+# SBR Operator RBAC - use generated role with kubebuilder RBAC markers
+- sbr_operator_service_account.yaml
+- role.yaml
+- sbr_operator_role_binding.yaml
+
+# SBR Agent RBAC - minimal permissions for agent operations
+- sbr_agent_service_account.yaml
+- sbr_agent_generated_role.yaml
+- sbr_agent_role_binding.yaml
+
+# Required permissions for NHC
+- external_remediation_clusterrole.yaml
+
+# Legacy operator RBAC (kept for backward compatibility)
+# All RBAC will be applied under this service account in
+# the deployment namespace. You may comment out this resource
+# if your manager will use a service account that exists at
+# runtime. Be sure to update RoleBinding and ClusterRoleBinding
+# subjects if changing service account names.
+# Temporarily disabled to avoid conflicts with sbr_operator_service_account.yaml
+# - service_account.yaml
+# - role.yaml
+# - role_binding.yaml
+
+# Leader election RBAC for operator high availability
+- leader_election_role.yaml
+- leader_election_role_binding.yaml
+
+# The following RBAC configurations are used to protect
+# the metrics endpoint with authn/authz. These configurations
+# ensure that only authorized users and service accounts
+# can access the metrics endpoint. Comment the following
+# permissions if you want to disable this protection.
+# More info: https://book.kubebuilder.io/reference/metrics.html
+- metrics_auth_role.yaml
+- metrics_auth_role_binding.yaml
+- metrics_reader_role.yaml
+
+# For each CRD, "Admin", "Editor" and "Viewer" roles are scaffolded by
+# default, aiding admins in cluster management. Those roles are
+# not used by the sbr-operator itself. You can comment the following lines
+# if you do not want those helpers be installed with your Project.
+- storagebasedremediationtemplate_admin_role.yaml
+- storagebasedremediationtemplate_editor_role.yaml
+- storagebasedremediationtemplate_viewer_role.yaml
+- storagebasedremediation_admin_role.yaml
+- storagebasedremediation_editor_role.yaml
+- storagebasedremediation_viewer_role.yaml
+- storagebasedremediationconfig_admin_role.yaml
+- storagebasedremediationconfig_editor_role.yaml
+- storagebasedremediationconfig_viewer_role.yaml
+

@@ -10,7 +10,7 @@ func MDR() Definition {
 		Key: v1alpha1.ComponentKeyMachineDeletionRemediation, ShortName: "mdr", ManifestDir: "mdr",
 		Deployments: []string{"machine-deletion-remediation-controller-manager"},
 		Images: []ImageBinding{
-			{Env: images.MDRManager, Original: "quay.io/medik8s/machine-deletion-remediation-operator:latest"},
+			imageBinding(images.MDRManager),
 		},
 		ManagedKinds: []ResourceKind{{Group: "machine-deletion-remediation.medik8s.io", Version: "v1alpha1", Kind: "MachineDeletionRemediation"}},
 	}
