@@ -14,12 +14,14 @@ disposable cluster's kubelets have been disconnected from the API server since 2
 pod can schedule (details in `evidence/2026-10-17-oadp-cluster/RESULTS.md`). Nothing on this
 branch has been exercised on a live cluster yet.
 
-Commits since the design docs (`git log --oneline 44f6e47..HEAD`):
+Commits since the design docs (`git log --oneline 44f6e47..HEAD`, taken before the commit that
+recorded this list):
 
 ```
-0e602ac hack: cluster-build refuses a dirty tree unless ALLOW_DIRTY=1
-295086c operands: opt-in bundle freshness check in verify-operand-manifests
-5502261 rbac: ship the SBR agent's RBAC standalone so its manager can bind it
+05d7855 docs: final-review minors and HANDOFF refresh
+5922a90 hack: cluster-build refuses a dirty tree unless ALLOW_DIRTY=1
+1f6a5be operands: opt-in bundle freshness check in verify-operand-manifests
+65cd118 rbac: ship the SBR agent's RBAC standalone so its manager can bind it
 fad68c1 docs: plan amendments made during execution
 b3624fb docs: describe Enabled, Disabled and uninstall under CSV-owned RBAC
 af759e2 docs: describe the OADP-style operand flow and FBC install
