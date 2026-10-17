@@ -1,6 +1,6 @@
 # POC catalog for the disposable-cluster install. `make catalog-source CATALOG_IMG=<ref>` fills
 # spec.image and writes dist/catalogsource.yaml. The image is a file-based catalog built by
-# `make catalog-fbc` (see README, "Operator image and POC catalog").
+# `make catalog-fbc` (see README, "Build, catalog and install on a disposable cluster").
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:

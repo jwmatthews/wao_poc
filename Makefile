@@ -207,7 +207,7 @@ verify-operand-manifests: kustomize yq ## Offline check that config/operands, re
 	YQ=$(YQ) KUSTOMIZE=$(KUSTOMIZE) hack/verify-operand-manifests.sh
 
 .PHONY: bump-operands
-bump-operands: update-release-set update-operand-manifests ## update-release-set then update-operand-manifests, then show the diff.
+bump-operands: update-release-set update-operand-manifests ## update-release-set then update-operand-manifests, then list the changed files (git status --short).
 	git status --short release-set.yaml config/operands config/manager internal/operands
 
 .PHONY: test-offline

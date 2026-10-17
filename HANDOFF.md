@@ -1,15 +1,28 @@
 # Handoff: adopting OADP's operand manifest approach
 
-Branch `explore_how_oadp_updates_third_party_bundles`, based on `dd7e250`. Updated 2026-10-16.
+Branch `explore_how_oadp_updates_third_party_bundles`, based on `dd7e250`. Updated 2026-10-17.
 
 ## Where things stand
 
-Tasks 1 to 13 of `docs/superpowers/plans/2026-10-16-oadp-operand-manifests.md` are implemented on
-this branch, covering GitHub #12 to #16: sync tooling (#13), FBC dev catalog (#14), operand RBAC in
-the WAO CSV (#15) and removal of the Python pipeline (#16). Commits since the design docs (`git log
---oneline 44f6e47..HEAD`):
+All plan tasks 0 to 13 of `docs/superpowers/plans/2026-10-16-oadp-operand-manifests.md` are
+implemented and reviewed on this branch, covering GitHub #12 to #16: sync tooling (#13), FBC dev
+catalog (#14), operand RBAC in the WAO CSV (#15) and removal of the Python pipeline (#16). The
+final review's fixes (below) are committed too.
+
+The cluster reset (plan Task 14) ran. The cluster verification (plan Task 15) is **BLOCKED**: the
+disposable cluster's kubelets have been disconnected from the API server since 2026-10-07, so no
+pod can schedule (details in `evidence/2026-10-17-oadp-cluster/RESULTS.md`). Nothing on this
+branch has been exercised on a live cluster yet.
+
+Commits since the design docs (`git log --oneline 44f6e47..HEAD`):
 
 ```
+0e602ac hack: cluster-build refuses a dirty tree unless ALLOW_DIRTY=1
+295086c operands: opt-in bundle freshness check in verify-operand-manifests
+5502261 rbac: ship the SBR agent's RBAC standalone so its manager can bind it
+fad68c1 docs: plan amendments made during execution
+b3624fb docs: describe Enabled, Disabled and uninstall under CSV-owned RBAC
+af759e2 docs: describe the OADP-style operand flow and FBC install
 b0a9aa9 ci: verify operand manifests offline instead of fetching bundles
 01db7ef bundle: restore icon and blank createdAt via bundle-reset
 5a9fe19 build: remove the Python manifest pipeline and ConfigMap catalog
@@ -31,9 +44,6 @@ dbe8394 operands: discover versions, digests and embedded commits for release-se
 40690b5 build: render the local bundle into a file-based catalog
 756f247 docs: record the OADP-style operand manifest design and plan
 ```
-
-Cluster verification (plan Tasks 14 and 15) is next and will be run by the controller on a
-disposable cluster confirmed in that session. Nothing has been run against a cluster for this work.
 
 `release-set.yaml` now records `version`, `tag` and `commit` per operand. The pinned versions are
 `v5.8.0` labels over `latest` or `v5.8.0` image tags, with the embedded git commits recorded; the
@@ -95,6 +105,26 @@ Each is also recorded in #12. Listed here so nobody re-litigates them by acciden
   `sbr-operator-sbr-agent-role` and `sbr-operator-sbr-agent-privileged-scc` by name, so those
   ClusterRoles must keep their upstream names. `make verify-operand-manifests` checks both lists.
 
+## Final review findings
+
+- **C1 (Critical), fixed: SBR agent RBAC was lost.** The SBR manager
+  (`internal/controller/storagebasedremediationconfig_controller.go` upstream) creates
+  ClusterRoleBindings whose `roleRef` names `sbr-operator-sbr-agent-role` and
+  `sbr-operator-sbr-agent-privileged-scc` verbatim. Folding `sbr-operator-sbr-agent` into the CSV
+  gave the first an OLM-generated name, and the second was rendered nowhere because upstream's
+  `config/rbac` kustomization omits its file. Fix: the agent SA moved to
+  `OPERAND_STANDALONE_SERVICE_ACCOUNTS`, so its ServiceAccount, ClusterRole and ClusterRoleBinding
+  ship as standalone bundle objects as in upstream's bundle; the SBR rbac overlay lists the upstream
+  SCC role file (built with `--load-restrictor LoadRestrictionsNone`); `verify-operand-manifests`
+  checks both SA lists and asserts both ClusterRoles are in the bundle.
+- **I1, fixed:** `verify-operand-manifests` checks bundle shape, not freshness. `VERIFY_BUNDLE=1`
+  now regenerates it with `make bundle-reset` and reports drift; `make test` already covers it.
+- **I2, fixed:** `hack/cluster-build.sh` builds the operator image from `git archive HEAD` but the
+  bundle from the working tree. It now refuses a dirty tree unless `ALLOW_DIRTY=1` and reminds the
+  developer that `make bundle-reset` restores the committed bundle.
+- The deferred-minor list and the controller's rulings are in
+  `.superpowers/sdd/2026-10-16-oadp-operand-manifests/progress.md`.
+
 ## Cluster
 
 Any live verification needs a disposable OpenShift cluster confirmed in that session. Earlier
@@ -103,9 +133,11 @@ authorized, so prefix every command with `KUBECONFIG=<path>` and check cluster i
 
 ## Suggested next steps
 
-1. Cluster verification results (plan Tasks 14 and 15) are pending; record them here when done.
+1. Recover or replace the disposable cluster, then run `hack/cluster-build.sh`,
+   `hack/cluster-install.sh` and the enable/disable checks in plan Task 15. Pay special attention
+   to SBR: enable it, create nothing, and read the SBR manager log for "cluster role binding"
+   errors. Record the results here.
 2. Split the branch into PRs in merge order (#13, #14, #15, #16) if desired. #14 must merge before
    #15, because the standalone ClusterRoles that #15 adds cannot be served by a ConfigMap catalog.
-3. The deferred-minor list lives in
-   `.superpowers/sdd/2026-10-16-oadp-operand-manifests/progress.md` until the final review
-   triages it.
+3. Triage the deferred-minor list in
+   `.superpowers/sdd/2026-10-16-oadp-operand-manifests/progress.md`.
