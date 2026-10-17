@@ -198,7 +198,7 @@ operand-manifests: kustomize yq ## Render runtime manifests, CRD list and RELATE
 
 .PHONY: verify-operand-manifests
 verify-operand-manifests: kustomize yq ## Offline check that config/operands, release-set.yaml, manager.yaml and the bundle agree (CI).
-	YQ=$(YQ) hack/verify-operand-manifests.sh
+	YQ=$(YQ) KUSTOMIZE=$(KUSTOMIZE) hack/verify-operand-manifests.sh
 
 .PHONY: bump-operands
 bump-operands: update-release-set update-operand-manifests ## update-release-set then update-operand-manifests, then show the diff.

@@ -4,6 +4,7 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 YQ=${YQ:-bin/yq}; [ -x "$YQ" ] || YQ=yq
+KUSTOMIZE=${KUSTOMIZE:-bin/kustomize}; [ -x "$KUSTOMIZE" ] || KUSTOMIZE=kustomize
 RS=release-set.yaml
 fail=0; problem() { echo "verify-operand-manifests: $*" >&2; fail=1; }
 
@@ -34,7 +35,14 @@ done
 # 4. Every operand ServiceAccount is in OPERAND_SERVICE_ACCOUNTS.
 extra=$(sed -n 's/^OPERAND_SERVICE_ACCOUNTS := //p' Makefile | tr ',' '\n')
 for k in $("$YQ" '.components | keys | .[]' "$RS"); do
-  for sa in $(bin/kustomize build "config/operands/$k/rbac" 2>/dev/null | "$YQ" -N 'select(.kind == "ServiceAccount") | .metadata.name'); do
+  errf=$(mktemp)
+  if ! rbac=$("$KUSTOMIZE" build "config/operands/$k/rbac" 2>"$errf"); then
+    problem "$k: kustomize build config/operands/$k/rbac failed: $(tail -1 "$errf")"; rm -f "$errf"; continue
+  fi
+  rm -f "$errf"
+  sas=$(printf '%s\n' "$rbac" | "$YQ" -N 'select(.kind == "ServiceAccount") | .metadata.name')
+  [ -n "$sas" ] || problem "$k: no ServiceAccount in config/operands/$k/rbac"
+  for sa in $sas; do
     grep -qx "$sa" <<<"$extra" || problem "$k: ServiceAccount $sa is not in OPERAND_SERVICE_ACCOUNTS; its roles would become standalone bundle files"
   done
 done
