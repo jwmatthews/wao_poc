@@ -155,6 +155,14 @@ OPERAND_SRC_DIR ?= .cache/operands
 update-release-set: yq ## Rewrite release-set.yaml from published images (OPERAND_TAG=release|pinned|latest|<tag>, or NHC_TAG=...).
 	YQ=$(YQ) hack/update-release-set.sh
 
+.PHONY: update-operand-manifests
+update-operand-manifests: yq ## Copy upstream config/ at the commits in release-set.yaml into config/operands/<k>/upstream, then render.
+	YQ=$(YQ) OPERAND_SRC_DIR=$(OPERAND_SRC_DIR) hack/update-operand-manifests.sh
+
+.PHONY: bump-operands
+bump-operands: update-release-set update-operand-manifests ## update-release-set then update-operand-manifests, then show the diff.
+	git status --short release-set.yaml config/operands config/manager internal/operands
+
 PYTHON ?= .venv/bin/python
 BUNDLE_CACHE ?= .cache/bundles
 

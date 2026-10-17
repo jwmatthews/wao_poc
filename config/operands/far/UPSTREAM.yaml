@@ -1,0 +1,5 @@
+# Written by hack/update-operand-manifests.sh. Do not edit; run make update-operand-manifests.
+repo: https://github.com/medik8s/fence-agents-remediation
+version: v5.8.0
+tag: latest
+commit: f3e85bf5d104ea7d96bf95b701ad3d58e3aea3fc

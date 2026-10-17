@@ -1,0 +1,5 @@
+# Written by hack/update-operand-manifests.sh. Do not edit; run make update-operand-manifests.
+repo: https://github.com/medik8s/node-maintenance-operator
+version: v5.8.0
+tag: latest
+commit: dce77e869f202b51a5885078d51baf9b98cd2b66
