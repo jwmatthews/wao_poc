@@ -159,10 +159,18 @@ help: ## Display this help.
 OPERANDS := nhc snr sbr far mdr nmo
 # Checkouts used by update-operand-manifests. Override all with OPERAND_SRC_DIR or one with NHC_PATH etc.
 OPERAND_SRC_DIR ?= .cache/operands
+# Tag that update-release-set and bump-operands resolve for every component:
+#   latest   the post-submit main build (default; the committed snapshot tracks main)
+#   release  the latest GitHub release of each repo
+#   pinned   keep the tag already in release-set.yaml and only re-resolve digests and commits
+#   <tag>    an explicit tag such as v0.12.0
+# Override one component with NHC_TAG=..., SNR_TAG=..., etc. Note that upstream releases can lag
+# files the config/operands wrappers rely on (for example SBR's privileged SCC ClusterRole).
+OPERAND_TAG ?= latest
 
 .PHONY: update-release-set
-update-release-set: yq ## Rewrite release-set.yaml from published images (OPERAND_TAG=release|pinned|latest|<tag>, or NHC_TAG=...).
-	YQ=$(YQ) hack/update-release-set.sh
+update-release-set: yq ## Rewrite release-set.yaml from published images (OPERAND_TAG=latest|release|pinned|<tag>, default latest; or NHC_TAG=...).
+	YQ=$(YQ) OPERAND_TAG=$(OPERAND_TAG) hack/update-release-set.sh
 
 .PHONY: update-operand-manifests
 update-operand-manifests: yq ## Copy upstream config/ at the commits in release-set.yaml into config/operands/<k>/upstream, then render.
@@ -208,7 +216,7 @@ verify-operand-manifests: kustomize yq ## Offline check that config/operands, re
 	YQ=$(YQ) KUSTOMIZE=$(KUSTOMIZE) hack/verify-operand-manifests.sh
 
 .PHONY: bump-operands
-bump-operands: ## Resolve images, copy source config, generate manifests and Go bindings, then verify consistency.
+bump-operands: ## Resolve images (OPERAND_TAG, default latest), copy source config, generate manifests and Go bindings, then verify consistency.
 	$(MAKE) update-release-set
 	$(MAKE) update-operand-manifests
 	$(MAKE) verify-operand-manifests

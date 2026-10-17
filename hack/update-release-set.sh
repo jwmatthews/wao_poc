@@ -3,9 +3,10 @@
 # For each component: pick a tag, resolve each image's digest, read the embedded git commit from
 # the operator binary (hack/image-commit.sh), and write tag, commit, tagged and pinned.
 #
-# Tag selection (first match wins): <K>_TAG (e.g. NHC_TAG=v0.12.0), OPERAND_TAG, or the latest
-# GitHub release. Special values: OPERAND_TAG=pinned keeps the tag already in the file;
-# OPERAND_TAG=latest selects the post-submit main build.
+# Tag selection (first match wins): <K>_TAG (e.g. NHC_TAG=v0.12.0), then OPERAND_TAG. The Makefile
+# defaults OPERAND_TAG to latest. Special values: latest selects the post-submit main build;
+# release selects the latest GitHub release; pinned keeps the tag already in the file. Run
+# directly without OPERAND_TAG, this script falls back to release.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 RS=${RELEASE_SET:-release-set.yaml}

@@ -112,9 +112,11 @@ commit embedded in each published image into `release-set.yaml`; `make update-op
 copies `config/` from a checkout at that commit into `config/operands/<k>/upstream/` (checkouts
 live in `.cache/operands`, or set `NHC_PATH` and friends), renders the runtime manifests the Go
 renderer embeds, generates Go image bindings, and syncs `RELATED_IMAGE_*`.
-Use `make bump-operands OPERAND_TAG=latest` for the complete sequence: resolve published images,
-copy configuration, generate manifests and bindings, then verify consistency. Omit `OPERAND_TAG`
-to select each component's latest GitHub release, or override one component with `NHC_TAG=...`.
+Use `make bump-operands` for the complete sequence: resolve published images, copy
+configuration, generate manifests and bindings, then verify consistency. `OPERAND_TAG` defaults
+to `latest`, the post-submit main build; pass `OPERAND_TAG=release` for each component's latest
+GitHub release, `OPERAND_TAG=pinned` to keep the current tags, or override one component with
+`NHC_TAG=...`. Upstream releases can lag files the `config/operands` wrappers rely on.
 The steps run sequentially, including with parallel Make, and finish with component and renderer
 Go tests. Review the diff before committing;
 CI runs `make verify-operand-manifests`, which is offline. Operand RBAC ships in the WAO
