@@ -57,7 +57,7 @@ snapshot has been checked locally and has not been tested on a live cluster.
 | `hack/update-release-set.sh`, `hack/image-commit.sh` | Resolve tags, image digests and the commit embedded in each published image into `release-set.yaml` |
 | `hack/update-operand-manifests.sh`, `hack/verify-operand-manifests.sh` | Copy the upstream trees at the recorded commits; offline CI verification |
 | `hack/cluster-build.sh`, `hack/cluster-install.sh`, `hack/cluster-uninstall.sh` | On-cluster build and OLM install for a disposable cluster |
-| `bundle/` | The generated OLM bundle (one CSV, thirteen CRDs, nineteen standalone ClusterRoles) |
+| `bundle/` | The generated OLM bundle (one CSV, thirteen CRDs, twenty-one standalone ClusterRoles, and the SBR agent's ServiceAccount and ClusterRoleBinding) |
 | `config/catalog/`, `catalog/` | Committed CatalogSource and Subscription templates; the rendered file-based catalog |
 | `AGENTS.md` | Instructions for coding agents working in this repository |
 
@@ -200,8 +200,13 @@ CatalogSource; the CRDs stay.
 ## Security notes
 
 - Operand RBAC is not created by WAO. It ships in the WAO CSV (operand ServiceAccount
-  permissions, via `--extra-service-accounts`) and as nineteen standalone ClusterRoles in the
-  bundle, and OLM creates it at install. The operand ServiceAccounts and roles therefore exist
+  permissions, via `--extra-service-accounts`) and as twenty-one standalone ClusterRoles in the
+  bundle, and OLM creates it at install. Six operand ServiceAccounts are folded into the CSV; the
+  SBR agent's RBAC (ServiceAccount `sbr-operator-sbr-agent`, ClusterRoles
+  `sbr-operator-sbr-agent-role` and `sbr-operator-sbr-agent-privileged-scc`, and a
+  ClusterRoleBinding) ships as standalone bundle objects instead, because the SBR manager creates
+  ClusterRoleBindings to those two ClusterRoles by name at runtime and a folded role would get an
+  OLM-generated name. The operand ServiceAccounts and roles therefore exist
   from install onward, even while every component is Disabled. WAO's own role holds no union of
   operand rules. The operand rules include:
   - SCC `use` on `privileged`, because the SNR and SBR CSVs grant it for their agents;

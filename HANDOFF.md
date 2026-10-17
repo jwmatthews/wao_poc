@@ -38,7 +38,7 @@ disposable cluster confirmed in that session. Nothing has been run against a clu
 `release-set.yaml` now records `version`, `tag` and `commit` per operand. The pinned versions are
 `v5.8.0` labels over `latest` or `v5.8.0` image tags, with the embedded git commits recorded; the
 copied trees under `config/operands/<k>/upstream/` come from those commits. The bundle ships
-nineteen standalone ClusterRoles.
+twenty-one standalone ClusterRoles plus the SBR agent's ServiceAccount and ClusterRoleBinding.
 
 `make test` note: `verify-no-changes` fails on pre-existing untracked files, in particular the
 untracked `evidence/` tree. Until that is cleaned up, run the tests with the wrapper command:
@@ -59,7 +59,9 @@ Each is also recorded in #12. Listed here so nobody re-litigates them by acciden
    `config/default` for runtime manifests. The operand's `bundle/` and `make bundle` are never used.
    WAO's CSV replaces theirs. Same as OADP with the non-admin controller.
 2. **Unbound ClusterRoles ship as standalone bundle objects.** Nineteen of them: six `metrics-reader`,
-   four `ext-remediation`, SBR admin/editor/viewer. We neither invent bindings nor drop them.
+   four `ext-remediation`, SBR admin/editor/viewer. We neither invent bindings nor drop them. The
+   SBR agent's two ClusterRoles (`sbr-operator-sbr-agent-role`, `sbr-operator-sbr-agent-privileged-scc`)
+   also ship standalone, for twenty-one in all: the SBR manager binds them by name at runtime.
 3. **The git ref comes from the image, not from a tag.** Every medik8s operator embeds
    `version.GitCommit` via ldflags in `hack/build.sh`; `go version -m` on the extracted binary reads
    it. Verified at design time: NHC v0.12.0 image embeds `a49ec14c47c5c1f0e5b81c68bf2880ff17ec4a5f`, which is
@@ -84,12 +86,14 @@ Each is also recorded in #12. Listed here so nobody re-litigates them by acciden
   is Disabled. OADP accepts the same for the non-admin controller.
 - `AllNamespaces` install mode makes OLM promote CSV `permissions` Roles to ClusterRoles with
   get/list/watch on `namespaces` appended (README deviation 8). More Roles go through that now.
-- `--extra-service-accounts` must list all seven operand SAs:
+- `--extra-service-accounts` (`OPERAND_SERVICE_ACCOUNTS`) lists six folded ServiceAccounts:
   `node-healthcheck-controller-manager`, `self-node-remediation-controller-manager`,
-  `sbr-operator-controller-manager`, `sbr-operator-sbr-agent`,
-  `fence-agents-remediation-controller-manager`, `machine-deletion-remediation-controller-manager`,
-  `node-maintenance-operator-controller-manager`. Names were read from checkouts that are ahead of
-  the pinned tags; confirm against the copied files when #13 lands.
+  `sbr-operator-controller-manager`, `fence-agents-remediation-controller-manager`,
+  `machine-deletion-remediation-controller-manager`, `node-maintenance-operator-controller-manager`.
+  The SBR agent's RBAC (`sbr-operator-sbr-agent`, listed in `OPERAND_STANDALONE_SERVICE_ACCOUNTS`)
+  is deliberately not folded: the SBR manager creates ClusterRoleBindings to
+  `sbr-operator-sbr-agent-role` and `sbr-operator-sbr-agent-privileged-scc` by name, so those
+  ClusterRoles must keep their upstream names. `make verify-operand-manifests` checks both lists.
 
 ## Cluster
 

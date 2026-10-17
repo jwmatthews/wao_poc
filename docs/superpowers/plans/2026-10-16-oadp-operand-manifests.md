@@ -1285,6 +1285,10 @@ Makefile: near `BUNDLE_METADATA_OPTS` add
 # missing here silently becomes dozens of standalone bundle files; verify-operand-manifests checks it.
 OPERAND_SERVICE_ACCOUNTS := node-healthcheck-controller-manager,self-node-remediation-controller-manager,sbr-operator-controller-manager,sbr-operator-sbr-agent,fence-agents-remediation-controller-manager,machine-deletion-remediation-controller-manager,node-maintenance-operator-controller-manager
 ```
+(Amended in the final-review fix: `sbr-operator-sbr-agent` moved out of this list into
+`OPERAND_STANDALONE_SERVICE_ACCOUNTS`, leaving six folded ServiceAccounts plus the SBR agent's
+standalone RBAC, because the SBR manager binds `sbr-operator-sbr-agent-role` by name at runtime; the
+bundle build also gained `--load-restrictor LoadRestrictionsNone` for the SBR SCC role.)
 and change the generate line in `bundle` to
 ```make
 	$(KUSTOMIZE) build $(MANIFESTS_DIR) | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) --extra-service-accounts $(OPERAND_SERVICE_ACCOUNTS) $(BUNDLE_METADATA_OPTS)
@@ -1715,7 +1719,7 @@ oc --kubeconfig=$KC get clusterrole -o name | grep -E 'metrics-reader|ext-remedi
 oc --kubeconfig=$KC get deploy -n $NS -o name
 oc --kubeconfig=$KC get clusterrole,role,rolebinding,clusterrolebinding -A -l app.kubernetes.io/managed-by=workload-availability-operator -o name | wc -l
 ```
-Expected: the seven operand ServiceAccounts plus the WAO SA; OLM-owned ClusterRoles present; nineteen standalone ClusterRoles; only the WAO Deployment; zero WAO-managed RBAC objects.
+Expected: six folded operand ServiceAccounts plus the SBR agent's standalone ServiceAccount `sbr-operator-sbr-agent`, plus the WAO SA; OLM-owned ClusterRoles present; nineteen ClusterRoles matched by the grep, and `sbr-operator-sbr-agent-role` and `sbr-operator-sbr-agent-privileged-scc` present (twenty-one standalone ClusterRoles in all); only the WAO Deployment; zero WAO-managed RBAC objects. (Amended in the final-review fix: the SBR agent's RBAC ships standalone because the SBR manager binds those two ClusterRoles by name at runtime.)
 
 - [ ] **Step 4: Enable NHC and NMO, then all six, and watch readiness**
 
