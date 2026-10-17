@@ -147,6 +147,14 @@ help: ## Display this help.
 
 ##@ Operands
 
+OPERANDS := nhc snr sbr far mdr nmo
+# Checkouts used by update-operand-manifests. Override all with OPERAND_SRC_DIR or one with NHC_PATH etc.
+OPERAND_SRC_DIR ?= .cache/operands
+
+.PHONY: update-release-set
+update-release-set: yq ## Rewrite release-set.yaml from published images (OPERAND_TAG=release|pinned|latest|<tag>, or NHC_TAG=...).
+	YQ=$(YQ) hack/update-release-set.sh
+
 PYTHON ?= .venv/bin/python
 BUNDLE_CACHE ?= .cache/bundles
 
