@@ -79,7 +79,10 @@ Each operand has a copy of its upstream `config/` tree in `config/operands/<k>/u
 two kustomize overlays: `rbac/` (rendered into the WAO CSV and bundle) and `runtime/` (rendered
 into `internal/operands/manifests/<k>/objects.yaml`, the Deployments, Services, ConfigMaps and
 webhook configurations the renderer applies at enable time). The operand CRDs ship in the CSV.
-Never hand-edit the generated files; run `make operand-manifests`.
+Never hand-edit the generated files; run `make operand-manifests`. `make verify-operand-manifests`
+checks the bundle's shape but not that it is current: `make test` checks that (via
+`verify-no-changes`), or run `VERIFY_BUNDLE=1 make verify-operand-manifests`, which regenerates it
+with `make bundle-reset`.
 
 ## Build and test
 

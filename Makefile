@@ -203,7 +203,7 @@ operand-manifests: kustomize yq ## Render runtime manifests, CRD list and RELATE
 	done
 
 .PHONY: verify-operand-manifests
-verify-operand-manifests: kustomize yq ## Offline check that config/operands, release-set.yaml, manager.yaml and the bundle agree (CI).
+verify-operand-manifests: kustomize yq ## Offline check that config/operands, release-set.yaml, manager.yaml and the bundle shape agree (CI). Bundle freshness: make test (verify-no-changes) or VERIFY_BUNDLE=1.
 	YQ=$(YQ) KUSTOMIZE=$(KUSTOMIZE) hack/verify-operand-manifests.sh
 
 .PHONY: bump-operands

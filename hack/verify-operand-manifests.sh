@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Offline checks that the committed operand files, release-set.yaml, the manager Deployment and the
 # bundle agree. CI runs this; it needs no network and no cluster.
+# It checks the bundle's shape, not that it is current. VERIFY_BUNDLE=1 also regenerates the bundle
+# with make bundle-reset (minutes; pass CONTROLLER_GEN and SORT_IMPORTS through the environment if
+# this checkout needs wrappers) and fails on drift. make test checks the same via verify-no-changes.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 YQ=${YQ:-bin/yq}; [ -x "$YQ" ] || YQ=yq
@@ -84,6 +87,19 @@ for cr in sbr-operator-sbr-agent-role sbr-operator-sbr-agent-privileged-scc; do
 done
 crds=$(ls bundle/manifests/*.yaml | xargs -n1 "$YQ" '.kind' | grep -c CustomResourceDefinition || true)
 [ "$crds" = 13 ] || problem "bundle has $crds CRDs, want 13"
+
+# 6. Optional: the committed bundle is what make bundle-reset generates.
+if [ "${VERIFY_BUNDLE:-}" = 1 ]; then
+  args=()
+  [ -z "${CONTROLLER_GEN:-}" ] || args+=("CONTROLLER_GEN=$CONTROLLER_GEN")
+  [ -z "${SORT_IMPORTS:-}" ] || args+=("SORT_IMPORTS=$SORT_IMPORTS")
+  if ! make -s ${args[@]+"${args[@]}"} bundle-reset >/dev/null; then
+    problem "make bundle-reset failed"
+  elif ! git diff --quiet -- bundle || [ -n "$(git status --porcelain --untracked-files=all -- bundle)" ]; then
+    git status --short -- bundle >&2
+    problem "bundle/ is not what make bundle-reset generates; run make bundle-reset and commit"
+  fi
+fi
 
 [ $fail = 0 ] && echo "verify-operand-manifests: OK"
 exit $fail
