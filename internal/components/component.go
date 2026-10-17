@@ -1,7 +1,8 @@
 package components
 
-// ImageBinding maps an operator image variable to the literal upstream image reference found in
-// the extracted manifests; the renderer replaces Original with the pinned value from the image set.
+// ImageBinding maps an operator image variable to the upstream reference from release-set.yaml
+// that the runtime overlay writes into the embedded manifests;
+// the renderer replaces Original with the pinned value from the image set.
 type ImageBinding struct {
 	Env      string
 	Original string

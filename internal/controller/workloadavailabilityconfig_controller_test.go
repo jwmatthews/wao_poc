@@ -115,19 +115,9 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		Expect(dep.OwnerReferences[0].Kind).To(Equal("WorkloadAvailabilityConfig"))
 		Expect(*dep.OwnerReferences[0].Controller).To(BeTrue())
 
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager"}, &rbacv1.ClusterRole{})).To(Succeed())
-		// OLM AllNamespaces behaviour: the CSV's namespaced permissions are also granted cluster-wide,
-		// with OLM's get/list/watch rule on namespaces appended.
-		allNSRole := &rbacv1.ClusterRole{}
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager-all-namespaces"}, allNSRole)).To(Succeed())
-		nsRole := &rbacv1.Role{}
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-controller-manager"}, nsRole)).To(Succeed())
-		Expect(allNSRole.Rules).To(Equal(append(append([]rbacv1.PolicyRule{}, nsRole.Rules...),
-			rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"namespaces"}, Verbs: []string{"get", "list", "watch"}})))
-		allNS := &rbacv1.ClusterRoleBinding{}
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager-all-namespaces"}, allNS)).To(Succeed())
-		Expect(allNS.Subjects).To(ConsistOf(rbacv1.Subject{Kind: "ServiceAccount", Name: "node-healthcheck-controller-manager", Namespace: ns}))
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-controller-manager"}, &corev1.ServiceAccount{})).To(Succeed())
+		// Operand RBAC comes from the WAO CSV (installed by OLM), never from the operand renderer.
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager"}, &rbacv1.ClusterRole{}))).To(BeTrue())
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-controller-manager"}, &corev1.ServiceAccount{}))).To(BeTrue())
 		vw := &admissionregistrationv1.ValidatingWebhookConfiguration{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-validating-webhook-configuration"}, vw)).To(Succeed())
 		Expect(vw.Webhooks[0].ClientConfig.Service.Namespace).To(Equal(ns))

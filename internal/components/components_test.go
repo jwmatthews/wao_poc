@@ -1,8 +1,12 @@
 package components_test
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"sigs.k8s.io/yaml"
 
 	"github.com/medik8s/workload-availability-operator/api/v1alpha1"
 	"github.com/medik8s/workload-availability-operator/internal/components"
@@ -82,6 +86,34 @@ func TestEveryComponentDeclaresManagedKinds(t *testing.T) {
 	for _, d := range components.All() {
 		if len(d.ManagedKinds) != 1 || d.ManagedKinds[0].Kind != want[d.Key] {
 			t.Errorf("%s ManagedKinds = %+v, want %s", d.Key, d.ManagedKinds, want[d.Key])
+		}
+	}
+}
+
+// Original image references are the `upstream` values in release-set.yaml: the runtime overlays
+// set them (make operand-manifests) and the renderer swaps them for the pinned RELATED_IMAGE_*.
+func TestOriginalImagesMatchReleaseSet(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "release-set.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rs struct {
+		Components map[string]struct {
+			Images map[string]struct{ Upstream string } `json:"images"`
+		} `json:"components"`
+	}
+	if err := yaml.Unmarshal(raw, &rs); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range components.All() {
+		comp, ok := rs.Components[d.ShortName]
+		if !ok {
+			t.Fatalf("%s: no release-set entry %q", d.Key, d.ShortName)
+		}
+		for _, img := range d.Images {
+			if got := comp.Images[img.Env].Upstream; got != img.Original {
+				t.Errorf("%s: Original for %s = %q, release-set.yaml upstream = %q", d.Key, img.Env, img.Original, got)
+			}
 		}
 	}
 }

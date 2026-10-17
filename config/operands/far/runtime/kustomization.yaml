@@ -7,23 +7,23 @@ kind: Kustomization
 namespace: __WAO_NAMESPACE__
 resources:
 - ../upstream/config/default
-images:
 # newName and newTag are kept equal to release-set.yaml images.*.upstream by `make operand-manifests`.
+images:
 - name: quay.io/medik8s/fence-agents-remediation-operator
   newName: quay.io/medik8s/fence-agents-remediation-operator
   newTag: latest
-labels:
 # Every operand pod and every Service selector carries the component label (design brief D10):
 # all six managers share one namespace and some upstream selectors would match other managers.
-- pairs:
-    workloadavailability.medik8s.io/component: fenceAgentsRemediation
-  fields:
-  - path: spec/template/metadata/labels
+labels:
+- fields:
+  - create: true
     kind: Deployment
-    create: true
-  - path: spec/selector
+    path: spec/template/metadata/labels
+  - create: true
     kind: Service
-    create: true
+    path: spec/selector
+  pairs:
+    workloadavailability.medik8s.io/component: fenceAgentsRemediation
 patches:
 - path: webhook_cert_patch.yaml
   target:

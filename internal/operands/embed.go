@@ -1,31 +1,45 @@
 package operands
 
 import (
+	"bytes"
 	"embed"
 	"fmt"
 	"path"
 	"sort"
+
+	"sigs.k8s.io/yaml"
 )
 
 //go:embed manifests
 var manifests embed.FS
 
-// Load returns the YAML files of one component directory keyed by file name.
+// Load returns the objects of one component's objects.yaml keyed by "<Kind>/<name>".
+// The file is written by `make operand-manifests` from config/operands/<dir>/runtime.
 func Load(dir string) (map[string][]byte, error) {
-	entries, err := manifests.ReadDir(path.Join("manifests", dir))
+	b, err := manifests.ReadFile(path.Join("manifests", dir, "objects.yaml"))
 	if err != nil {
-		return nil, fmt.Errorf("manifest directory %q: %w", dir, err)
+		return nil, fmt.Errorf("manifests for %q: %w", dir, err)
 	}
 	out := map[string][]byte{}
-	for _, e := range entries {
-		if e.IsDir() || path.Ext(e.Name()) != ".yaml" {
+	for _, doc := range bytes.Split(b, []byte("\n---\n")) {
+		doc = bytes.TrimSpace(doc)
+		if len(doc) == 0 {
 			continue
 		}
-		b, err := manifests.ReadFile(path.Join("manifests", dir, e.Name()))
-		if err != nil {
-			return nil, err
+		var head struct {
+			Kind     string `json:"kind"`
+			Metadata struct {
+				Name string `json:"name"`
+			} `json:"metadata"`
 		}
-		out[e.Name()] = b
+		if err := yaml.Unmarshal(doc, &head); err != nil {
+			return nil, fmt.Errorf("manifests for %q: %w", dir, err)
+		}
+		key := head.Kind + "/" + head.Metadata.Name
+		if _, dup := out[key]; dup {
+			return nil, fmt.Errorf("manifests for %q: duplicate %s", dir, key)
+		}
+		out[key] = doc
 	}
 	return out, nil
 }
