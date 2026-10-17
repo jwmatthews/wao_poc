@@ -130,9 +130,12 @@ CSV via `--extra-service-accounts` and OLM creates it at install; WAO creates no
 ## Build, catalog and install on a disposable cluster
 
 The operator, bundle and a file-based catalog (FBC) image are built on the cluster with binary
-Docker builds in namespace `wao-poc-build`, from a clean `git archive HEAD`. The bundle references
-the operator image by digest and the catalog references the bundle by digest. No external registry
-is needed. The kubeconfig is always passed explicitly.
+Docker builds in namespace `wao-poc-build`. The operator image comes from a clean `git archive
+HEAD`; the bundle and catalog are generated from the working tree, so `hack/cluster-build.sh`
+refuses a dirty tree unless `ALLOW_DIRTY=1` is set. The bundle references the operator image by
+digest and the catalog references the bundle by digest. No external registry is needed. The
+kubeconfig is always passed explicitly. The build rewrites `bundle/` and
+`config/manager/kustomization.yaml`; `make bundle-reset` restores the committed bundle.
 
 ```sh
 KC=/path/to/disposable-cluster.kubeconfig

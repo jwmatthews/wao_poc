@@ -7,6 +7,14 @@ set -euo pipefail
 KC=${1:?usage: $0 KUBECONFIG}
 KC=$(cd "$(dirname "$KC")" 2>/dev/null && pwd)/$(basename "$KC")
 [ -f "$KC" ] || { echo "kubeconfig not found: $KC" >&2; exit 1; }
+# The operator image comes from git archive HEAD, but the bundle and catalog are generated from the
+# working tree, so uncommitted changes would make them disagree with the image.
+dirty=$(git status --porcelain)
+if [ -n "$dirty" ]; then
+  echo "warning: the working tree is not clean; the operator image is built from HEAD but the bundle from these files:" >&2
+  echo "$dirty" >&2
+  [ "${ALLOW_DIRTY:-}" = 1 ] || { echo "commit or stash them, or set ALLOW_DIRTY=1 to build anyway" >&2; exit 1; }
+fi
 BUILD_NS=${BUILD_NS:-wao-poc-build}
 INSTALL_NS=${INSTALL_NS:-openshift-workload-availability}
 REG=image-registry.openshift-image-registry.svc:5000
@@ -54,3 +62,4 @@ CATALOG_IMG="$REG/$BUILD_NS/wao-catalog@$(digest_of wao-catalog)"
 echo "CATALOG_IMG=$CATALOG_IMG"
 make catalog-source CATALOG_IMG="$CATALOG_IMG"
 echo "wrote dist/catalogsource.yaml; next: hack/cluster-install.sh $KC"
+echo "note: bundle/ and config/manager/kustomization.yaml were rewritten for this build; make bundle-reset restores the committed bundle"
