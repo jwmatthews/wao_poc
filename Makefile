@@ -204,44 +204,9 @@ verify-operand-manifests: kustomize yq ## Offline check that config/operands, re
 bump-operands: update-release-set update-operand-manifests ## update-release-set then update-operand-manifests, then show the diff.
 	git status --short release-set.yaml config/operands config/manager internal/operands
 
-PYTHON ?= .venv/bin/python
-BUNDLE_CACHE ?= .cache/bundles
-
-.PHONY: python-env
-python-env: ## Prepare the default Python environment and its pinned dependencies.
-
-# A custom interpreter is managed by the caller; only bootstrap our local venv.
-ifeq ($(PYTHON),.venv/bin/python)
-python-env: .venv/.requirements-installed
-
-.venv/bin/python:
-	python3 -m venv .venv
-
-.venv/.requirements-installed: hack/requirements.txt .venv/bin/python
-	$(PYTHON) -m pip install -r hack/requirements.txt
-	touch $@
-endif
-
-# Order-only prerequisites keep environment setup out of target freshness checks.
-bundles bundle-check catalog-configmap test-offline: | python-env
-
-.PHONY: bundles
-bundles: ## Fetch the pinned upstream bundles from release-set.yaml into .cache/bundles.
-	$(PYTHON) hack/fetch-bundles.py --release-set release-set.yaml --out $(BUNDLE_CACHE)
-
-.PHONY: bundle-check
-bundle-check: ## Verify the generated bundle against the POC contract and release-set.yaml.
-	$(PYTHON) hack/check-bundle.py bundle release-set.yaml
-
-CATALOG_NS ?= openshift-marketplace
-.PHONY: catalog-configmap
-catalog-configmap: bundle-check ## Render the POC ConfigMap-backed CatalogSource into dist/wao-poc-catalog.yaml.
-	mkdir -p dist
-	$(PYTHON) hack/configmap-catalog.py --bundle bundle --package $(OPERATOR_NAME) --channel $(or $(DEFAULT_CHANNEL),alpha) --name wao-poc-catalog --namespace $(CATALOG_NS) > dist/wao-poc-catalog.yaml
-
 .PHONY: test-offline
-test-offline: ## Run every offline Python test and syntax-check the live-cluster scripts (no cluster needed).
-	$(PYTHON) -m unittest hack/extract_operand_manifests_test.py hack/configmap_catalog_test.py hack/e2e_runner_test.py hack/build_test.py
+test-offline: verify-operand-manifests ## Offline checks: operand manifests, bundle shape, and the remaining script tests (no cluster, no network).
+	python3 -m unittest hack/e2e_runner_test.py hack/build_test.py
 
 
 ##@ Development
