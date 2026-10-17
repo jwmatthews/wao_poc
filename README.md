@@ -41,7 +41,7 @@ snapshot has been checked locally and has not been tested on a live cluster.
 | Design brief | Written |
 | Implementation plan for the install case | Written: [docs/archive/bootstrap/implementation-plan.md](docs/archive/bootstrap/implementation-plan.md) |
 | Implementation | Done: Tasks 1–10 (operator, operand manifests, bundle, image, POC catalog, live-cluster harness, docs) |
-| Live install verification | Run on a disposable OpenShift 4.22 cluster (3 nodes, `HighlyAvailable`): four full runs of 19 cases. Runs found two WAO RBAC bugs, both fixed (see [Deviations from the plan](#deviations-from-the-plan), items 3 and 8). The final run passed 17 of 19: WAO-INST-09 and WAO-INST-12 failed only because the upstream MDR manager could not start under its 30Mi memory limit, which reproduces without WAO (see [Known upstream issues](#known-upstream-issues)). Every other case passed. A fifth run on 2026-10-05 against a fresh OpenShift 5.0.0-rc.5 cluster (3 nodes, `HighlyAvailable`, classic OLM) through `test/cluster/full-run.sh` passed all 19 cases, including MDR, which started with a warm page cache that time. Raw results are not committed |
+| Live install verification | Run on a disposable OpenShift 4.22 cluster (3 nodes, `HighlyAvailable`): four full runs of 19 cases. Runs found two WAO RBAC bugs, both fixed (see [Deviations from the plan](#deviations-from-the-plan), items 3 and 8). The final run passed 17 of 19: WAO-INST-09 and WAO-INST-12 failed only because the upstream MDR manager could not start under its 30Mi memory limit, which reproduces without WAO (see [Known upstream issues](#known-upstream-issues)). Every other case passed. A fifth run on 2026-10-05 against a fresh OpenShift 5.0.0-rc.5 cluster (3 nodes, `HighlyAvailable`, classic OLM) through the since-removed `test/cluster/full-run.sh` harness passed all 19 cases, including MDR, which started with a warm page cache that time. Raw results are not committed |
 | Upgrade scenarios | Future plan |
 
 ## Layout
@@ -52,13 +52,13 @@ snapshot has been checked locally and has not been tested on a live cluster.
 | `release-set.yaml` | The pinned upstream bundle and image digests the POC installs |
 | `api/v1alpha1/` | The `WorkloadAvailabilityConfig` API |
 | `internal/controller/` | The lifecycle controller and the default-config bootstrap |
-| `internal/operands/` | The embedded operand manifests and the renderer |
-| `hack/fetch-bundles.py` | Fetches the pinned bundles anonymously from quay.io and verifies digests |
-| `hack/extract-operand-manifests.py` | Generates the operand manifests, component CRDs and the union role from the bundles |
-| `hack/check-bundle.py` | Checks the generated bundle against the POC contract and `release-set.yaml` |
-| `hack/configmap-catalog.py` | Renders the POC ConfigMap-backed CatalogSource from `bundle/` |
-| `bundle/` | The generated OLM bundle (one CSV, thirteen CRDs) |
-| `test/cluster/` | Live-cluster harness: `full-run.sh` (build, install, run) and the per-case scripts, see its [README](test/cluster/README.md) |
+| `internal/operands/` | The embedded runtime manifests and the renderer |
+| `config/operands/<k>/` | Per operand: `upstream/` (copy of the upstream `config/` tree), `UPSTREAM.yaml` (source and commit), `rbac/` and `runtime/` kustomize overlays |
+| `hack/update-release-set.sh`, `hack/image-commit.sh` | Resolve tags, image digests and the commit embedded in each published image into `release-set.yaml` |
+| `hack/update-operand-manifests.sh`, `hack/verify-operand-manifests.sh` | Copy the upstream trees at the recorded commits; offline CI verification |
+| `hack/cluster-build.sh`, `hack/cluster-install.sh`, `hack/cluster-uninstall.sh` | On-cluster build and OLM install for a disposable cluster |
+| `bundle/` | The generated OLM bundle (one CSV, thirteen CRDs, nineteen standalone ClusterRoles) |
+| `config/catalog/`, `catalog/` | Committed CatalogSource and Subscription templates; the rendered file-based catalog |
 | `AGENTS.md` | Instructions for coding agents working in this repository |
 
 ## Toolchain
@@ -69,30 +69,17 @@ snapshot has been checked locally and has not been tested on a live cluster.
 | operator-sdk | v1.42.3 | kubebuilder `go.kubebuilder.io/v4` layout |
 | controller-gen | v0.18.0 | Downloaded into `bin/` by the Makefile |
 | envtest | Kubernetes 1.33.0 | Downloaded into `bin/k8s/` by `make test` |
-| Python | 3, with PyYAML from `hack/requirements.txt` in `.venv` | Bundle fetch, extraction, checks, catalog, parity |
+| kustomize, yq, opm | Pinned in the Makefile | Downloaded into `bin/` on demand; render manifests and the catalog |
+| python3 | 3, standard library only | The two remaining script tests under `make test-offline` |
 | podman | 5.7.0 | Installed but not used; the operator image is built on the cluster |
 
-## Generated operand manifests
+## Operand manifests
 
-`make operand-manifests` writes 90 manifests to `internal/operands/manifests/`
-(plus `provenance.json`), the twelve component CRDs to `config/crd/bases/`, and the
-union role to `config/rbac/operand_union_role.yaml`:
-
-| Component | Manifests | Of which ClusterRoles / ClusterRoleBindings |
-| --- | --- | --- |
-| NHC | 12 | 3 / 2 |
-| SNR | 15 | 4 / 2 |
-| SBR | 24 | 15 / 3 |
-| FAR | 15 | 4 / 2 |
-| MDR | 12 | 4 / 2 |
-| NMO | 12 | 3 / 2 |
-| **Total** | **90** | |
-
-Each component's set includes the `<serviceaccount>-all-namespaces` ClusterRole and
-ClusterRoleBinding that copy the CSV's namespaced `permissions` cluster-wide and
-append get/list/watch on `namespaces`, as OLM does for an all-namespaces install
-(design brief D7). Never hand-edit these files;
-regenerate them.
+Each operand has a copy of its upstream `config/` tree in `config/operands/<k>/upstream/`, plus
+two kustomize overlays: `rbac/` (rendered into the WAO CSV and bundle) and `runtime/` (rendered
+into `internal/operands/manifests/<k>/objects.yaml`, the Deployments, Services, ConfigMaps and
+webhook configurations the renderer applies at enable time). The operand CRDs ship in the CSV.
+Never hand-edit the generated files; run `make operand-manifests`.
 
 ## Build and test
 
@@ -100,31 +87,23 @@ Run from the repository root (the `cd` command works from any directory inside t
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
-make python-env               # create .venv and install pinned Python requirements
-
-make bundles                  # fetch the pinned bundles into .cache/bundles and verify digests
-make operand-manifests-check  # committed manifests, CRDs and union role match the bundles
+make verify-operand-manifests # offline: copies, pins, ServiceAccount coverage and bundle shape agree
 make generate manifests       # controller-gen: deepcopy, CRD and RBAC
 make test                     # Go unit and envtest suites
-make test-offline             # Python tests and bash syntax check of test/cluster (no cluster)
+make test-offline             # verify-operand-manifests plus the remaining script tests (no cluster)
 GOTOOLCHAIN=go1.24.13 make lint # match the Go 1.24 toolchain used by CI's pinned linter
 ```
 
-GitHub Actions runs the Go suites, lint, and offline tests. The offline job fetches
-the pinned bundles first so extraction and parity tests run instead of skipping
-because `.cache/bundles` is missing.
+GitHub Actions runs the Go suites, lint, `make verify-operand-manifests` and the offline tests.
+None of them needs the network or a cluster.
 
-Python Make targets automatically run `python-env` first. It creates `.venv` if
-missing and reinstalls dependencies when `hack/requirements.txt` changes. With
-`PYTHON=/path/to/python`, you manage that interpreter and its dependencies yourself.
-
-`make test-e2e` requires Docker, Kind, kubectl and Python 3. It creates a new disposable Kind
+`make test-e2e` requires Docker, Kind, kubectl and python3. It creates a new disposable Kind
 cluster with a dedicated kubeconfig, builds WAO, and tests the all-Disabled install:
 manager readiness, the default config, and absence of operands and native resources.
 It uses `config/e2e` to select the locally built WAO image without editing the
 committed image pin. It does not enable operands or require cert-manager or metrics.
-The full OLM and enabled-operand checks remain in `test/cluster` on a confirmed
-disposable OpenShift cluster.
+The full OLM and enabled-operand checks are done by hand on a confirmed
+disposable OpenShift cluster (see the next section).
 
 The Kind runner generates a unique cluster name by default. An explicit
 `KIND_CLUSTER` is locked against concurrent runs and must not already exist.
@@ -134,116 +113,34 @@ its Kind cluster on success or failure. Raw output and the isolated kubeconfig s
 under `evidence/<UTC-date>-kind-e2e-<pid>/`. CI saves only `e2e.log` as the
 `kind-e2e-logs` artifact, never the kubeconfig.
 
-`make operand-manifests` regenerates the operand manifests after a deliberate
-release-set change. `make bundle` and `make bundle-check` generate and check the
-bundle; `make catalog-configmap` renders the POC catalog (next section).
+Operand manifests are copied from each upstream checkout, following OADP's non-admin-controller
+pattern. `make update-release-set` records the latest release tag, image digests and the git
+commit embedded in each published image into `release-set.yaml`; `make update-operand-manifests`
+copies `config/` from a checkout at that commit into `config/operands/<k>/upstream/` (checkouts
+live in `.cache/operands`, or set `NHC_PATH` and friends), renders the runtime manifests the Go
+renderer embeds, and syncs `RELATED_IMAGE_*`. `make bump-operands` does both. Review the diff and
+commit; CI runs `make verify-operand-manifests`, which is offline. Operand RBAC ships in the WAO
+CSV via `--extra-service-accounts` and OLM creates it at install; WAO creates no RBAC itself.
 
-## Operator image and POC catalog
+## Build, catalog and install on a disposable cluster
 
-**Registry choice:** the OpenShift internal image registry of the disposable test
-cluster (plan Task 8, option B). No external registry credentials are needed. The
-image is built on the cluster with an OpenShift binary Docker build in its own
-namespace `wao-poc-build`, not in the install namespace, because preflight
-(WAO-INST-00) requires `openshift-workload-availability` to be absent and OLM
-creates it later. The bundle references the image **by digest**.
-
-The build uploads a clean `git archive` of `HEAD`, never the working directory, so
-git-ignored files such as kubeconfigs are never sent to the cluster.
-
-```sh
-KC=/path/to/disposable-cluster.kubeconfig   # always passed explicitly
-SRC=$(mktemp -d) && git archive HEAD | tar -x -C "$SRC"
-
-oc create namespace wao-poc-build --kubeconfig "$KC"
-oc new-build --binary --name wao -n wao-poc-build --strategy docker --kubeconfig "$KC"
-# Let pods in the install namespace pull from the build namespace (works before it exists).
-oc policy add-role-to-group system:image-puller \
-  system:serviceaccounts:openshift-workload-availability -n wao-poc-build --kubeconfig "$KC"
-oc start-build wao -n wao-poc-build --from-dir="$SRC" --follow --kubeconfig "$KC"
-
-DIGEST=$(oc get istag wao:latest -n wao-poc-build --kubeconfig "$KC" -o jsonpath='{.image.metadata.name}')
-IMG=image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@$DIGEST
-
-make bundle IMG=$IMG VERSION=0.1.0 CHANNELS=alpha DEFAULT_CHANNEL=alpha
-make bundle-check
-make catalog-configmap DEFAULT_CHANNEL=alpha   # writes dist/wao-poc-catalog.yaml (git-ignored)
-```
-
-The committed bundle currently references
-`image-registry.openshift-image-registry.svc:5000/wao-poc-build/wao@sha256:6077f4265aaf49de3e445e07bd7ee1750171951cdc2d7de4a11f7d8f63328671`
-(linux/amd64). A different cluster needs its own build and a regenerated bundle.
-
-`dist/wao-poc-catalog.yaml` holds a ConfigMap with the CSV and thirteen CRDs and a
-`sourceType: internal` CatalogSource named `wao-poc-catalog` in
-`openshift-marketplace` (design brief D6). It is for the POC install case only. The
-upgrade case needs an FBC catalog image (`make catalog-build catalog-push`).
-
-## Run the POC on a cluster
-
-`test/cluster/full-run.sh` runs the POC on a **disposable** OpenShift cluster with classic OLM
-that you are authorized to modify. Pass the kubeconfig explicitly; the current context is never
-used. Without `CONFIRM=yes` it shows the cluster and asks before changing anything.
-
-First prepare the local Python environment, even though the operator image is built on the cluster.
-From anywhere inside the checkout, including `test/cluster`, run:
+The operator, bundle and a file-based catalog (FBC) image are built on the cluster with binary
+Docker builds in namespace `wao-poc-build`, from a clean `git archive HEAD`. The bundle references
+the operator image by digest and the catalog references the bundle by digest. No external registry
+is needed. The kubeconfig is always passed explicitly.
 
 ```sh
-cd "$(git rev-parse --show-toplevel)"
-python3 -m venv .venv
-.venv/bin/python -m pip install -r hack/requirements.txt
+KC=/path/to/disposable-cluster.kubeconfig
+hack/cluster-build.sh "$KC"      # builds three images, writes dist/catalogsource.yaml
+hack/cluster-install.sh "$KC"    # CatalogSource, namespace, OperatorGroup, Subscription; waits for the CSV
+hack/cluster-uninstall.sh "$KC"  # removes them; CRDs stay
 ```
 
-The scripts use `<repository-root>/.venv/bin/python` directly by default; no activation is needed.
-They do not create the environment automatically. If `full-run.sh build` reports
-`.venv/bin/python missing`, use the setup above. The environment belongs at the repository root,
-including when you launch the script from `test/cluster`.
-
-Then run the desired phases from the repository root:
-
-```sh
-export KUBECONFIG=/path/to/disposable.kubeconfig
-bash test/cluster/full-run.sh build      # build the WAO image on the cluster, point the bundle at it, render the catalog
-bash test/cluster/full-run.sh install    # install WAO through OLM; leaves it installed, every component Disabled
-bash test/cluster/full-run.sh run        # the full verification, WAO-INST-00..18, ending with uninstall and a report
-bash test/cluster/full-run.sh            # build, then run
-```
-
-| Phase | What it does | Mutates |
-| --- | --- | --- |
-| `build` | Workstation checks (`make bundles operand-manifests-check test test-offline`), read-only preflight, on-cluster image build from `git archive HEAD` into `wao-poc-build`, `make bundle` pointed at the new digest, `make catalog-configmap` | namespace `wao-poc-build`; tracked files `README.md`, the bundle CSV and `config/manager/kustomization.yaml` (review and commit them) |
-| `install` | Cases 00–02: catalog, OLM install, InstallPlan approval. Prints the CSV and component phases and the `oc patch` to enable a component | CatalogSource in `openshift-marketplace`; namespace `openshift-workload-availability` |
-| `run` | Cases 00–18: install, enable all six components, parity, restart, drift, disable, delete config, uninstall. Writes `REPORT.md` beside `results.json` | everything above, then removes it; case 06 starts SNR agents on every node |
-
-`install` and `run` need a prior `build` on that cluster (the image in its internal registry and
-`dist/wao-poc-catalog.yaml`). After `install`, continue with single cases such as
-`bash test/cluster/run-all.sh 05` and clean up with `bash test/cluster/run-all.sh 18`.
-Options: `SKIP_BUILD=1` reuses the image already on the cluster, `SKIP_PREREQS=1` skips the
-workstation checks, `ALLOW_DIRTY=1` permits uncommitted changes. Raw output goes only to the
-git-ignored `evidence/`. See [test/cluster/README.md](test/cluster/README.md) and
-[docs/agent-test-run.md](docs/agent-test-run.md).
-
-## Install by hand
-
-What `full-run.sh install` does, on a disposable cluster with no medik8s operators or CRDs installed:
-
-1. `oc apply -f dist/wao-poc-catalog.yaml` and wait for the CatalogSource to be `READY`.
-2. Create the namespace `openshift-workload-availability` with the annotation
-   `openshift.io/node-selector: ""`, an OperatorGroup with an empty spec (all
-   namespaces), and a Subscription to package `workload-availability-operator`,
-   channel `alpha`, source `wao-poc-catalog` in `openshift-marketplace`.
-3. Approve the InstallPlan. The CSV `workload-availability-operator.v0.1.0`
-   reaches `Succeeded` and owns all thirteen CRDs.
-4. WAO creates the config `cluster` with every component `Disabled` (D4). Enable a
-   component with, for example:
-
-   ```sh
-   oc patch workloadavailabilityconfig cluster --type merge \
-     -p '{"spec":{"components":{"nodeHealthCheck":{"state":"Enabled"}}}}'
-   ```
-
-`test/cluster/02-install-wao.sh` performs steps 2 and 3. The harness in
-[test/cluster/](test/cluster/README.md) runs the whole install case (plan section 4).
-It writes raw output only to the git-ignored `evidence/`.
+`config/catalog/` holds the committed CatalogSource (`sourceType: grpc`) and Subscription
+templates. `make catalog-fbc BUNDLE_IMG=<ref>` renders `./bundle` into `catalog/` with `opm` and
+`make catalog-build` builds the image locally when a container tool is available. The shared
+`make dev-olm-deploy` from medik8s/tools (`TOOLS_DIR=<path to medik8s/tools>`) installs the bundle
+with `operator-sdk run bundle` and needs no catalog image.
 
 ## What Enabled and Disabled mean
 
@@ -289,24 +186,23 @@ removed, the operand objects it renders. Specifically:
    SNR template and Secret `self-node-remediation-certificates`, the thirteen CRDs
    (this deletes every custom resource of those kinds), the NHC aggregation
    ClusterRole and binding, the ConsolePlugin, the `medik8s-leases` namespace, the
-   CatalogSource and its ConfigMap, the namespace and the `wao-poc-build` namespace.
+   CatalogSource, the namespace and the `wao-poc-build` namespace.
 
-`test/cluster/18-uninstall.sh` performs this cleanup.
+`hack/cluster-uninstall.sh` performs steps 2 and 3 and the CatalogSource removal.
 
 ## Security notes
 
-- WAO's operand ClusterRole (`config/rbac/operand_union_role.yaml`) is the union of
-  every rule of every Role and ClusterRole it renders, plus RBAC `bind` and the
-  rules it needs itself (D7). Kubernetes RBAC escalation prevention only lets WAO
-  create roles whose rules it holds. The union therefore includes:
+- Operand RBAC is not created by WAO. It ships in the WAO CSV (operand ServiceAccount
+  permissions, via `--extra-service-accounts`) and as nineteen standalone ClusterRoles in the
+  bundle, and OLM creates it at install. The operand ServiceAccounts and roles therefore exist
+  from install onward, even while every component is Disabled. WAO's own role holds no union of
+  operand rules. The operand rules include:
   - SCC `use` on `privileged`, because the SNR and SBR CSVs grant it for their agents;
   - NMO's `oauth.openshift.io` wildcard;
   - cluster-wide `clusterroles` and `clusterrolebindings` management from NHC and SBR.
-- Each component's namespaced CSV `permissions` are also granted cluster-wide
-  through `<serviceaccount>-all-namespaces`, with OLM's get/list/watch rule on
-  `namespaces` appended, exactly as OLM does for the all-namespaces install mode
-  these CSVs support. For FAR this means its manager can read Secrets (fence
-  credentials) in every namespace, which upstream FAR requires.
+- For the `AllNamespaces` OperatorGroup, OLM promotes each CSV's namespaced `permissions`
+  to cluster-wide roles and appends get/list/watch on `namespaces`. For FAR this means its
+  manager can read Secrets (fence credentials) in every namespace, which upstream FAR requires.
 - Enabling SNR starts privileged node agents on every eligible node (D3).
 - No API field can override a component image; the pinned digests are reported in
   the config status (`releaseSet`).
@@ -356,6 +252,13 @@ Bugs in the plan found and fixed during implementation:
    WAO-INST-12. A standalone OLM install of the same NMO v0.21.0 bundle had the extra
    rule and ran without restarts, confirming the cause. WAO now reproduces the rule
    in every `<serviceaccount>-all-namespaces` ClusterRole, and WAO-INST-10 checks it.
+9. 2026-10: the Python pipeline, the union role and the ConfigMap catalog were replaced by the
+   OADP-style approach (GitHub #12 to #16): operand `config/` trees are copied from upstream
+   checkouts at the commit embedded in the published image, operand RBAC ships in the WAO CSV and
+   OLM creates it, and the dev catalog is an FBC image. Items 2, 3 and 8 are historical; OLM now
+   does the cluster-wide promotion of CSV `permissions` for the `AllNamespaces` OperatorGroup.
+   Trade-off accepted: operand ServiceAccounts and roles exist from install onward, even while
+   every component is Disabled.
 
 ## License
 
