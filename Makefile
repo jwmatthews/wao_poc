@@ -471,55 +471,35 @@ bundle-run-update: operator-sdk ## Upgrade bundle image
 bundle-cleanup: operator-sdk ## Remove bundle installed via bundle-run
 	$(OPERATOR_SDK) -n $(OPERATOR_NAMESPACE) cleanup $(OPERATOR_NAME)
 
-# Build a file-based catalog image
-# https://docs.openshift.com/container-platform/4.14/operators/admin/olm-managing-custom-catalogs.html#olm-managing-custom-catalogs-fb
-# NOTE: CATALOG_DIR and CATALOG_DOCKERFILE items won't be deleted in case of recipe's failure
+# File-based catalog (FBC). https://olm.operatorframework.io/docs/reference/file-based-catalogs/
+# catalog-fbc renders the local ./bundle directory, so it needs no registry access, and stamps
+# BUNDLE_IMG into the olm.bundle blob: that is the reference OLM pulls at install time.
+# NOTE: CATALOG_DIR and CATALOG_DOCKERFILE are left in place if a recipe fails, for inspection.
 CATALOG_DIR := catalog
 CATALOG_DOCKERFILE := ${CATALOG_DIR}.Dockerfile
 CATALOG_INDEX := $(CATALOG_DIR)/index.yaml
 
-# Add olm.channel entries for each channel in CHANNELS.
-# Keep the default candidate's upgrade edge in the catalog.
-.PHONY: add_channel_entry_for_the_bundle
-add_channel_entry_for_the_bundle: verify-previous-version verify-skip-range
+.PHONY: catalog-fbc
+catalog-fbc: opm yq verify-previous-version verify-skip-range ## Render ./bundle into a validated FBC under catalog/ for BUNDLE_IMG.
+	rm -rf ${CATALOG_DIR} ${CATALOG_DOCKERFILE}
+	mkdir -p ${CATALOG_DIR}
+	$(OPM) generate dockerfile ${CATALOG_DIR}
+	$(OPM) init ${OPERATOR_NAME} --default-channel=${DEFAULT_CHANNEL} --description=./README.md --icon="${BLUE_ICON_PATH}" --output yaml > ${CATALOG_INDEX}
+	$(OPM) render ./bundle --output yaml | $(YQ) '(select(.schema == "olm.bundle") | .image) = "$(BUNDLE_IMG)"' >> ${CATALOG_INDEX}
 	@for channel in $(shell echo ${CHANNELS} | tr ',' ' '); do \
-		echo "---" >> ${CATALOG_INDEX}; \
-		echo "schema: olm.channel" >> ${CATALOG_INDEX}; \
-		echo "package: ${OPERATOR_NAME}" >> ${CATALOG_INDEX}; \
-		echo "name: $$channel" >> ${CATALOG_INDEX}; \
-		echo "entries:" >> ${CATALOG_INDEX}; \
-		echo "  - name: ${OPERATOR_NAME}.v${VERSION}" >> ${CATALOG_INDEX}; \
-		\
-		if [ -n "${PREVIOUS_VERSION}" ]; then \
-			echo "    replaces: ${OPERATOR_NAME}.v${PREVIOUS_VERSION}" >> ${CATALOG_INDEX}; \
-		fi; \
-		if [ -n "${SKIP_RANGE_LOWER}" ]; then \
-			echo "    skipRange: '>=${SKIP_RANGE_LOWER} <${VERSION}'" >> ${CATALOG_INDEX}; \
-		fi; \
+		printf '%s\n' '---' 'schema: olm.channel' 'package: ${OPERATOR_NAME}' "name: $$channel" 'entries:' '  - name: ${OPERATOR_NAME}.v${VERSION}' >> ${CATALOG_INDEX}; \
+		if [ -n "${PREVIOUS_VERSION}" ]; then printf '%s\n' '    replaces: ${OPERATOR_NAME}.v${PREVIOUS_VERSION}' >> ${CATALOG_INDEX}; fi; \
+		if [ -n "${SKIP_RANGE_LOWER}" ]; then printf '%s\n' "    skipRange: '>=${SKIP_RANGE_LOWER} <${VERSION}'" >> ${CATALOG_INDEX}; fi; \
 	done
+	$(OPM) validate ${CATALOG_DIR}
+	@test "$$($(YQ) 'select(.schema == "olm.bundle") | .image' ${CATALOG_INDEX})" = "$(BUNDLE_IMG)" || { echo "catalog-fbc: bundle image not stamped"; exit 1; }
 
 .PHONY: catalog-build
-catalog-build: verify-previous-version verify-skip-range ## Build a file-based catalog image.
-	$(MAKE) opm
-	# Remove the catalog directory and Dockerfile if they exist
-	-rm -r ${CATALOG_DIR} ${CATALOG_DOCKERFILE}
-	@mkdir -p ${CATALOG_DIR}
-	$(OPM) generate dockerfile ${CATALOG_DIR}
-	$(OPM) init ${OPERATOR_NAME} \
-		--default-channel=${DEFAULT_CHANNEL} \
-		--description=./README.md \
-		--icon="${BLUE_ICON_PATH}" \
-		--output yaml \
-		> ${CATALOG_INDEX}
-	$(OPM) render ${BUNDLE_IMG} --output yaml >> ${CATALOG_INDEX}
-	$(MAKE) add_channel_entry_for_the_bundle
-	$(OPM) validate ${CATALOG_DIR}
+catalog-build: catalog-fbc ## Build the FBC image CATALOG_IMG from catalog/ (needs CONTAINER_TOOL).
 	$(CONTAINER_TOOL) build . -f ${CATALOG_DOCKERFILE} -t ${CATALOG_IMG}
-	# Clean up the catalog directory and Dockerfile
-	rm -r ${CATALOG_DIR} ${CATALOG_DOCKERFILE}
 
 .PHONY: catalog-push
-catalog-push: ## Push a catalog image.
+catalog-push: ## Push the catalog image.
 	$(CONTAINER_TOOL) push $(CATALOG_IMG)
 
 ##@ Targets used by CI
