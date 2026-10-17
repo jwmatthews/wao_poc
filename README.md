@@ -16,7 +16,7 @@ The POC installs all six upstream components as managed operands:
 | [Machine Deletion Remediation (MDR)](https://github.com/medik8s/machine-deletion-remediation) | Remediates nodes by deleting their Machine so the Machine API replaces it |
 | [Node Maintenance (NMO)](https://github.com/medik8s/node-maintenance-operator) | Cordons and drains a node on explicit request |
 
-The selected component versions, bundle digests and operand image digests are in
+The selected component versions, operand image digests and embedded commits are in
 [release-set.yaml](release-set.yaml). A snapshot may include development bundles;
 the CSV version alone does not establish a published release. Floating tags such
 as `latest` are resolved only when refreshing that file. WAO deploys the recorded
@@ -40,7 +40,7 @@ snapshot has been checked locally and has not been tested on a live cluster.
 | --- | --- |
 | Design brief | Written |
 | Implementation plan for the install case | Written: [docs/archive/bootstrap/implementation-plan.md](docs/archive/bootstrap/implementation-plan.md) |
-| Implementation | Done: Tasks 1–10 (operator, operand manifests, bundle, image, POC catalog, live-cluster harness, docs) |
+| Implementation | Done: Tasks 1–10 (operator, operand manifests, bundle, image, docs); the OADP-style rework (Tasks 1–13) is on branch `explore_how_oadp_updates_third_party_bundles`, cluster verification pending |
 | Live install verification | Run on a disposable OpenShift 4.22 cluster (3 nodes, `HighlyAvailable`): four full runs of 19 cases. Runs found two WAO RBAC bugs, both fixed (see [Deviations from the plan](#deviations-from-the-plan), items 3 and 8). The final run passed 17 of 19: WAO-INST-09 and WAO-INST-12 failed only because the upstream MDR manager could not start under its 30Mi memory limit, which reproduces without WAO (see [Known upstream issues](#known-upstream-issues)). Every other case passed. A fifth run on 2026-10-05 against a fresh OpenShift 5.0.0-rc.5 cluster (3 nodes, `HighlyAvailable`, classic OLM) through the since-removed `test/cluster/full-run.sh` harness passed all 19 cases, including MDR, which started with a warm page cache that time. Raw results are not committed |
 | Upgrade scenarios | Future plan |
 
@@ -49,7 +49,7 @@ snapshot has been checked locally and has not been tested on a live cluster.
 | Path | Contents |
 | --- | --- |
 | [docs/archive/bootstrap/](docs/archive/bootstrap/README.md) | Historical design brief, operand research and implementation plan used to bootstrap the project |
-| `release-set.yaml` | The pinned upstream bundle and image digests the POC installs |
+| `release-set.yaml` | The pinned upstream release tags, commits and image digests the POC installs |
 | `api/v1alpha1/` | The `WorkloadAvailabilityConfig` API |
 | `internal/controller/` | The lifecycle controller and the default-config bootstrap |
 | `internal/operands/` | The embedded runtime manifests and the renderer |
@@ -121,6 +121,8 @@ live in `.cache/operands`, or set `NHC_PATH` and friends), renders the runtime m
 renderer embeds, and syncs `RELATED_IMAGE_*`. `make bump-operands` does both. Review the diff and
 commit; CI runs `make verify-operand-manifests`, which is offline. Operand RBAC ships in the WAO
 CSV via `--extra-service-accounts` and OLM creates it at install; WAO creates no RBAC itself.
+`release-set.yaml` records per operand `repo`, `version`, `tag`, `commit` and
+`images.<ENV>.{upstream,pinned}`.
 
 ## Build, catalog and install on a disposable cluster
 
@@ -144,14 +146,17 @@ with `operator-sdk run bundle` and needs no catalog image.
 
 ## What Enabled and Disabled mean
 
-**Enabled** renders the component's operand objects from the pinned bundle and
-applies them with server-side apply: manager Deployment, Services, ServiceAccounts,
-roles and bindings, ConfigMaps and webhook configurations. The phase becomes
+**Enabled** applies the component's operand objects with server-side apply: the
+manager Deployment, Services, ConfigMaps and webhook configurations, rendered from the
+upstream `config/default` copy (the `objects.yaml` embedded in the binary) with the pinned
+image digests substituted. The operand ServiceAccounts, Roles and bindings are not part of
+this: OLM creates them from the WAO CSV at install, and they exist whether or not the
+component is Enabled. The phase becomes
 `Available` once the managers are ready and, for NHC, SNR, FAR and NMO, the
 service-ca CA bundles are injected into the webhooks (D1).
 
 **Disabled** (the default for every component) means WAO has not created, or has
-removed, the operand objects it renders. Specifically:
+removed, the operand objects it renders (not the OLM-owned RBAC). Specifically:
 
 - Installing WAO creates no remediation policy, remediation request, native config,
   node agent, operand Deployment or webhook configuration. The CRDs are installed
@@ -181,14 +186,16 @@ removed, the operand objects it renders. Specifically:
    next time it starts (D4), which is harmless.
 3. Delete the Subscription and the CSV in `openshift-workload-availability`. OLM
    removes WAO's Deployment; CRDs remain, as with any OLM uninstall.
-4. If desired, remove what remains: delete the SNR config
-   `self-node-remediation-config` (its agent DaemonSet is garbage-collected), the
-   SNR template and Secret `self-node-remediation-certificates`, the thirteen CRDs
-   (this deletes every custom resource of those kinds), the NHC aggregation
-   ClusterRole and binding, the ConsolePlugin, the `medik8s-leases` namespace, the
-   CatalogSource, the namespace and the `wao-poc-build` namespace.
+4. Operand RBAC is owned by OLM and is removed with the CSV. What can remain after
+   uninstall is: the thirteen CRDs (OLM does not delete them; deleting them removes every
+   custom resource of those kinds), agent DaemonSets owned by component configs such as
+   the SNR config `self-node-remediation-config`, the service-ca Secrets
+   `<prefix>-webhook-server-cert`, and objects the upstream managers created (NHC's
+   aggregation ClusterRole, the ConsolePlugin, the `medik8s-leases` namespace). If desired,
+   also delete the CatalogSource, the namespace and the `wao-poc-build` namespace.
 
-`hack/cluster-uninstall.sh` performs steps 2 and 3 and the CatalogSource removal.
+`hack/cluster-uninstall.sh` is the scripted path: it performs steps 2 and 3 and removes the
+CatalogSource; the CRDs stay.
 
 ## Security notes
 
