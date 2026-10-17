@@ -107,10 +107,10 @@ touch -t 203001010000 bin/controller-gen-wrapper
 
 - [ ] **Step 4: Verify `make test` passes with the wrapper**
 
-Run: `CONTROLLER_GEN=$PWD/bin/controller-gen-wrapper make test 2>&1 | tail -15`
+Run: `make CONTROLLER_GEN=$PWD/bin/controller-gen-wrapper SORT_IMPORTS=$PWD/bin/sort-imports-wrapper test-no-verify-changes 2>&1 | tail -15`
 Expected: `ok  github.com/medik8s/workload-availability-operator/internal/controller` and `verify-no-changes` clean. If `verify-no-changes` reports a dirty tree from `bundle-reset`, inspect with `git status --short`; the only acceptable diff is none.
 
-Every later `make test` in this plan is run as `CONTROLLER_GEN=$PWD/bin/controller-gen-wrapper make test`.
+Every later `make test` in this plan is run as `make CONTROLLER_GEN=$PWD/bin/controller-gen-wrapper SORT_IMPORTS=$PWD/bin/sort-imports-wrapper test-no-verify-changes` (variables on the make command line, because the Makefile assigns them with `=`; `verify-no-changes` is skipped because it fails on pre-existing untracked files), followed by `git status --short` to confirm no tracked file changed unexpectedly.
 
 - [ ] **Step 5: Download the pinned tools once**
 
@@ -1255,7 +1255,7 @@ In `workloadavailabilityconfig_controller_test.go`:
 
 - [ ] **Step 2: Run the controller tests to see the NHC test fail**
 
-Run: `CONTROLLER_GEN=$PWD/bin/controller-gen-wrapper make test-no-verify-changes 2>&1 | tail -20`
+Run: `make CONTROLLER_GEN=$PWD/bin/controller-gen-wrapper SORT_IMPORTS=$PWD/bin/sort-imports-wrapper test-no-verify-changes 2>&1 | tail -20`
 Expected: FAIL in "installs the NHC operand when enabled" is NOT expected anymore because Task 7 already stopped rendering RBAC; the test should pass. If it fails, the renderer still emits RBAC; fix Task 7 first.
 
 - [ ] **Step 3: Wire the operand RBAC into the bundle**
@@ -1306,7 +1306,7 @@ and change the `rbac.authorization.k8s.io` marker line to be removed entirely, a
 
 Run:
 ```bash
-CONTROLLER_GEN=$PWD/bin/controller-gen-wrapper make manifests bundle
+make CONTROLLER_GEN=$PWD/bin/controller-gen-wrapper SORT_IMPORTS=$PWD/bin/sort-imports-wrapper manifests bundle
 CSV=bundle/manifests/workload-availability-operator.clusterserviceversion.yaml
 yq '.spec.install.spec.permissions[] | .serviceAccountName + " " + (.rules | length | tostring)' $CSV
 yq '.spec.install.spec.clusterPermissions[] | .serviceAccountName + " " + (.rules | length | tostring)' $CSV
@@ -1319,7 +1319,7 @@ Then `make bundle-validate` must pass.
 
 - [ ] **Step 6: Full test run and commit**
 
-Run: `CONTROLLER_GEN=$PWD/bin/controller-gen-wrapper make test 2>&1 | tail -8`
+Run: `make CONTROLLER_GEN=$PWD/bin/controller-gen-wrapper SORT_IMPORTS=$PWD/bin/sort-imports-wrapper test-no-verify-changes 2>&1 | tail -8`
 Expected: pass, including `verify-no-changes` (if `bundle-reset` shows a diff in `createdAt` only, that is the existing behaviour and the target handles it).
 
 ```bash
@@ -1479,7 +1479,7 @@ Place it before the "reports DisableIncomplete" test so ordering-sensitive tests
 
 - [ ] **Step 2: Run**
 
-Run: `CONTROLLER_GEN=$PWD/bin/controller-gen-wrapper make test 2>&1 | tail -8`
+Run: `make CONTROLLER_GEN=$PWD/bin/controller-gen-wrapper SORT_IMPORTS=$PWD/bin/sort-imports-wrapper test-no-verify-changes 2>&1 | tail -8`
 Expected: pass.
 
 - [ ] **Step 3: Commit**
@@ -1527,7 +1527,7 @@ Expected: only README lines (fixed in Task 13) and possibly `test/olmv1` or `OLM
 
 - [ ] **Step 3: Run the offline tests**
 
-Run: `make test-offline && CONTROLLER_GEN=$PWD/bin/controller-gen-wrapper make test 2>&1 | tail -5`
+Run: `make test-offline && make CONTROLLER_GEN=$PWD/bin/controller-gen-wrapper SORT_IMPORTS=$PWD/bin/sort-imports-wrapper test-no-verify-changes 2>&1 | tail -5`
 Expected: both pass.
 
 - [ ] **Step 4: Commit**
@@ -1715,7 +1715,7 @@ oc --kubeconfig=$KC get clusterrole -o name | grep -E 'metrics-reader|ext-remedi
 oc --kubeconfig=$KC get deploy -n $NS -o name
 oc --kubeconfig=$KC get clusterrole,role,rolebinding,clusterrolebinding -A -l app.kubernetes.io/managed-by=workload-availability-operator -o name | wc -l
 ```
-Expected: the seven operand ServiceAccounts plus the WAO SA; OLM-owned ClusterRoles present; twenty standalone ClusterRoles; only the WAO Deployment; zero WAO-managed RBAC objects.
+Expected: the seven operand ServiceAccounts plus the WAO SA; OLM-owned ClusterRoles present; nineteen standalone ClusterRoles; only the WAO Deployment; zero WAO-managed RBAC objects.
 
 - [ ] **Step 4: Enable NHC and NMO, then all six, and watch readiness**
 
@@ -1757,7 +1757,7 @@ Write `evidence/<UTC date>-oadp-cluster/RESULTS.md` with every command and sanit
 
 - [ ] **Step 7: Final full test run**
 
-Run: `make verify-operand-manifests test-offline && CONTROLLER_GEN=$PWD/bin/controller-gen-wrapper make test 2>&1 | tail -5 && git status --short`
+Run: `make verify-operand-manifests test-offline && make CONTROLLER_GEN=$PWD/bin/controller-gen-wrapper SORT_IMPORTS=$PWD/bin/sort-imports-wrapper test-no-verify-changes 2>&1 | tail -5 && git status --short`
 Expected: all pass; tree clean apart from untracked pre-existing files. Remove `evidence/go.mod` at the very end per KI-6.
 
 ---
