@@ -502,6 +502,13 @@ catalog-build: catalog-fbc ## Build the FBC image CATALOG_IMG from catalog/ (nee
 catalog-push: ## Push the catalog image.
 	$(CONTAINER_TOOL) push $(CATALOG_IMG)
 
+.PHONY: catalog-source
+catalog-source: yq ## Write dist/catalogsource.yaml pointing at CATALOG_IMG.
+	@test -n "$(CATALOG_IMG)" || { echo "catalog-source: set CATALOG_IMG"; exit 1; }
+	mkdir -p dist
+	$(YQ) '.spec.image = "$(CATALOG_IMG)"' config/catalog/catalogsource.yaml > dist/catalogsource.yaml
+	@grep -q CATALOG_IMG_PLACEHOLDER dist/catalogsource.yaml && { echo "catalog-source: placeholder left"; exit 1; } || true
+
 ##@ Targets used by CI
 
 .PHONY: container-build

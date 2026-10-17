@@ -1,0 +1,18 @@
+# POC catalog for the disposable-cluster install. `make catalog-source CATALOG_IMG=<ref>` fills
+# spec.image and writes dist/catalogsource.yaml. The image is a file-based catalog built by
+# `make catalog-fbc` (see README, "Operator image and POC catalog").
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: wao-poc-catalog
+  namespace: openshift-marketplace
+spec:
+  displayName: WAO POC
+  publisher: medik8s POC
+  sourceType: grpc
+  image: CATALOG_IMG_PLACEHOLDER
+  grpcPodConfig:
+    securityContextConfig: restricted
+  updateStrategy:
+    registryPoll:
+      interval: 10m
