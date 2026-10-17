@@ -1,0 +1,30 @@
+# Runtime objects WAO applies when the component is enabled: Deployment, Services, ConfigMaps and
+# webhook configurations. `make operand-manifests` builds this, drops every other kind, and writes
+# internal/operands/manifests/sbr/objects.yaml. The namespace placeholder and the upstream image
+# reference are replaced by the Go renderer at reconcile time.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: __WAO_NAMESPACE__
+resources:
+- ../upstream/config/default
+images:
+# newName and newTag are kept equal to release-set.yaml images.*.upstream by `make operand-manifests`.
+- name: quay.io/medik8s/storage-based-remediation-operator
+  newName: quay.io/medik8s/storage-based-remediation-operator
+  newTag: latest
+labels:
+# Every operand pod and every Service selector carries the component label (design brief D10):
+# all six managers share one namespace and some upstream selectors would match other managers.
+- pairs:
+    workloadavailability.medik8s.io/component: storageBasedRemediation
+  fields:
+  - path: spec/template/metadata/labels
+    kind: Deployment
+    create: true
+  - path: spec/selector
+    kind: Service
+    create: true
+patches:
+- path: agent_image_env_patch.yaml
+  target:
+    kind: Deployment

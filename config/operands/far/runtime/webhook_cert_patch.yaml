@@ -1,0 +1,21 @@
+# OpenShift service-ca wiring, which OLM would do for a standalone install. The Service asks
+# service-ca for a serving certificate in Secret fence-agents-remediation-webhook-server-cert; the
+# Deployment mounts it where controller-runtime expects it; the webhook configuration gets the CA.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fence-agents-remediation-controller-manager
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        volumeMounts:
+        - name: webhook-server-cert
+          mountPath: /tmp/k8s-webhook-server/serving-certs
+          readOnly: true
+      volumes:
+      - name: webhook-server-cert
+        secret:
+          secretName: fence-agents-remediation-webhook-server-cert
+          defaultMode: 420
