@@ -17,16 +17,8 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install Python dependencies
-        run: python -m pip install -r hack/requirements.txt
-
-      - name: Check pinned manifests and run offline tests
-        run: make bundles operand-manifests-check test-offline PYTHON=python
+      - name: Verify operand manifests and run offline tests
+        run: make verify-operand-manifests test-offline
 
       - name: Running Tests
         run: |
