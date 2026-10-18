@@ -49,8 +49,11 @@ var AllComponentKeys = []string{
 
 // ComponentSpec configures one component.
 type ComponentSpec struct {
-	// state requests the component to be installed (Enabled) or removed at the
-	// manager level (Disabled). Unset means Disabled.
+	// Enabled runs the operator. Disabled removes its manager and managed
+	// installation resources; existing agents, configuration, and native resources
+	// can remain. Complete active maintenance or remediation before disabling.
+	// Default: Disabled.
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,displayName="State",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:select:Disabled","urn:alm:descriptor:com.tectonic.ui:select:Enabled"}
 	// +kubebuilder:default=Disabled
 	// +optional
 	State ComponentState `json:"state,omitempty"`
@@ -58,22 +61,49 @@ type ComponentSpec struct {
 
 // ComponentsSpec holds per-component intent. Every component defaults to Disabled.
 type ComponentsSpec struct {
+	// Runs the Node Health Check operator. Configure a NodeHealthCheck policy
+	// separately to enable automated health monitoring and remediation.
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Node Health Check",order=2
 	// +optional
 	NodeHealthCheck ComponentSpec `json:"nodeHealthCheck,omitempty"`
+	// Runs the Self Node Remediation operator. Enabling this component creates
+	// its default configuration and starts privileged node agents on eligible
+	// nodes. Disabling does not remove existing node agents or their configuration.
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Self Node Remediation",order=3
 	// +optional
 	SelfNodeRemediation ComponentSpec `json:"selfNodeRemediation,omitempty"`
+	// Runs the Storage Based Remediation operator. Configure a
+	// StorageBasedRemediationConfig separately to deploy its agents and configure
+	// storage-based fencing. Existing agents and storage configuration can remain
+	// after disabling.
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Storage Based Remediation",order=4
 	// +optional
 	StorageBasedRemediation ComponentSpec `json:"storageBasedRemediation,omitempty"`
+	// Runs the Node Maintenance operator. Creating a NodeMaintenance resource
+	// separately requests node cordoning and draining. Complete active maintenance
+	// before disabling; stopping the manager does not uncordon a node.
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Node Maintenance",order=5
 	// +optional
 	NodeMaintenance ComponentSpec `json:"nodeMaintenance,omitempty"`
+	// Runs the Fence Agents Remediation operator. Fencing requires separately
+	// configured remediation resources and fence-agent credentials.
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Fence Agents Remediation",order=6
 	// +optional
 	FenceAgentsRemediation ComponentSpec `json:"fenceAgentsRemediation,omitempty"`
+	// Runs the Machine Deletion Remediation operator. Machine deletion requires
+	// a separate remediation request.
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Machine Deletion Remediation",order=7
 	// +optional
 	MachineDeletionRemediation ComponentSpec `json:"machineDeletionRemediation,omitempty"`
 }
 
 // WorkloadAvailabilityConfigSpec defines the desired state of the installation.
 type WorkloadAvailabilityConfigSpec struct {
+	// Choose which component operators WAO runs. All components default to
+	// Disabled. Disabling removes the component manager and its managed
+	// installation resources; resources created by that component can remain.
+	// Disable a component only when it has no active work.
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Components",order=1
 	// +optional
 	Components ComponentsSpec `json:"components,omitempty"`
 }
@@ -156,12 +186,21 @@ type ImageReference struct {
 
 // WorkloadAvailabilityConfigStatus defines the observed state.
 type WorkloadAvailabilityConfigStatus struct {
+	// Configuration generation last processed by WAO.
+	// +operator-sdk:csv:customresourcedefinitions:type=status,displayName="Observed Generation",xDescriptors={"urn:alm:descriptor:text"},order=3
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	// Available, Progressing, and Degraded describe WAO reconciliation.
+	// Available means reconciliation succeeded, including when all components
+	// are Disabled; it does not mean workloads are protected. Check component
+	// status for retained resources after disabling.
+	// +operator-sdk:csv:customresourcedefinitions:type=status,displayName="Reconciliation Conditions",xDescriptors={"urn:alm:descriptor:io.kubernetes.conditions"},order=1
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 	// +optional
 	Components []ComponentStatus `json:"components,omitempty"`
+	// Namespace where WAO installs component operators.
+	// +operator-sdk:csv:customresourcedefinitions:type=status,displayName="Installation Namespace",xDescriptors={"urn:alm:descriptor:io.kubernetes:Namespace"},order=2
 	// +optional
 	InstallNamespace string `json:"installNamespace,omitempty"`
 	// +optional
@@ -175,8 +214,13 @@ type WorkloadAvailabilityConfigStatus struct {
 // +kubebuilder:printcolumn:name="Progressing",type=string,JSONPath=`.status.conditions[?(@.type=="Progressing")].status`
 // +kubebuilder:printcolumn:name="Degraded",type=string,JSONPath=`.status.conditions[?(@.type=="Degraded")].status`
 // +kubebuilder:validation:XValidation:rule="self.metadata.name == 'cluster'",message="WorkloadAvailabilityConfig is a singleton and must be named 'cluster'"
+// +operator-sdk:csv:customresourcedefinitions:resources={{Deployment,v1,""},{Service,v1,""},{ConfigMap,v1,""},{ValidatingWebhookConfiguration,v1,""},{MutatingWebhookConfiguration,v1,""}}
 
-// WorkloadAvailabilityConfig is the cluster-scoped singleton entry point.
+// WorkloadAvailabilityConfig provides cluster-wide configuration for the six
+// medik8s component operators. WAO automatically creates this cluster-scoped
+// singleton with the name cluster and all components Disabled. Edit the existing
+// cluster resource to configure components. When creating it manually, use the
+// name cluster.
 type WorkloadAvailabilityConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

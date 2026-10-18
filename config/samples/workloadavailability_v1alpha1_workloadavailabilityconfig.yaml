@@ -10,3 +10,9 @@ spec:
       state: Disabled
     storageBasedRemediation:
       state: Disabled
+    nodeMaintenance:
+      state: Disabled
+    fenceAgentsRemediation:
+      state: Disabled
+    machineDeletionRemediation:
+      state: Disabled

@@ -29,8 +29,12 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: WorkloadAvailabilityConfig is the cluster-scoped singleton entry
-          point.
+        description: |-
+          WorkloadAvailabilityConfig provides cluster-wide configuration for the six
+          medik8s component operators. WAO automatically creates this cluster-scoped
+          singleton with the name cluster and all components Disabled. Edit the existing
+          cluster resource to configure components. When creating it manually, use the
+          name cluster.
         properties:
           apiVersion:
             description: |-
@@ -54,82 +58,113 @@ spec:
               of the installation.
             properties:
               components:
-                description: ComponentsSpec holds per-component intent. Every component
-                  defaults to Disabled.
+                description: |-
+                  Choose which component operators WAO runs. All components default to
+                  Disabled. Disabling removes the component manager and its managed
+                  installation resources; resources created by that component can remain.
+                  Disable a component only when it has no active work.
                 properties:
                   fenceAgentsRemediation:
-                    description: ComponentSpec configures one component.
+                    description: |-
+                      Runs the Fence Agents Remediation operator. Fencing requires separately
+                      configured remediation resources and fence-agent credentials.
                     properties:
                       state:
                         default: Disabled
                         description: |-
-                          state requests the component to be installed (Enabled) or removed at the
-                          manager level (Disabled). Unset means Disabled.
+                          Enabled runs the operator. Disabled removes its manager and managed
+                          installation resources; existing agents, configuration, and native resources
+                          can remain. Complete active maintenance or remediation before disabling.
+                          Default: Disabled.
                         enum:
                         - Enabled
                         - Disabled
                         type: string
                     type: object
                   machineDeletionRemediation:
-                    description: ComponentSpec configures one component.
+                    description: |-
+                      Runs the Machine Deletion Remediation operator. Machine deletion requires
+                      a separate remediation request.
                     properties:
                       state:
                         default: Disabled
                         description: |-
-                          state requests the component to be installed (Enabled) or removed at the
-                          manager level (Disabled). Unset means Disabled.
+                          Enabled runs the operator. Disabled removes its manager and managed
+                          installation resources; existing agents, configuration, and native resources
+                          can remain. Complete active maintenance or remediation before disabling.
+                          Default: Disabled.
                         enum:
                         - Enabled
                         - Disabled
                         type: string
                     type: object
                   nodeHealthCheck:
-                    description: ComponentSpec configures one component.
+                    description: |-
+                      Runs the Node Health Check operator. Configure a NodeHealthCheck policy
+                      separately to enable automated health monitoring and remediation.
                     properties:
                       state:
                         default: Disabled
                         description: |-
-                          state requests the component to be installed (Enabled) or removed at the
-                          manager level (Disabled). Unset means Disabled.
+                          Enabled runs the operator. Disabled removes its manager and managed
+                          installation resources; existing agents, configuration, and native resources
+                          can remain. Complete active maintenance or remediation before disabling.
+                          Default: Disabled.
                         enum:
                         - Enabled
                         - Disabled
                         type: string
                     type: object
                   nodeMaintenance:
-                    description: ComponentSpec configures one component.
+                    description: |-
+                      Runs the Node Maintenance operator. Creating a NodeMaintenance resource
+                      separately requests node cordoning and draining. Complete active maintenance
+                      before disabling; stopping the manager does not uncordon a node.
                     properties:
                       state:
                         default: Disabled
                         description: |-
-                          state requests the component to be installed (Enabled) or removed at the
-                          manager level (Disabled). Unset means Disabled.
+                          Enabled runs the operator. Disabled removes its manager and managed
+                          installation resources; existing agents, configuration, and native resources
+                          can remain. Complete active maintenance or remediation before disabling.
+                          Default: Disabled.
                         enum:
                         - Enabled
                         - Disabled
                         type: string
                     type: object
                   selfNodeRemediation:
-                    description: ComponentSpec configures one component.
+                    description: |-
+                      Runs the Self Node Remediation operator. Enabling this component creates
+                      its default configuration and starts privileged node agents on eligible
+                      nodes. Disabling does not remove existing node agents or their configuration.
                     properties:
                       state:
                         default: Disabled
                         description: |-
-                          state requests the component to be installed (Enabled) or removed at the
-                          manager level (Disabled). Unset means Disabled.
+                          Enabled runs the operator. Disabled removes its manager and managed
+                          installation resources; existing agents, configuration, and native resources
+                          can remain. Complete active maintenance or remediation before disabling.
+                          Default: Disabled.
                         enum:
                         - Enabled
                         - Disabled
                         type: string
                     type: object
                   storageBasedRemediation:
-                    description: ComponentSpec configures one component.
+                    description: |-
+                      Runs the Storage Based Remediation operator. Configure a
+                      StorageBasedRemediationConfig separately to deploy its agents and configure
+                      storage-based fencing. Existing agents and storage configuration can remain
+                      after disabling.
                     properties:
                       state:
                         default: Disabled
                         description: |-
-                          state requests the component to be installed (Enabled) or removed at the
-                          manager level (Disabled). Unset means Disabled.
+                          Enabled runs the operator. Disabled removes its manager and managed
+                          installation resources; existing agents, configuration, and native resources
+                          can remain. Complete active maintenance or remediation before disabling.
+                          Default: Disabled.
                         enum:
                         - Enabled
                         - Disabled
@@ -198,6 +233,11 @@ spec:
                   type: object
                 type: array
               conditions:
+                description: |-
+                  Available, Progressing, and Degraded describe WAO reconciliation.
+                  Available means reconciliation succeeded, including when all components
+                  are Disabled; it does not mean workloads are protected. Check component
+                  status for retained resources after disabling.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -254,8 +294,10 @@ spec:
                   type: object
                 type: array
               installNamespace:
+                description: Namespace where WAO installs component operators.
                 type: string
               observedGeneration:
+                description: Configuration generation last processed by WAO.
                 format: int64
                 type: integer
               releaseSet:

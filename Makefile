@@ -396,6 +396,16 @@ define operator-framework-tool
 	}
 endef
 
+.PHONY: scorecard
+scorecard: operator-sdk
+	@test -n "$(KUBECONFIG)" || { echo "KUBECONFIG is required"; exit 1; }
+	@test -n "$(SCORECARD_NAMESPACE)" || { echo "SCORECARD_NAMESPACE is required"; exit 1; }
+	$(OPERATOR_SDK) scorecard ./bundle \
+		--kubeconfig="$(KUBECONFIG)" \
+		--namespace="$(SCORECARD_NAMESPACE)" \
+		--wait-time=120s \
+		--output=text
+
 ##@ Working with Bundle
 
 .PHONY: bundle
