@@ -38,61 +38,142 @@ spec:
       displayName: Node Health Check
       kind: NodeHealthCheck
       name: nodehealthchecks.remediation.medik8s.io
+      resources:
+      - kind: Node
+        name: ""
+        version: v1
+      - kind: Lease
+        name: ""
+        version: v1
       version: v1alpha1
     - description: Owned by WAO; served by the SNR operand when enabled.
       displayName: Self Node Remediation Config
       kind: SelfNodeRemediationConfig
       name: selfnoderemediationconfigs.self-node-remediation.medik8s.io
+      resources:
+      - kind: DaemonSet
+        name: ""
+        version: v1
+      - kind: Pod
+        name: ""
+        version: v1
       version: v1alpha1
     - description: Owned by WAO; served by the SNR operand when enabled.
       displayName: Self Node Remediation
       kind: SelfNodeRemediation
       name: selfnoderemediations.self-node-remediation.medik8s.io
+      resources:
+      - kind: Node
+        name: ""
+        version: v1
+      - kind: Pod
+        name: ""
+        version: v1
+      - kind: VolumeAttachment
+        name: ""
+        version: v1
       version: v1alpha1
     - description: Owned by WAO; served by the SNR operand when enabled.
       displayName: Self Node Remediation Template
       kind: SelfNodeRemediationTemplate
       name: selfnoderemediationtemplates.self-node-remediation.medik8s.io
+      resources:
+      - kind: SelfNodeRemediation
+        name: selfnoderemediations.self-node-remediation.medik8s.io
+        version: v1alpha1
       version: v1alpha1
     - description: Owned by WAO; served by the SBR operand when enabled.
       displayName: Storage Based Remediation Config
       kind: StorageBasedRemediationConfig
       name: storagebasedremediationconfigs.storage-based-remediation.medik8s.io
+      resources:
+      - kind: DaemonSet
+        name: ""
+        version: v1
+      - kind: PersistentVolumeClaim
+        name: ""
+        version: v1
+      - kind: Job
+        name: ""
+        version: v1
       version: v1alpha1
     - description: Owned by WAO; served by the SBR operand when enabled.
       displayName: Storage Based Remediation
       kind: StorageBasedRemediation
       name: storagebasedremediations.storage-based-remediation.medik8s.io
+      resources:
+      - kind: Node
+        name: ""
+        version: v1
+      - kind: StorageBasedRemediationConfig
+        name: storagebasedremediationconfigs.storage-based-remediation.medik8s.io
+        version: v1alpha1
       version: v1alpha1
     - description: Owned by WAO; served by the SBR operand when enabled.
       displayName: Storage Based Remediation Template
       kind: StorageBasedRemediationTemplate
       name: storagebasedremediationtemplates.storage-based-remediation.medik8s.io
+      resources:
+      - kind: StorageBasedRemediation
+        name: storagebasedremediations.storage-based-remediation.medik8s.io
+        version: v1alpha1
       version: v1alpha1
     - description: Owned by WAO; served by the FAR operand when enabled.
       displayName: Fence Agents Remediation
       kind: FenceAgentsRemediation
       name: fenceagentsremediations.fence-agents-remediation.medik8s.io
+      resources:
+      - kind: Node
+        name: ""
+        version: v1
+      - kind: Secret
+        name: ""
+        version: v1
       version: v1alpha1
     - description: Owned by WAO; served by the FAR operand when enabled.
       displayName: Fence Agents Remediation Template
       kind: FenceAgentsRemediationTemplate
       name: fenceagentsremediationtemplates.fence-agents-remediation.medik8s.io
+      resources:
+      - kind: FenceAgentsRemediation
+        name: fenceagentsremediations.fence-agents-remediation.medik8s.io
+        version: v1alpha1
       version: v1alpha1
     - description: Owned by WAO; served by the MDR operand when enabled.
       displayName: Machine Deletion Remediation
       kind: MachineDeletionRemediation
       name: machinedeletionremediations.machine-deletion-remediation.medik8s.io
+      resources:
+      - kind: Machine
+        name: machines.machine.openshift.io
+        version: v1beta1
+      - kind: Node
+        name: ""
+        version: v1
       version: v1alpha1
     - description: Owned by WAO; served by the MDR operand when enabled.
       displayName: Machine Deletion Remediation Template
       kind: MachineDeletionRemediationTemplate
       name: machinedeletionremediationtemplates.machine-deletion-remediation.medik8s.io
+      resources:
+      - kind: MachineDeletionRemediation
+        name: machinedeletionremediations.machine-deletion-remediation.medik8s.io
+        version: v1alpha1
       version: v1alpha1
     - description: Owned by WAO; served by the NMO operand when enabled.
       displayName: Node Maintenance
       kind: NodeMaintenance
       name: nodemaintenances.nodemaintenance.medik8s.io
+      resources:
+      - kind: Node
+        name: ""
+        version: v1
+      - kind: Pod
+        name: ""
+        version: v1
+      - kind: Lease
+        name: ""
+        version: v1
       version: v1beta1
     - description: |-
         WorkloadAvailabilityConfig provides cluster-wide configuration for the six
@@ -103,6 +184,22 @@ spec:
       displayName: Workload Availability Config
       kind: WorkloadAvailabilityConfig
       name: workloadavailabilityconfigs.workloadavailability.medik8s.io
+      resources:
+      - kind: ConfigMap
+        name: ""
+        version: v1
+      - kind: Deployment
+        name: ""
+        version: v1
+      - kind: MutatingWebhookConfiguration
+        name: ""
+        version: v1
+      - kind: Service
+        name: ""
+        version: v1
+      - kind: ValidatingWebhookConfiguration
+        name: ""
+        version: v1
       specDescriptors:
       - description: |-
           Choose which component operators WAO runs. All components default to

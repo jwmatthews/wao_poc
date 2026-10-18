@@ -214,6 +214,7 @@ type WorkloadAvailabilityConfigStatus struct {
 // +kubebuilder:printcolumn:name="Progressing",type=string,JSONPath=`.status.conditions[?(@.type=="Progressing")].status`
 // +kubebuilder:printcolumn:name="Degraded",type=string,JSONPath=`.status.conditions[?(@.type=="Degraded")].status`
 // +kubebuilder:validation:XValidation:rule="self.metadata.name == 'cluster'",message="WorkloadAvailabilityConfig is a singleton and must be named 'cluster'"
+// +operator-sdk:csv:customresourcedefinitions:resources={{Deployment,v1,""},{Service,v1,""},{ConfigMap,v1,""},{ValidatingWebhookConfiguration,v1,""},{MutatingWebhookConfiguration,v1,""}}
 
 // WorkloadAvailabilityConfig provides cluster-wide configuration for the six
 // medik8s component operators. WAO automatically creates this cluster-scoped
