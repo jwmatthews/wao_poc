@@ -14,7 +14,7 @@ work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 
 # 1. Stamps match release-set.yaml.
 for k in $("$YQ" '.components | keys | .[]' "$RS"); do
-  stamp=config/operands/$k/UPSTREAM.yaml
+  stamp=config/operands/$k/VENDORED.yaml
   [ -f "$stamp" ] || { problem "$stamp missing"; continue; }
   for f in repo tag commit; do
     want=$("$YQ" ".components.$k.$f" "$RS"); got=$("$YQ" ".$f" "$stamp")
@@ -48,7 +48,7 @@ done
 
 # 4. Every operand ServiceAccount is in exactly one of OPERAND_SERVICE_ACCOUNTS (roles folded into
 # the CSV) or OPERAND_STANDALONE_SERVICE_ACCOUNTS (ServiceAccount, ClusterRole and binding shipped as
-# standalone bundle objects under their upstream names; see the Makefile comment).
+# standalone bundle objects under their operand names; see the Makefile comment).
 extra=$(sed -n 's/^OPERAND_SERVICE_ACCOUNTS := //p' Makefile | tr ',' '\n')
 standalone=$(sed -n 's/^OPERAND_STANDALONE_SERVICE_ACCOUNTS := //p' Makefile | tr ',' '\n')
 for sa in $standalone; do
@@ -61,7 +61,7 @@ for sa in $standalone; do
 done
 for k in $("$YQ" '.components | keys | .[]' "$RS"); do
   errf=$(mktemp)
-  # LoadRestrictionsNone: config/operands/sbr/rbac lists an upstream file that upstream's own kustomization omits.
+  # LoadRestrictionsNone: config/operands/sbr/rbac lists a vendored file that SBR's own kustomization omits.
   if ! rbac=$("$KUSTOMIZE" build --load-restrictor LoadRestrictionsNone "config/operands/$k/rbac" 2>"$errf"); then
     problem "$k: kustomize build config/operands/$k/rbac failed: $(tail -1 "$errf")"; rm -f "$errf"; continue
   fi
@@ -86,7 +86,7 @@ for f in bundle/manifests/*.yaml; do
   esac
 done
 # The SBR manager creates ClusterRoleBindings whose roleRef names these ClusterRoles verbatim
-# (internal/controller/storagebasedremediationconfig_controller.go upstream); without them, enabling
+# (internal/controller/storagebasedremediationconfig_controller.go in the SBR source); without them, enabling
 # SBR leaves its agent with no permissions and no privileged SCC.
 for cr in sbr-operator-sbr-agent-role sbr-operator-sbr-agent-privileged-scc; do
   found=

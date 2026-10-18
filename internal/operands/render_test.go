@@ -212,7 +212,7 @@ func TestRenderLeavesNoPlaceholder(t *testing.T) {
 	}
 }
 
-func TestRenderReplacesEveryUpstreamImage(t *testing.T) {
+func TestRenderReplacesEveryOperandImage(t *testing.T) {
 	for _, def := range components.All() {
 		objs, err := operands.Render(def, "wao-ns", testImages())
 		if err != nil {

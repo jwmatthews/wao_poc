@@ -130,7 +130,7 @@ func (tr *tree) saveReleaseSet(rs releaseSet) {
 }
 
 // changeTags gives every component a new tag, retags its images and rewrites
-// the UPSTREAM.yaml stamps so verification sees a consistent bump.
+// the VENDORED.yaml stamps so verification sees a consistent bump.
 func (tr *tree) changeTags() {
 	tr.t.Helper()
 	rs := tr.loadReleaseSet()
@@ -147,7 +147,7 @@ func (tr *tree) changeTags() {
 		if err != nil {
 			tr.t.Fatal(err)
 		}
-		tr.write(filepath.Join("config/operands", name, "UPSTREAM.yaml"), stamp)
+		tr.write(filepath.Join("config/operands", name, "VENDORED.yaml"), stamp)
 	}
 	tr.saveReleaseSet(rs)
 }

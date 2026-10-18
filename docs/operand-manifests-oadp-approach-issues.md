@@ -179,14 +179,14 @@ For each component:
    keep only Deployment, Service, ConfigMap, ValidatingWebhookConfiguration and
    MutatingWebhookConfiguration, apply the shared service-ca webhook component, and write the
    result to the directory the Go renderer embeds. This replaces the Python manifest rewriting.
-4. Write `config/operands/<component>/UPSTREAM.yaml` with repo, tag and commit.
+4. Write `config/operands/<component>/VENDORED.yaml` with repo, tag and commit.
 5. Sync `RELATED_IMAGE_*` values in `config/manager/manager.yaml` from the `pinned` digests with
    `yq`, as OADP does for `RELATED_IMAGE_NON_ADMIN_CONTROLLER`.
 6. Run `make bundle`.
 
 **`make verify-operand-manifests`** (offline, runs in CI)
 
-- Each `UPSTREAM.yaml` matches `release-set.yaml` for tag and commit.
+- Each `VENDORED.yaml` matches `release-set.yaml` for tag and commit.
 - Each `RELATED_IMAGE_*` value in the manager Deployment equals the matching `pinned` digest.
 - Every ServiceAccount under `config/operands/*/rbac/` appears in `--extra-service-accounts`.
 - The bundle contains no standalone Role, RoleBinding or ServiceAccount file, and no standalone

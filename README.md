@@ -53,7 +53,7 @@ snapshot has been checked locally and has not been tested on a live cluster.
 | `api/v1alpha1/` | The `WorkloadAvailabilityConfig` API |
 | `internal/controller/` | The lifecycle controller and the default-config bootstrap |
 | `internal/operands/` | The embedded runtime manifests and the renderer |
-| `config/operands/<k>/` | Per operand: `upstream/` (copy of the upstream `config/` tree), `UPSTREAM.yaml` (source and commit), `rbac/` and `runtime/` kustomize overlays |
+| `config/operands/<k>/` | Per operand: `vendored/` (copy of the operand's `config/` tree), `VENDORED.yaml` (source and commit), `rbac/` and `runtime/` kustomize overlays |
 | `hack/update-release-set.sh`, `hack/image-commit.sh` | Resolve tags, image digests and the commit embedded in each published image into `release-set.yaml` |
 | `hack/update-operand-manifests.sh`, `hack/verify-operand-manifests.sh` | Copy the upstream trees at the recorded commits; offline CI verification |
 | `hack/cluster-build.sh`, `hack/cluster-install.sh`, `hack/cluster-uninstall.sh` | On-cluster build and OLM install for a disposable cluster |
@@ -75,7 +75,7 @@ snapshot has been checked locally and has not been tested on a live cluster.
 
 ## Operand manifests
 
-Each operand has a copy of its upstream `config/` tree in `config/operands/<k>/upstream/`, plus
+Each operand has a copy of its own `config/` tree in `config/operands/<k>/vendored/`, plus
 two kustomize overlays: `rbac/` (rendered into the WAO CSV and bundle) and `runtime/` (rendered
 into `internal/operands/manifests/<k>/objects.yaml`, the Deployments, Services, ConfigMaps and
 webhook configurations the renderer applies at enable time). The operand CRDs ship in the CSV.
@@ -106,17 +106,17 @@ Install the required tools and populate the Go module cache with `go mod downloa
 toolchain downloads; with those prerequisites available, offline checks need no network or
 cluster. CI prepares the module cache before running them.
 
-Operand manifests are copied from each upstream checkout, following OADP's non-admin-controller
+Operand manifests are copied from each operand checkout, following OADP's non-admin-controller
 pattern. `make update-release-set` records the latest release tag, image digests and the git
 commit embedded in each published image into `release-set.yaml`; `make update-operand-manifests`
-copies `config/` from a checkout at that commit into `config/operands/<k>/upstream/` (checkouts
+copies `config/` from a checkout at that commit into `config/operands/<k>/vendored/` (checkouts
 live in `.cache/operands`, or set `NHC_PATH` and friends), renders the runtime manifests the Go
 renderer embeds, generates Go image bindings, and syncs `RELATED_IMAGE_*`.
 Use `make bump-operands` for the complete sequence: resolve published images, copy
 configuration, generate manifests and bindings, then verify consistency. `OPERAND_TAG` defaults
 to `latest`, the post-submit main build; pass `OPERAND_TAG=release` for each component's latest
 GitHub release, `OPERAND_TAG=pinned` to keep the current tags, or override one component with
-`NHC_TAG=...`. Upstream releases can lag files the `config/operands` wrappers rely on.
+`NHC_TAG=...`. Operand releases can lag files the `config/operands` wrappers rely on.
 The steps run sequentially, including with parallel Make, and finish with component and renderer
 Go tests. Review the diff before committing;
 CI runs `make verify-operand-manifests`, which is offline. Operand RBAC ships in the WAO
@@ -151,7 +151,7 @@ with `operator-sdk run bundle` and needs no catalog image.
 
 **Enabled** applies the component's operand objects with server-side apply: the
 manager Deployment, Services, ConfigMaps and webhook configurations, rendered from the
-upstream `config/default` copy (the `objects.yaml` embedded in the binary) with the pinned
+vendored `config/default` copy (the `objects.yaml` embedded in the binary) with the pinned
 image digests substituted. The operand ServiceAccounts, Roles and bindings are not part of
 this: OLM creates them from the WAO CSV at install, and they exist whether or not the
 component is Enabled. The phase becomes

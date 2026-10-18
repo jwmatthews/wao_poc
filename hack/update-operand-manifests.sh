@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Copy each operand's upstream config/ tree at the commit recorded in release-set.yaml into
-# config/operands/<k>/upstream/, following OADP's update-non-admin-manifests. Checkouts live in
+# Copy each operand's config/ tree at the commit recorded in release-set.yaml into
+# config/operands/<k>/vendored/, following OADP's update-non-admin-manifests. Checkouts live in
 # $OPERAND_SRC_DIR/<k> (default .cache/operands/<k>, git-ignored) unless <K>_PATH names one.
 # A user-supplied checkout is never modified: objects are read with `git archive <commit>`.
 set -euo pipefail
@@ -31,10 +31,10 @@ for k in $("$YQ" '.components | keys | .[]' "$RS"); do
   tmp=$work/$k; rm -rf "$tmp"; mkdir -p "$tmp"
   git -C "$dir" archive "$commit" config | tar -x -C "$tmp"
   for d in $PRUNE; do rm -rf "$tmp/config/$d"; done
-  mkdir -p "config/operands/$k/upstream"
-  rm -rf "config/operands/$k/upstream/config"
-  mv "$tmp/config" "config/operands/$k/upstream/config"
-  cat > "config/operands/$k/UPSTREAM.yaml" <<EOF
+  mkdir -p "config/operands/$k/vendored"
+  rm -rf "config/operands/$k/vendored/config"
+  mv "$tmp/config" "config/operands/$k/vendored/config"
+  cat > "config/operands/$k/VENDORED.yaml" <<EOF
 # Written by hack/update-operand-manifests.sh. Do not edit; run make update-operand-manifests.
 repo: $repo
 tag: $tag
