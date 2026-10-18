@@ -3,9 +3,9 @@
 # CSV; unbound ClusterRoles become standalone bundle objects. OLM creates all of it at install.
 # The SBR agent ServiceAccount is listed in OPERAND_STANDALONE_SERVICE_ACCOUNTS instead, so its
 # ClusterRole keeps the name sbr-operator-sbr-agent-role that the SBR manager binds at runtime.
-# Unlike the other operands, SBR's metrics Service lives in upstream config/default, not
+# Unlike the other operands, SBR's metrics Service lives in the vendored config/default, not
 # config/rbac, so this wrapper needs no $patch: delete block for it.
-# sbr_agent_privileged_scc_role.yaml is added explicitly because upstream's config/rbac
+# sbr_agent_privileged_scc_role.yaml is added explicitly because the vendored config/rbac
 # kustomization omits it although the controller binds sbr-operator-sbr-agent-privileged-scc by
 # name (internal/controller/storagebasedremediationconfig_controller.go). It is outside this
 # kustomization's root, so builds of it need --load-restrictor LoadRestrictionsNone.
@@ -13,5 +13,5 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namePrefix: sbr-operator-
 resources:
-- ../upstream/config/rbac
-- ../upstream/config/rbac/sbr_agent_privileged_scc_role.yaml
+- ../vendored/config/rbac
+- ../vendored/config/rbac/sbr_agent_privileged_scc_role.yaml

@@ -1,12 +1,12 @@
 # Agent instructions
 
 This repository is a proof of concept for a single Workload Availability Operator
-(WAO) that installs the six upstream medik8s operators (NHC, SNR, SBR, FAR, MDR and NMO)
+(WAO) that installs the six medik8s operators (NHC, SNR, SBR, FAR, MDR and NMO)
 as operands in one namespace.
 
 ## Hard constraints
 
-- Do not modify, fork or rebuild the component operators. Consume the upstream
+- Do not modify, fork or rebuild the component operators. Consume the operand
   images exactly as pinned in `release-set.yaml`, by digest.
 - Every component defaults to `Disabled`. Installing WAO must not create a
   remediation policy, remediation request, native config or node agent.

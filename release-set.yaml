@@ -3,7 +3,7 @@
 # tag: the image tag the snapshot was resolved from: `latest` (post-submit main build) or a
 #   release tag. commit: the git commit the published operator image was built from, read from
 #   the binary's embedded version.GitCommit by hack/image-commit.sh. The manifests under
-#   config/operands/<k>/upstream are copied from this commit, so they describe the image that runs.
+#   config/operands/<k>/vendored are copied from this commit, so they describe the image that runs.
 # images: "tagged" is the tag reference written into the embedded runtime manifests; "pinned"
 #   is the same image by digest. The operator Deployment carries the pinned digests as
 #   RELATED_IMAGE_* and the renderer substitutes them for the tagged references.
