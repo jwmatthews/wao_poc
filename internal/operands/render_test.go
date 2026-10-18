@@ -1,6 +1,7 @@
 package operands_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -229,5 +230,86 @@ func TestRenderReplacesEveryOperandImage(t *testing.T) {
 				t.Errorf("%s: %s/%s references an unbound tagged image", def.Key, o.GetKind(), o.GetName())
 			}
 		}
+	}
+}
+
+// NHC's manager creates a ServiceMonitor on OpenShift that assumes the operand's OCP packaging:
+// a service-ca injected CA bundle, a metrics Service labelled instance=metrics with a serving
+// certificate, and that certificate mounted where the manager enables metrics mTLS.
+func TestRenderNHCMetricsWiringMatchesOCPPackaging(t *testing.T) {
+	def, _ := components.ByKey(v1alpha1.ComponentKeyNodeHealthCheck)
+	objs, err := operands.Render(def, testNamespace, testImages())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ca := find(t, objs, "ConfigMap", "node-healthcheck-ca-bundle")
+	if ca.GetAnnotations()["service.beta.openshift.io/inject-cabundle"] != "true" {
+		t.Errorf("CA bundle annotations = %v", ca.GetAnnotations())
+	}
+	svc := find(t, objs, "Service", "node-healthcheck-controller-manager-metrics-service")
+	if svc.GetLabels()["app.kubernetes.io/instance"] != "metrics" {
+		t.Errorf("metrics Service labels = %v", svc.GetLabels())
+	}
+	if svc.GetAnnotations()["service.beta.openshift.io/serving-cert-secret-name"] != "node-healthcheck-tls" {
+		t.Errorf("metrics Service annotations = %v", svc.GetAnnotations())
+	}
+	dep := find(t, objs, "Deployment", "node-healthcheck-controller-manager")
+	containers, _, _ := unstructured.NestedSlice(dep.Object, "spec", "template", "spec", "containers")
+	mounted := false
+	for _, c := range containers {
+		vms, _, _ := unstructured.NestedSlice(c.(map[string]interface{}), "volumeMounts")
+		for _, vm := range vms {
+			m := vm.(map[string]interface{})
+			if m["mountPath"] == "/etc/tls/private" && m["readOnly"] == true {
+				mounted = true
+			}
+		}
+	}
+	if !mounted {
+		t.Error("manager has no read-only mount at /etc/tls/private")
+	}
+	vols, _, _ := unstructured.NestedSlice(dep.Object, "spec", "template", "spec", "volumes")
+	backed := false
+	for _, v := range vols {
+		if secret, _, _ := unstructured.NestedString(v.(map[string]interface{}), "secret", "secretName"); secret == "node-healthcheck-tls" {
+			backed = true
+		}
+	}
+	if !backed {
+		t.Errorf("no volume backed by Secret node-healthcheck-tls: %v", vols)
+	}
+}
+
+// The OCP packaging also ships the Node Remediation console backend, which NHC registers as a
+// ConsolePlugin at startup. WAO renders it as a second Deployment of the component, with its own
+// image pinned by digest and without the manager's webhook certificate patch leaking into it.
+func TestRenderNHCConsolePlugin(t *testing.T) {
+	def, _ := components.ByKey(v1alpha1.ComponentKeyNodeHealthCheck)
+	const name = "node-healthcheck-node-remediation-console-plugin"
+	if !slices.Contains(def.Deployments, name) {
+		t.Errorf("Deployments = %v, want %s included", def.Deployments, name)
+	}
+	objs, err := operands.Render(def, testNamespace, testImages())
+	if err != nil {
+		t.Fatal(err)
+	}
+	dep := find(t, objs, "Deployment", name)
+	containers, _, _ := unstructured.NestedSlice(dep.Object, "spec", "template", "spec", "containers")
+	if len(containers) != 1 {
+		t.Fatalf("console Deployment has %d containers, want 1: %v", len(containers), containers)
+	}
+	c := containers[0].(map[string]interface{})
+	if c["name"] != "node-remediation-console-plugin" || c["image"] != testImages().Get(images.NHCConsole) {
+		t.Errorf("console container = %v/%v", c["name"], c["image"])
+	}
+	vols, _, _ := unstructured.NestedSlice(dep.Object, "spec", "template", "spec", "volumes")
+	for _, v := range vols {
+		if secret, _, _ := unstructured.NestedString(v.(map[string]interface{}), "secret", "secretName"); strings.HasSuffix(secret, "-webhook-server-cert") {
+			t.Errorf("webhook certificate volume leaked into the console Deployment: %v", v)
+		}
+	}
+	svc := find(t, objs, "Service", name)
+	if svc.GetAnnotations()["service.beta.openshift.io/serving-cert-secret-name"] != "nrc-plugin-cert" {
+		t.Errorf("console Service annotations = %v", svc.GetAnnotations())
 	}
 }

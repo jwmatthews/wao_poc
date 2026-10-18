@@ -1,0 +1,210 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+    categories: OpenShift Optional
+    containerImage: quay.io/medik8s/fence-agents-remediation-operator:v5.8.0
+    createdAt: ""
+    description: Fence Agents Remediation Operator uses well-known agents to fence
+      and remediate unhealthy nodes. The remediation includes rebooting the unhealthy
+      node using a fence agent, and then evicting workloads from the unhealthy node.
+    olm.skipRange: '>=0.0.1 <5.8.0'
+    operatorframework.io/suggested-namespace: openshift-workload-availability
+    operatorframework.io/suggested-namespace-template: '{"kind":"Namespace","apiVersion":"v1","metadata":{"name":"openshift-workload-availability","annotations":{"openshift.io/node-selector":""}}}'
+    repository: https://github.com/medik8s/fence-agents-remediation
+    support: Medik8s
+  name: fence-agents-remediation.v5.8.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: FenceAgentsRemediation is the Schema for the fenceagentsremediations
+        API
+      displayName: Fence Agents Remediation
+      kind: FenceAgentsRemediation
+      name: fenceagentsremediations.fence-agents-remediation.medik8s.io
+      resources:
+      - kind: FenceAgentsRemediation
+        name: fenceagentsremediations
+        version: v1alpha1
+      specDescriptors:
+      - description: |-
+          Agent is the name of fence agent that will be used.
+          It should have a fence_ prefix.
+        displayName: Agent
+        path: agent
+      - description: NodeSecretNames maps the node name to the Secret name which contains
+          params relevant for that node.
+        displayName: Node Secret Names
+        path: nodeSecretNames
+      - description: NodeParameters are passed to the fencing agent according to the
+          node that is fenced, since they are node specific
+        displayName: Node Parameters
+        path: nodeparameters
+      - description: |-
+          RemediationStrategy is the remediation method for unhealthy nodes.
+          Currently, it could be either "OutOfServiceTaint" or "ResourceDeletion".
+          ResourceDeletion will iterate over all pods related to the unhealthy node and delete them.
+          OutOfServiceTaint will add the out-of-service taint which is a new well-known taint "node.kubernetes.io/out-of-service"
+          that enables automatic deletion of pv-attached pods on failed nodes, "out-of-service" taint is only supported on clusters with k8s version 1.26+ or OCP/OKD version 4.13+.
+        displayName: Remediation Strategy
+        path: remediationStrategy
+      - description: RetryCount is the number of times the fencing agent will be executed
+        displayName: Retry Count
+        path: retrycount
+      - description: RetryInterval is the interval between each fencing agent execution
+        displayName: Retry Interval
+        path: retryinterval
+      - description: |-
+          SharedSecretName is the name of the Secret which contains shared fence agent parameters.
+
+          Heads up: in an earlier version this had a default value of "fence-agents-credentials-shared".
+          We removed that default to be able to differentiate during CR validation between using a Secret or not.
+
+          As a temporary workaround this field will be set with the old default value in case a Secret with the
+          old default of "fence-agents-credentials-shared" is found. Also, in case the field contains the old default
+          value, but the Secret does not exist, the value will be deleted. This workaround will be removed in a future version.
+        displayName: Shared Secret Name
+        path: sharedSecretName
+      - description: SharedParameters are parameters common to all nodes
+        displayName: Shared Parameters
+        path: sharedparameters
+      - description: Timeout is the timeout for each fencing agent execution
+        displayName: Timeout
+        path: timeout
+      statusDescriptors:
+      - description: |-
+          Represents the observations of a FenceAgentsRemediation's current state.
+          Known .status.conditions.type are: "Processing", "FenceAgentActionSucceeded", and "Succeeded".
+        displayName: conditions
+        path: conditions
+        x-descriptors:
+        - urn:alm:descriptor:io.kubernetes.conditions
+      - description: LastUpdateTime is the last time the status was updated.
+        displayName: Last Update Time
+        path: lastUpdateTime
+      version: v1alpha1
+    - description: FenceAgentsRemediationTemplate is the Schema for the fenceagentsremediationtemplates
+        API
+      displayName: Fence Agents Remediation Template
+      kind: FenceAgentsRemediationTemplate
+      name: fenceagentsremediationtemplates.fence-agents-remediation.medik8s.io
+      resources:
+      - kind: FenceAgentsRemediationTemplate
+        name: fenceagentsremediationtemplates
+        version: v1alpha1
+      specDescriptors:
+      - description: |-
+          StatusValidationSample configures how many nodes the fence agent status validation should run for.
+          Accepts an absolute number (e.g., 3) or a percentage string (e.g., "60%").
+        displayName: Status Validation Sample
+        path: statusValidationSample
+      - description: Template defines the desired state of FenceAgentsRemediationTemplate
+        displayName: Template
+        path: template
+      - description: |-
+          Agent is the name of fence agent that will be used.
+          It should have a fence_ prefix.
+        displayName: Agent
+        path: template.spec.agent
+      - description: NodeSecretNames maps the node name to the Secret name which contains
+          params relevant for that node.
+        displayName: Node Secret Names
+        path: template.spec.nodeSecretNames
+      - description: NodeParameters are passed to the fencing agent according to the
+          node that is fenced, since they are node specific
+        displayName: Node Parameters
+        path: template.spec.nodeparameters
+      - description: |-
+          RemediationStrategy is the remediation method for unhealthy nodes.
+          Currently, it could be either "OutOfServiceTaint" or "ResourceDeletion".
+          ResourceDeletion will iterate over all pods related to the unhealthy node and delete them.
+          OutOfServiceTaint will add the out-of-service taint which is a new well-known taint "node.kubernetes.io/out-of-service"
+          that enables automatic deletion of pv-attached pods on failed nodes, "out-of-service" taint is only supported on clusters with k8s version 1.26+ or OCP/OKD version 4.13+.
+        displayName: Remediation Strategy
+        path: template.spec.remediationStrategy
+      - description: RetryCount is the number of times the fencing agent will be executed
+        displayName: Retry Count
+        path: template.spec.retrycount
+      - description: RetryInterval is the interval between each fencing agent execution
+        displayName: Retry Interval
+        path: template.spec.retryinterval
+      - description: |-
+          SharedSecretName is the name of the Secret which contains shared fence agent parameters.
+
+          Heads up: in an earlier version this had a default value of "fence-agents-credentials-shared".
+          We removed that default to be able to differentiate during CR validation between using a Secret or not.
+
+          As a temporary workaround this field will be set with the old default value in case a Secret with the
+          old default of "fence-agents-credentials-shared" is found. Also, in case the field contains the old default
+          value, but the Secret does not exist, the value will be deleted. This workaround will be removed in a future version.
+        displayName: Shared Secret Name
+        path: template.spec.sharedSecretName
+      - description: SharedParameters are parameters common to all nodes
+        displayName: Shared Parameters
+        path: template.spec.sharedparameters
+      - description: Timeout is the timeout for each fencing agent execution
+        displayName: Timeout
+        path: template.spec.timeout
+      version: v1alpha1
+  description: |
+    ### Introduction
+    Fence Agents Remediation (FAR) is a Kubernetes operator that uses well-known agents to fence and remediate unhealthy nodes.
+    The remediation includes rebooting the unhealthy node using a fence agent and then evicting workloads from the unhealthy node.
+
+    ### Compatibility
+    FAR is one of the remediator operators by [Medik8s](https://www.medik8s.io/remediation/remediation/),
+    such as [Self Node Remediation](https://github.com/medik8s/self-node-remediation) and [Machine Deletion Remediation](https://github.com/medik8s/machine-deletion-remediation),
+    that were designed to run with the Node HealthCheck Operator [(NHC)](https://github.com/medik8s/node-healthcheck-operator) which detects an unhealthy node and creates remediation CR.
+    It is recommended to use FAR with NHC for an easier and smoother experience by fully automating the remediation process, but it can be used as a standalone remediator for the more experienced user.
+
+    ### Advantages
+    - Robustness - FAR has direct feedback from the traditional Application Programming Interface (API) call (e.g., IPMI) about the result of the fence action without using the Kubernetes API.
+    - Speed - FAR is rapid since it can reboot a node and receive an acknowledgment from the API call while other remediators might need to wait a safe time till they can expect the node to be rebooted.
+    - Diversity - FAR includes several fence agents from a large known set of upstream fencing agents for bare metal servers, virtual machines, cloud platforms, etc.
+    - Adjustability - FAR allows to set up different parameters for running the API call that remediates the node.
+  displayName: Fence Agents Remediation Operator
+  icon:
+  - base64data: base64EncodedIcon
+    mediatype: image/png
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - medik8s
+  - fencing
+  - auto-healing
+  - recovery
+  - high-availability
+  - fence-agents
+  - fence-agents-remediation
+  - remediation
+  - far
+  - baremetal
+  links:
+  - name: Fence Agents Remediation
+    url: https://www.medik8s.io/remediation/fence-agents-remediation/fence-agents-remediation/
+  - name: Source Code
+    url: https://www.github.com/medik8s/fence-agents-remediation
+  maintainers:
+  - email: medik8s@googlegroups.com
+    name: Medik8s Team
+  maturity: alpha
+  minKubeVersion: 1.24.0
+  provider:
+    name: Medik8s
+    url: https://github.com/medik8s
+  version: 5.8.0

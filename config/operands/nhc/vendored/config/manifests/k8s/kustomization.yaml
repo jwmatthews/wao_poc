@@ -1,0 +1,4 @@
+resources:
+- ../base
+
+# no patches to apply at the moment, keep this anyway

@@ -105,7 +105,7 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 			c := component(getWAC(ctx), v1alpha1.ComponentKeyNodeHealthCheck)
 			g.Expect(c).NotTo(BeNil())
 			g.Expect(c.Phase).To(Equal(v1alpha1.ComponentPhaseProgressing)) // envtest has no kubelet or service-ca
-			g.Expect(c.Deployments).To(HaveLen(1))
+			g.Expect(c.Deployments).To(HaveLen(2))                          // the manager and the console plugin backend of NHC's OCP packaging
 			g.Expect(c.AdmissionReady).To(Equal(ptr.To(false)))
 		}).Should(Succeed())
 		dep := &appsv1.Deployment{}
@@ -115,6 +115,10 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		Expect(dep.OwnerReferences).To(HaveLen(1))
 		Expect(dep.OwnerReferences[0].Kind).To(Equal("WorkloadAvailabilityConfig"))
 		Expect(*dep.OwnerReferences[0].Controller).To(BeTrue())
+		console := &appsv1.Deployment{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-node-remediation-console-plugin"}, console)).To(Succeed())
+		Expect(console.Spec.Template.Spec.Containers[0].Image).To(Equal(testImages().Get(images.NHCConsole)))
+		Expect(console.OwnerReferences).To(HaveLen(1))
 
 		// Operand RBAC comes from the WAO CSV (installed by OLM), never from the operand renderer.
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-controller-manager"}, &rbacv1.ClusterRole{}))).To(BeTrue())
