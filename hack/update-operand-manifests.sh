@@ -8,8 +8,6 @@ cd "$(git rev-parse --show-toplevel)"
 RS=${RELEASE_SET:-release-set.yaml}
 YQ=${YQ:-bin/yq}; [ -x "$YQ" ] || YQ=yq
 SRC_DIR=${OPERAND_SRC_DIR:-.cache/operands}
-# Directories config/default never needs; everything else is kept so kustomize bases resolve.
-PRUNE="samples scorecard manifests manifests-k8s manifests-ocp assets"
 
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 
@@ -18,6 +16,8 @@ for k in $("$YQ" '.components | keys | .[]' "$RS"); do
   repo=$("$YQ" ".components.$k.repo" "$RS")
   tag=$("$YQ" ".components.$k.tag" "$RS")
   commit=$("$YQ" ".components.$k.commit" "$RS")
+  overlay=$("$YQ" ".components.$k.overlay" "$RS")
+  [[ "$overlay" =~ ^config/[A-Za-z0-9_/.-]+$ ]] || { echo "$k: release-set.yaml has no overlay (the vendored kustomize directory WAO renders, e.g. config/default)" >&2; exit 1; }
   [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || { echo "$k: release-set.yaml has no commit; run make update-release-set" >&2; exit 1; }
   dir=${!path_var:-$SRC_DIR/$k}
   if [ ! -d "$dir/.git" ]; then
@@ -30,7 +30,6 @@ for k in $("$YQ" '.components | keys | .[]' "$RS"); do
   echo "== $k: copying config/ at $commit (tag: $tag) from $dir"
   tmp=$work/$k; rm -rf "$tmp"; mkdir -p "$tmp"
   git -C "$dir" archive "$commit" config | tar -x -C "$tmp"
-  for d in $PRUNE; do rm -rf "$tmp/config/$d"; done
   mkdir -p "config/operands/$k/vendored"
   rm -rf "config/operands/$k/vendored/config"
   mv "$tmp/config" "config/operands/$k/vendored/config"
@@ -39,6 +38,7 @@ for k in $("$YQ" '.components | keys | .[]' "$RS"); do
 repo: $repo
 tag: $tag
 commit: $commit
+overlay: $overlay
 EOF
 done
 [ "${SKIP_RENDER:-}" = 1 ] || make operand-manifests

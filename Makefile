@@ -90,7 +90,7 @@ endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # Operand ServiceAccounts whose Roles and ClusterRoles operator-sdk folds into the CSV. A name
 # missing here silently becomes dozens of standalone bundle files; verify-operand-manifests checks it.
-OPERAND_SERVICE_ACCOUNTS := node-healthcheck-controller-manager,self-node-remediation-controller-manager,sbr-operator-controller-manager,fence-agents-remediation-controller-manager,machine-deletion-remediation-controller-manager,node-maintenance-operator-controller-manager
+OPERAND_SERVICE_ACCOUNTS := node-healthcheck-controller-manager,node-healthcheck-console-plugin,self-node-remediation-controller-manager,sbr-operator-controller-manager,fence-agents-remediation-controller-manager,machine-deletion-remediation-controller-manager,node-maintenance-operator-controller-manager
 # Operand ServiceAccounts deliberately NOT folded: operator-sdk emits their ServiceAccount, ClusterRole
 # and ClusterRoleBinding as standalone bundle objects with their operand names, as the operand's own
 # bundle does. The SBR manager creates ClusterRoleBindings to ClusterRole sbr-operator-sbr-agent-role
@@ -187,11 +187,9 @@ operand-manifests: kustomize yq ## Generate runtime manifests, Go image bindings
 	@set -e; for k in $(OPERANDS); do \
 	  for env in $$($(YQ) ".components.$$k.images | keys | .[]" release-set.yaml); do \
 	    tagged=$$($(YQ) ".components.$$k.images.$$env.tagged" release-set.yaml); \
-	    case $$env in \
-	      RELATED_IMAGE_SBR_AGENT) $(YQ) -i "(.spec.template.spec.containers[] | select(.name == \"manager\") | .env[] | select(.name == \"RELATED_IMAGE_AGENT\") | .value) = \"$$tagged\"" config/operands/sbr/runtime/agent_image_env_patch.yaml ;; \
-	      *) name=$$($(YQ) '.images[0].name' config/operands/$$k/runtime/kustomization.yaml); \
-	         (cd config/operands/$$k/runtime && $(KUSTOMIZE) edit set image $$name=$$tagged) ;; \
-	    esac; \
+	    if [ $$env = RELATED_IMAGE_SBR_AGENT ]; then $(YQ) -i "(.spec.template.spec.containers[] | select(.name == \"manager\") | .env[] | select(.name == \"RELATED_IMAGE_AGENT\") | .value) = \"$$tagged\"" config/operands/sbr/runtime/agent_image_env_patch.yaml; fi; \
+	    name=$$($(YQ) ".components.$$k.images.$$env.kustomizeName // \"\"" release-set.yaml); \
+	    if [ -n "$$name" ]; then (cd config/operands/$$k/runtime && $(KUSTOMIZE) edit set image $$name=$$tagged); fi; \
 	    if [ $$k = snr ]; then $(YQ) -i "(.spec.template.spec.containers[] | select(.name == \"manager\") | .env[] | select(.name == \"SELF_NODE_REMEDIATION_IMAGE\") | .value) = \"$$tagged\"" config/operands/snr/runtime/manager_image_env_patch.yaml; fi; \
 	  done; \
 	  mkdir -p internal/operands/manifests/$$k; \
@@ -293,7 +291,7 @@ manager: generate fmt vet ## Build manager binary
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./main.go
+	go run ./cmd/main.go
 
 .PHONY: docker-build
 docker-build: test-no-verify-changes ## Build docker image with the manager.

@@ -73,6 +73,8 @@ spec:
                   fieldPath: metadata.namespace
             - name: RELATED_IMAGE_NHC_MANAGER
               value: quay.io/medik8s/node-healthcheck-operator@sha256:fd290f730d5a6fc8fdb3aac8e528d3932a1186027606387c9d69a7db2783b3a5
+            - name: RELATED_IMAGE_NHC_CONSOLE
+              value: quay.io/medik8s/node-remediation-console@sha256:24561ff05bee8dd7594325f45c3bd3fbe2db77e5dea2f054f4e95c82dd2ff713
             - name: RELATED_IMAGE_SNR_MANAGER
               value: quay.io/medik8s/self-node-remediation-operator@sha256:c75e3787fd8c3ca373d7d39fd889af2703c0c47a42a07418f5ff215912e37c11
             - name: RELATED_IMAGE_SBR_MANAGER

@@ -1,0 +1,7 @@
+apiVersion: nodemaintenance.medik8s.io/v1beta1
+kind: NodeMaintenance
+metadata:
+  name: nodemaintenance-sample
+spec:
+  nodeName: node02
+  reason: "Test node maintenance"

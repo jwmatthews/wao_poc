@@ -1,0 +1,10 @@
+apiVersion: storage-based-remediation.medik8s.io/v1alpha1
+kind: StorageBasedRemediation
+metadata:
+  labels:
+    app.kubernetes.io/name: sbr-operator
+    app.kubernetes.io/managed-by: kustomize
+  # Resource name must match the Kubernetes node name to fence.
+  name: worker-1
+  namespace: default
+spec: {}

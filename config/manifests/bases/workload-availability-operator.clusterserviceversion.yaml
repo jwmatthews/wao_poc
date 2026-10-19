@@ -22,6 +22,7 @@ metadata:
       ]
     capabilities: Basic Install
     categories: OpenShift Optional
+    console.openshift.io/plugins: '["node-remediation-console-plugin"]'
     description: Proof of concept single operator that installs the six medik8s workload
       availability operators (NHC, SNR, SBR, FAR, MDR, NMO) as managed operands.
     operatorframework.io/suggested-namespace: openshift-workload-availability

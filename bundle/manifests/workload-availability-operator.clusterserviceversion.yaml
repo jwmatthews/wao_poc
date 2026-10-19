@@ -36,6 +36,7 @@ metadata:
       ]
     capabilities: Basic Install
     categories: OpenShift Optional
+    console.openshift.io/plugins: '["node-remediation-console-plugin"]'
     createdAt: ""
     description: Proof of concept single operator that installs the six medik8s workload availability operators (NHC, SNR, SBR, FAR, MDR, NMO) as managed operands.
     operatorframework.io/suggested-namespace: openshift-workload-availability
@@ -1312,6 +1313,8 @@ spec:
                             fieldPath: metadata.namespace
                       - name: RELATED_IMAGE_NHC_MANAGER
                         value: quay.io/medik8s/node-healthcheck-operator@sha256:fd290f730d5a6fc8fdb3aac8e528d3932a1186027606387c9d69a7db2783b3a5
+                      - name: RELATED_IMAGE_NHC_CONSOLE
+                        value: quay.io/medik8s/node-remediation-console@sha256:24561ff05bee8dd7594325f45c3bd3fbe2db77e5dea2f054f4e95c82dd2ff713
                       - name: RELATED_IMAGE_SNR_MANAGER
                         value: quay.io/medik8s/self-node-remediation-operator@sha256:c75e3787fd8c3ca373d7d39fd889af2703c0c47a42a07418f5ff215912e37c11
                       - name: RELATED_IMAGE_SBR_MANAGER
@@ -1432,6 +1435,26 @@ spec:
                 - patch
           serviceAccountName: machine-deletion-remediation-controller-manager
         - rules:
+            - apiGroups:
+                - ""
+              resourceNames:
+                - no-op-placeholder
+              resources:
+                - configmaps
+              verbs:
+                - get
+          serviceAccountName: node-healthcheck-console-plugin
+        - rules:
+            - apiGroups:
+                - ""
+              resourceNames:
+                - extension-apiserver-authentication
+              resources:
+                - configmaps
+              verbs:
+                - get
+                - list
+                - watch
             - apiGroups:
                 - ""
               resources:
@@ -1608,6 +1631,8 @@ spec:
   relatedImages:
     - image: quay.io/medik8s/node-healthcheck-operator@sha256:fd290f730d5a6fc8fdb3aac8e528d3932a1186027606387c9d69a7db2783b3a5
       name: nhc-manager
+    - image: quay.io/medik8s/node-remediation-console@sha256:24561ff05bee8dd7594325f45c3bd3fbe2db77e5dea2f054f4e95c82dd2ff713
+      name: nhc-console
     - image: quay.io/medik8s/self-node-remediation-operator@sha256:c75e3787fd8c3ca373d7d39fd889af2703c0c47a42a07418f5ff215912e37c11
       name: snr-manager
     - image: quay.io/medik8s/storage-based-remediation-operator@sha256:ebb3f7550968953c6a0c2f56ed2e1b5b57462fcf32d383d67ff25e0ca77fd718

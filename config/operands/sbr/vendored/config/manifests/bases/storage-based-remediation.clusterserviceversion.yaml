@@ -1,0 +1,84 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+    categories: OpenShift Optional
+    containerImage: quay.io/medik8s/storage-based-remediation-operator:v5.8.0
+    createdAt: ""
+    description: Storage-Based Remediation Operator for remediating nodes using storage-based fencing (SBD/STONITH).
+    olm.skipRange: '>=0.3.0 <5.8.0'
+    operatorframework.io/suggested-namespace: openshift-workload-availability
+    operatorframework.io/suggested-namespace-template: '{"kind":"Namespace","apiVersion":"v1","metadata":{"name":"openshift-workload-availability","annotations":{"openshift.io/node-selector":""}}}'
+    repository: https://github.com/medik8s/storage-based-remediation
+    support: Medik8s
+  name: storage-based-remediation.v5.8.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: StorageBasedRemediationConfig is the Schema for the storagebasedremediationconfigs API.
+      displayName: StorageBasedRemediationConfig
+      kind: StorageBasedRemediationConfig
+      name: storagebasedremediationconfigs.storage-based-remediation.medik8s.io
+      version: v1alpha1
+    - description: StorageBasedRemediation is the Schema for the storagebasedremediations API.
+      displayName: StorageBasedRemediation
+      kind: StorageBasedRemediation
+      name: storagebasedremediations.storage-based-remediation.medik8s.io
+      version: v1alpha1
+    - description: StorageBasedRemediationTemplate is the Schema for the storagebasedremediationtemplates
+        API.
+      displayName: StorageBasedRemediation Template
+      kind: StorageBasedRemediationTemplate
+      name: storagebasedremediationtemplates.storage-based-remediation.medik8s.io
+      version: v1alpha1
+  description: |
+    ### Introduction
+    Storage-Based Remediation (SBR) is a Kubernetes operator that provides automated node remediation when nodes become unresponsive by leveraging shared block storage for fencing operations.
+    The operator implements a cloud-native approach to storage-based fencing for Kubernetes environments where traditional out-of-band management (IPMI, iDRAC) is unavailable.
+
+    ### Compatibility
+    SBR integrates with the Medik8s Node HealthCheck Operator [(NHC)](https://github.com/medik8s/node-healthcheck-operator) which detects unhealthy nodes and creates remediation CRs.
+    It is recommended to use SBR with NHC for fully automating the remediation process, but it can be used as a standalone remediator for experienced users.
+
+    ### Advantages
+    - **Shared Storage Fencing** - Uses CSI block PVs with concurrent multi-node access for inter-node communication, providing reliable node fencing without requiring out-of-band management hardware.
+    - **Dual Watchdog System** - Combines shared storage watchdog with local kernel watchdog for robust failure detection and automatic recovery.
+    - **Split-Brain Prevention** - Shared storage arbitration ensures cluster consistency and prevents split-brain scenarios in stateful workloads.
+    - **Cloud-Native** - Built for Kubernetes environments with native CRD integration and support for various storage backends (e.g., Ceph RBD, OpenShift Data Foundation).
+  displayName: Storage-Based Remediation Operator
+  icon:
+  - base64data: "base64EncodedIcon"
+    mediatype: "image/png"
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - sbr
+  - storage
+  - remediation
+  links:
+  - name: Storage-Based Remediation
+    url: https://medik8s.io
+  maintainers:
+  - email: medik8s@googlegroups.com
+    name: Medik8s Team
+  maturity: alpha
+  minKubeVersion: 1.26.0
+  provider:
+     name: medik8s
+     url: https://github.com/medik8s
+  version: 5.8.0

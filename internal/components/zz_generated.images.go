@@ -4,6 +4,7 @@ package components
 var taggedImageReferences = map[string]string{
 	"RELATED_IMAGE_FAR_MANAGER": "quay.io/medik8s/fence-agents-remediation-operator:latest",
 	"RELATED_IMAGE_MDR_MANAGER": "quay.io/medik8s/machine-deletion-remediation-operator:latest",
+	"RELATED_IMAGE_NHC_CONSOLE": "quay.io/medik8s/node-remediation-console:latest",
 	"RELATED_IMAGE_NHC_MANAGER": "quay.io/medik8s/node-healthcheck-operator:latest",
 	"RELATED_IMAGE_NMO_MANAGER": "quay.io/medik8s/node-maintenance-operator:latest",
 	"RELATED_IMAGE_SBR_AGENT":   "quay.io/medik8s/storage-based-remediation-agent:latest",

@@ -2,3 +2,4 @@
 repo: https://github.com/medik8s/node-maintenance-operator
 tag: latest
 commit: dce77e869f202b51a5885078d51baf9b98cd2b66
+overlay: config/default

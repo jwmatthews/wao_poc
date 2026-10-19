@@ -143,7 +143,9 @@ func (tr *tree) changeTags() {
 			tagged := m["tagged"].(string)
 			m["tagged"] = tagged[:strings.LastIndex(tagged, ":")] + ":" + tag
 		}
-		stamp, err := json.Marshal(map[string]any{"repo": comp["repo"], "tag": tag, "commit": comp["commit"]})
+		stamp, err := json.Marshal(map[string]any{
+			"repo": comp["repo"], "tag": tag, "commit": comp["commit"], "overlay": comp["overlay"],
+		})
 		if err != nil {
 			tr.t.Fatal(err)
 		}
@@ -271,5 +273,39 @@ touch .completed-%s
 	}
 	if got := strings.Fields(string(tr.read("steps.log"))); !slices.Equal(got, steps[:2]) {
 		t.Errorf("steps ran as %v after failure, want %v", got, steps[:2])
+	}
+}
+
+// Each component records which vendored kustomize overlay WAO renders (release-set.yaml
+// `overlay`). The stamp and the runtime kustomization must agree with it, so an operand's
+// packaging entrypoint cannot drift silently when the manifests are refreshed.
+func TestVerificationRejectsOverlayDrift(t *testing.T) {
+	tr := newTree(t)
+	rs := tr.loadReleaseSet()
+	rs.Components["nhc"]["overlay"] = "config/default"
+	tr.saveReleaseSet(rs)
+	out, err := tr.try("make", "-s", "verify-operand-manifests")
+	if err == nil {
+		t.Fatalf("verification passed with a release-set overlay that differs from the stamp\n%s", out)
+	}
+	if !strings.Contains(out, "overlay") {
+		t.Fatalf("expected an overlay mismatch, got:\n%s", out)
+	}
+}
+
+// NHC enables metrics mTLS only if its ServiceAccount can read the client CA in
+// kube-system/extension-apiserver-authentication. The vendored Role grants that, but its
+// RoleBinding names the unprefixed ServiceAccount, so WAO must rebind it or the CSV drops it.
+func TestVerificationRejectsNHCWithoutClientCARead(t *testing.T) {
+	tr := newTree(t)
+	role := "config/operands/nhc/vendored/config/optional/kube-system-rbac/kube_system_role.yaml"
+	data := strings.Replace(string(tr.read(role)), "extension-apiserver-authentication", "some-other-configmap", 1)
+	tr.write(role, []byte(data))
+	out, err := tr.try("make", "-s", "verify-operand-manifests")
+	if err == nil {
+		t.Fatalf("verification passed although NHC cannot read the client CA\n%s", out)
+	}
+	if !strings.Contains(out, "extension-apiserver-authentication") {
+		t.Fatalf("expected a client CA check failure, got:\n%s", out)
 	}
 }
