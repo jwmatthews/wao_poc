@@ -143,7 +143,9 @@ func (tr *tree) changeTags() {
 			tagged := m["tagged"].(string)
 			m["tagged"] = tagged[:strings.LastIndex(tagged, ":")] + ":" + tag
 		}
-		stamp, err := json.Marshal(map[string]any{"repo": comp["repo"], "tag": tag, "commit": comp["commit"], "overlay": comp["overlay"]})
+		stamp, err := json.Marshal(map[string]any{
+			"repo": comp["repo"], "tag": tag, "commit": comp["commit"], "overlay": comp["overlay"],
+		})
 		if err != nil {
 			tr.t.Fatal(err)
 		}
