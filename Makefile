@@ -34,6 +34,10 @@ GOIMPORTS_VERSION ?= v0.44.0
 # Sort-imports versions at https://github.com/slintes/sort-imports/releases
 SORT_IMPORTS_VERSION = v0.3.0
 
+# golangci-lint versions at https://github.com/golangci/golangci-lint/releases
+# Keep in sync with .github/workflows/lint.yml.
+GOLANGCI_LINT_VERSION = v2.1.0
+
 # update for major version updates to YQ_VERSION! see https://github.com/mikefarah/yq
 YQ_API_VERSION = v4
 YQ_VERSION = v4.53.2
@@ -266,6 +270,27 @@ test-imports: sort-imports ## Check for sorted imports
 fix-imports: sort-imports ## Sort imports
 	$(SORT_IMPORTS) -w .
 
+# golangci-lint type-checks with the Go toolchain it runs under. A host Go newer
+# than go.mod reports spurious "undefined" typecheck errors, so pin the
+# toolchain to the go.mod version. CI (.github/workflows/lint.yml) sets up Go
+# from go.mod and runs the same golangci-lint version over the whole module.
+LINT_GOTOOLCHAIN ?= go$(shell go list -m -f '{{.GoVersion}}')
+
+.PHONY: lint
+lint: golangci-lint ## Run golangci-lint the way CI does (.golangci.yml, whole module)
+	GOTOOLCHAIN=$(LINT_GOTOOLCHAIN) $(GOLANGCI_LINT) run ./...
+
+.PHONY: lint-fix
+lint-fix: golangci-lint ## Run golangci-lint and apply the fixes it can make automatically
+	GOTOOLCHAIN=$(LINT_GOTOOLCHAIN) $(GOLANGCI_LINT) run --fix ./...
+
+# Developer pre-commit gate. Every prerequisite only reports and never rewrites
+# files, so it is safe on a dirty tree. CI does not call this target; it runs the
+# same checks through its own steps. Behavior and generated-code freshness are
+# covered by test-offline and test, which take minutes and need a clean tree.
+.PHONY: check
+check: lint test-imports verify-operand-manifests ## Fast read-only checks before a commit: lint, import order, operand manifest consistency
+
 .PHONY: verify-no-changes
 verify-no-changes: bundle-reset ## verify no there are no un-staged changes and remove unwanted changes to bundle
 	./hack/verify-diff.sh
@@ -355,6 +380,11 @@ goimports: ## Download goimports locally if necessary.
 SORT_IMPORTS = $(LOCALBIN)/sort-imports
 sort-imports: ## Download sort-imports locally if necessary.
 	$(call go-install-tool,$(SORT_IMPORTS),github.com/slintes/sort-imports@$(SORT_IMPORTS_VERSION))
+
+.PHONY: golangci-lint
+GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+golangci-lint: ## Download golangci-lint locally if necessary.
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION))
 
 .PHONY: yq
 YQ = $(LOCALBIN)/yq

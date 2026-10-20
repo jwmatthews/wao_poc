@@ -34,5 +34,6 @@ working for has confirmed which cluster to use in the current session.
 ## Commits
 
 Small commits per task.
-Run `make test` and `make test-offline`
-before each commit.
+Run `make check` before each commit (lint, import order, operand manifest
+consistency; read-only, seconds). Run `make test-offline` and `make test` on a
+clean tree before pushing. Together they match what CI runs.
