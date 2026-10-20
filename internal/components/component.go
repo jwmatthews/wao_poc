@@ -57,3 +57,16 @@ func ByKey(key string) (Definition, bool) {
 	}
 	return Definition{}, false
 }
+
+// APIGroups returns the API groups of the component's native kinds, in first-seen order.
+func (d Definition) APIGroups() []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, k := range append(append([]ResourceKind(nil), d.ManagedKinds...), d.AgentOwners...) {
+		if !seen[k.Group] {
+			seen[k.Group] = true
+			out = append(out, k.Group)
+		}
+	}
+	return out
+}
