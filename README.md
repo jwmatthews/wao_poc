@@ -29,6 +29,31 @@ named `cluster`. A lifecycle controller installs each component's unchanged
 controller-manager as a separate operand when an administrator enables it. Every
 component starts **Disabled**. 
 
+```sh
+❯ oc get workloadavailabilityconfig -o yaml
+apiVersion: v1
+items:
+- apiVersion: workloadavailability.medik8s.io/v1alpha1
+  kind: WorkloadAvailabilityConfig
+  metadata:
+    name: cluster
+  ...
+  spec:
+    components:
+      fenceAgentsRemediation:
+        state: Disabled
+      machineDeletionRemediation:
+        state: Disabled
+      nodeHealthCheck:
+        state: Disabled
+      nodeMaintenance:
+        state: Disabled
+      selfNodeRemediation:
+        state: Disabled
+      storageBasedRemediation:
+        state: Disabled
+    ...
+```
 This operator does NOT intend to change the behavior or functionality of the underlying components.  Success for this operator is to simplify the publishing of the operands as a single entity.  Allow development to continue to happen in their respective repositories, sync the updated bundle artifacts of each component into this repository and publish a single operator from this repository.
 
 
@@ -78,15 +103,25 @@ configuration, generate manifests and bindings, then verify consistency.
 
 ## Development
 
-### Install from shared medik8s/tools `make dev-olm-deploy`
-Run from the repository root :
+### Developer install follows `make dev-olm-deploy` from shared medik8s/tools
 
+#### Deploy the code as-is from the repository to your local cluster
 ```sh
-make generate manifests fmt
-make dev-olm-deploy # Assumes your KUBECONFIG points to an OpenShift cluster with OLM installed.
+# Rebuild the manager and bundle, push images, and reinstall on
+# your development OpenShift cluster.
+KUBECONFIG=/path/to/disposable.kubeconfig \
+  make dev-olm-deploy DEV_CLUSTER_TYPE=external. # DEV_CLUSTER_TYPE=external is optional, helps to avoid confusion if you also had a kind cluster available
+```
+
+#### Rebuild the manager and wao's manifests and then deploy to your local cluster 
+```sh
+make generate manifests fmt # Only needed if you changed local code or manifests
+KUBECONFIG=/path/to/disposable.kubeconfig \
+  make dev-olm-deploy DEV_CLUSTER_TYPE=external. # DEV_CLUSTER_TYPE=external is optional, helps to avoid confusion if you also had a kind cluster available
 ```
   * If you changed operand manifest inputs, also run `make operand-manifests` before deploying, so the new manifests are embedded in the manager binary.
 
+#### Update the operands and do a full rebuild and deploy to your local cluster
 If you want to refresh the `release-set.yaml`, run:
 ```sh
 
@@ -105,7 +140,7 @@ KUBECONFIG=/path/to/disposable.kubeconfig \
 
 ```
 
-### Uninstall from shared medik8s/tools `make dev-olm-undeploy`
+### Uninstall the dev installation`make dev-olm-undeploy`
 ```sh
 make dev-olm-undeploy
 ```
