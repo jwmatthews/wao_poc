@@ -37,7 +37,7 @@ metadata:
     capabilities: Basic Install
     categories: OpenShift Optional
     console.openshift.io/plugins: '["node-remediation-console-plugin"]'
-    createdAt: ""
+    createdAt: "2026-10-20T21:44:00Z"
     description: Proof of concept single operator that installs the six medik8s workload availability operators (NHC, SNR, SBR, FAR, MDR, NMO) as managed operands.
     operatorframework.io/suggested-namespace: openshift-workload-availability
     operatorframework.io/suggested-namespace-template: '{"kind":"Namespace","apiVersion":"v1","metadata":{"name":"openshift-workload-availability","annotations":{"openshift.io/node-selector":""}}}'
@@ -1312,22 +1312,22 @@ spec:
                           fieldRef:
                             fieldPath: metadata.namespace
                       - name: RELATED_IMAGE_NHC_MANAGER
-                        value: quay.io/medik8s/node-healthcheck-operator@sha256:fd290f730d5a6fc8fdb3aac8e528d3932a1186027606387c9d69a7db2783b3a5
+                        value: quay.io/medik8s/node-healthcheck-operator:latest
                       - name: RELATED_IMAGE_NHC_CONSOLE
-                        value: quay.io/medik8s/node-remediation-console@sha256:24561ff05bee8dd7594325f45c3bd3fbe2db77e5dea2f054f4e95c82dd2ff713
+                        value: quay.io/medik8s/node-remediation-console:latest
                       - name: RELATED_IMAGE_SNR_MANAGER
-                        value: quay.io/medik8s/self-node-remediation-operator@sha256:c75e3787fd8c3ca373d7d39fd889af2703c0c47a42a07418f5ff215912e37c11
+                        value: quay.io/medik8s/self-node-remediation-operator:latest
                       - name: RELATED_IMAGE_SBR_MANAGER
-                        value: quay.io/medik8s/storage-based-remediation-operator@sha256:ebb3f7550968953c6a0c2f56ed2e1b5b57462fcf32d383d67ff25e0ca77fd718
+                        value: quay.io/medik8s/storage-based-remediation-operator:latest
                       - name: RELATED_IMAGE_SBR_AGENT
-                        value: quay.io/medik8s/storage-based-remediation-agent@sha256:1689514e537d1f2dbc19f27047fee80fa755e74f5c263eecb900500b49b92f56
+                        value: quay.io/medik8s/storage-based-remediation-agent:latest
                       - name: RELATED_IMAGE_FAR_MANAGER
-                        value: quay.io/medik8s/fence-agents-remediation-operator@sha256:d1289cfa144169d1c8af67c03129c1cf6a5283906c10b481ceb1d299f7bb5d4c
+                        value: quay.io/medik8s/fence-agents-remediation-operator:latest
                       - name: RELATED_IMAGE_MDR_MANAGER
-                        value: quay.io/medik8s/machine-deletion-remediation-operator@sha256:421090014368c5c29bd96a6e99a4062570de9d3dbfe91cb12d3fd0a9420b1b01
+                        value: quay.io/medik8s/machine-deletion-remediation-operator:latest
                       - name: RELATED_IMAGE_NMO_MANAGER
-                        value: quay.io/medik8s/node-maintenance-operator@sha256:d0ae352a382193ed587b9fe6c4d1b24586ca007f98417e8ebae33b31f540c235
-                    image: quay.io/medik8s/workload-availability-operator:v0.1.0
+                        value: quay.io/medik8s/node-maintenance-operator:latest
+                    image: ttl.sh/medik8s-workload-availability-operator-xp6wsgpc:2h
                     livenessProbe:
                       httpGet:
                         path: /healthz
@@ -1629,21 +1629,21 @@ spec:
   provider:
     name: wao_poc
   relatedImages:
-    - image: quay.io/medik8s/node-healthcheck-operator@sha256:fd290f730d5a6fc8fdb3aac8e528d3932a1186027606387c9d69a7db2783b3a5
+    - image: quay.io/medik8s/node-healthcheck-operator:latest
       name: nhc-manager
-    - image: quay.io/medik8s/node-remediation-console@sha256:24561ff05bee8dd7594325f45c3bd3fbe2db77e5dea2f054f4e95c82dd2ff713
+    - image: quay.io/medik8s/node-remediation-console:latest
       name: nhc-console
-    - image: quay.io/medik8s/self-node-remediation-operator@sha256:c75e3787fd8c3ca373d7d39fd889af2703c0c47a42a07418f5ff215912e37c11
+    - image: quay.io/medik8s/self-node-remediation-operator:latest
       name: snr-manager
-    - image: quay.io/medik8s/storage-based-remediation-operator@sha256:ebb3f7550968953c6a0c2f56ed2e1b5b57462fcf32d383d67ff25e0ca77fd718
+    - image: quay.io/medik8s/storage-based-remediation-operator:latest
       name: sbr-manager
-    - image: quay.io/medik8s/storage-based-remediation-agent@sha256:1689514e537d1f2dbc19f27047fee80fa755e74f5c263eecb900500b49b92f56
+    - image: quay.io/medik8s/storage-based-remediation-agent:latest
       name: sbr-agent
-    - image: quay.io/medik8s/fence-agents-remediation-operator@sha256:d1289cfa144169d1c8af67c03129c1cf6a5283906c10b481ceb1d299f7bb5d4c
+    - image: quay.io/medik8s/fence-agents-remediation-operator:latest
       name: far-manager
-    - image: quay.io/medik8s/machine-deletion-remediation-operator@sha256:421090014368c5c29bd96a6e99a4062570de9d3dbfe91cb12d3fd0a9420b1b01
+    - image: quay.io/medik8s/machine-deletion-remediation-operator:latest
       name: mdr-manager
-    - image: quay.io/medik8s/node-maintenance-operator@sha256:d0ae352a382193ed587b9fe6c4d1b24586ca007f98417e8ebae33b31f540c235
+    - image: quay.io/medik8s/node-maintenance-operator:latest
       name: nmo-manager
   version: 0.1.0
   icon:
