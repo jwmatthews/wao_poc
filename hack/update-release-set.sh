@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Rewrite release-set.yaml from published operand images.
-# For each component: pick a tag, resolve each image's digest, read the embedded git commit from
-# the operator binary (hack/image-commit.sh), and write tag, commit, tagged and pinned.
+# For each component: keep latest floating, resolve other tags to digests, read the embedded
+# git commit (hack/image-commit.sh), and write tag, commit, tagged and pullRef.
 #
 # Tag selection (first match wins): <K>_TAG (e.g. NHC_TAG=v0.12.0), then OPERAND_TAG. The Makefile
 # defaults OPERAND_TAG to latest. Special values: latest selects the post-submit main build;
@@ -36,21 +36,25 @@ for k in $("$YQ" '.components | keys | .[]' "$RS"); do
   for env in $("$YQ" ".components.$k.images | keys | .[]" "$RS"); do
     base=$("$YQ" ".components.$k.images.$env.tagged" "$RS"); base=${base%:*}
     tagged="$base:$tag"
-    pinned=$(digest_ref "$tagged")
+    if [ "$tag" = latest ]; then
+      pull_ref=$tagged
+    else
+      pull_ref=$(digest_ref "$tagged")
+    fi
     errf=$(mktemp)
-    set +e; c=$(hack/image-commit.sh "$tagged" 2>"$errf"); rc=$?; set -e
+    set +e; c=$(hack/image-commit.sh "$pull_ref" 2>"$errf"); rc=$?; set -e
     case $rc in
       0) ;;
       2) c=""; echo "   $env: no embedded commit (skipping commit check for this image)" ;;
-      *) cat "$errf" >&2; rm -f "$errf"; echo "   $env: hack/image-commit.sh failed (rc=$rc) for $tagged" >&2; exit 1 ;;
+      *) cat "$errf" >&2; rm -f "$errf"; echo "   $env: hack/image-commit.sh failed (rc=$rc) for $pull_ref" >&2; exit 1 ;;
     esac
     rm -f "$errf"
     if [ -n "$c" ] && [ -n "$commit" ] && [ "$c" != "$commit" ]; then
       echo "   $env: embedded commit $c differs from $commit" >&2; exit 1
     fi
     [ -n "$c" ] && commit=$c
-    echo "   $env: $pinned"
-    "$YQ" -i ".components.$k.images.$env.tagged = \"$tagged\" | .components.$k.images.$env.pinned = \"$pinned\"" "$RS"
+    echo "   $env: $pull_ref"
+    "$YQ" -i ".components.$k.images.$env.tagged = \"$tagged\" | .components.$k.images.$env.pullRef = \"$pull_ref\" | del(.components.$k.images.$env.pinned)" "$RS"
   done
   [ -n "$commit" ] || { echo "   no image of $k embeds version.GitCommit" >&2; exit 1; }
   echo "   commit: $commit"

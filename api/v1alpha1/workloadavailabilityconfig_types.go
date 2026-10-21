@@ -178,7 +178,7 @@ type ComponentStatus struct {
 	Message string `json:"message,omitempty"`
 }
 
-// ImageReference is one pinned image in the release set.
+// ImageReference is one configured image pull reference in the release set.
 type ImageReference struct {
 	Name  string `json:"name"`
 	Image string `json:"image"`

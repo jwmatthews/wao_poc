@@ -20,7 +20,7 @@ const (
 // Required lists every image environment variable the operator needs at startup.
 var Required = []string{NHCManager, NHCConsole, SNRManager, SBRManager, SBRAgent, FARManager, MDRManager, NMOManager}
 
-// Set maps RELATED_IMAGE_* names to pinned image references.
+// Set maps RELATED_IMAGE_* names to selected image pull references.
 type Set map[string]string
 
 // FromEnv builds a Set from the given lookup, failing if any required value is absent or blank.

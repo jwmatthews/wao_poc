@@ -37,7 +37,7 @@ metadata:
     capabilities: Basic Install
     categories: OpenShift Optional
     console.openshift.io/plugins: '["node-remediation-console-plugin"]'
-    createdAt: "2026-10-20T21:44:00Z"
+    createdAt: ""
     description: Proof of concept single operator that installs the six medik8s workload availability operators (NHC, SNR, SBR, FAR, MDR, NMO) as managed operands.
     operatorframework.io/suggested-namespace: openshift-workload-availability
     operatorframework.io/suggested-namespace-template: '{"kind":"Namespace","apiVersion":"v1","metadata":{"name":"openshift-workload-availability","annotations":{"openshift.io/node-selector":""}}}'
@@ -1327,7 +1327,7 @@ spec:
                         value: quay.io/medik8s/machine-deletion-remediation-operator:latest
                       - name: RELATED_IMAGE_NMO_MANAGER
                         value: quay.io/medik8s/node-maintenance-operator:latest
-                    image: ttl.sh/medik8s-workload-availability-operator-xp6wsgpc:2h
+                    image: quay.io/medik8s/workload-availability-operator:v0.1.0
                     livenessProbe:
                       httpGet:
                         path: /healthz

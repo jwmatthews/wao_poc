@@ -1,19 +1,19 @@
-# Upstream medik8s builds of the six components WAO installs. Everything is pinned by digest.
+# Upstream medik8s builds of the six components WAO installs.
 #
-# tag: the image tag the snapshot was resolved from: `latest` (post-submit main build) or a
-#   release tag. commit: the git commit the published operator image was built from, read from
-#   the binary's embedded version.GitCommit by hack/image-commit.sh. The manifests under
-#   config/operands/<k>/vendored are copied from this commit, so they describe the image that runs.
-# images: "tagged" is the tag reference written into the embedded runtime manifests; "pinned"
-#   is the same image by digest. The operator Deployment carries the pinned digests as
-#   RELATED_IMAGE_* and the renderer substitutes them for the tagged references.
-# overlay: the kustomize directory inside the vendored config/ tree that WAO renders (the operand's
-#   packaging entrypoint; NHC's OpenShift packaging lives in config/manifests/ocp). kustomizeName:
-#   the image name as that directory leaves it, which make operand-manifests keeps pointed at tagged.
+# tag: the selected image tag. Exactly latest stays floating; every other tag is
+#   resolved to a digest. commit: the git commit embedded in the published image,
+#   read by hack/image-commit.sh. config/operands/<k>/vendored is copied from this
+#   commit. For latest this is a manifest snapshot; future pulls can run newer code.
+# images: tagged is the matching reference in embedded runtime manifests; pullRef
+#   is the deployed reference (repository:latest or repository@sha256:...). The WAO
+#   Deployment carries pullRef as RELATED_IMAGE_* and the renderer substitutes it.
+# overlay: the kustomize directory in the vendored config/ tree that WAO renders.
+# kustomizeName: the image name that directory leaves for the runtime overlay to retag.
 #
-# Update with `make update-release-set` (OPERAND_TAG defaults to latest, the main build), or
-# `make update-release-set OPERAND_TAG=release`, `OPERAND_TAG=v0.12.0`, `NHC_TAG=...`.
-# `OPERAND_TAG=pinned` keeps every tag and only re-resolves digests and commits.
+# make update-release-set defaults to OPERAND_TAG=latest. Use OPERAND_TAG=release
+# for GitHub release tags, an explicit version, or per-component NHC_TAG=... etc.
+# OPERAND_TAG=pinned keeps the recorded tags and refreshes pull references and commits;
+# it does not freeze latest. The standalone script defaults to release.
 resolvedAt: '2026-10-18T20:55:29Z'
 components:
   nhc:
@@ -23,12 +23,12 @@ components:
     images:
       RELATED_IMAGE_NHC_MANAGER:
         tagged: quay.io/medik8s/node-healthcheck-operator:latest
-        pinned: quay.io/medik8s/node-healthcheck-operator@sha256:fd290f730d5a6fc8fdb3aac8e528d3932a1186027606387c9d69a7db2783b3a5
         kustomizeName: quay.io/medik8s/node-healthcheck-operator
+        pullRef: quay.io/medik8s/node-healthcheck-operator:latest
       RELATED_IMAGE_NHC_CONSOLE:
         kustomizeName: quay.io/medik8s/node-remediation-console
         tagged: quay.io/medik8s/node-remediation-console:latest
-        pinned: quay.io/medik8s/node-remediation-console@sha256:24561ff05bee8dd7594325f45c3bd3fbe2db77e5dea2f054f4e95c82dd2ff713
+        pullRef: quay.io/medik8s/node-remediation-console:latest
     overlay: config/manifests/ocp
   snr:
     repo: https://github.com/medik8s/self-node-remediation
@@ -37,8 +37,8 @@ components:
     images:
       RELATED_IMAGE_SNR_MANAGER:
         tagged: quay.io/medik8s/self-node-remediation-operator:latest
-        pinned: quay.io/medik8s/self-node-remediation-operator@sha256:c75e3787fd8c3ca373d7d39fd889af2703c0c47a42a07418f5ff215912e37c11
         kustomizeName: quay.io/medik8s/self-node-remediation-operator
+        pullRef: quay.io/medik8s/self-node-remediation-operator:latest
     overlay: config/default
   sbr:
     repo: https://github.com/medik8s/storage-based-remediation
@@ -47,11 +47,11 @@ components:
     images:
       RELATED_IMAGE_SBR_MANAGER:
         tagged: quay.io/medik8s/storage-based-remediation-operator:latest
-        pinned: quay.io/medik8s/storage-based-remediation-operator@sha256:ebb3f7550968953c6a0c2f56ed2e1b5b57462fcf32d383d67ff25e0ca77fd718
         kustomizeName: quay.io/medik8s/storage-based-remediation-operator
+        pullRef: quay.io/medik8s/storage-based-remediation-operator:latest
       RELATED_IMAGE_SBR_AGENT:
         tagged: quay.io/medik8s/storage-based-remediation-agent:latest
-        pinned: quay.io/medik8s/storage-based-remediation-agent@sha256:1689514e537d1f2dbc19f27047fee80fa755e74f5c263eecb900500b49b92f56
+        pullRef: quay.io/medik8s/storage-based-remediation-agent:latest
     overlay: config/default
   far:
     repo: https://github.com/medik8s/fence-agents-remediation
@@ -60,8 +60,8 @@ components:
     images:
       RELATED_IMAGE_FAR_MANAGER:
         tagged: quay.io/medik8s/fence-agents-remediation-operator:latest
-        pinned: quay.io/medik8s/fence-agents-remediation-operator@sha256:d1289cfa144169d1c8af67c03129c1cf6a5283906c10b481ceb1d299f7bb5d4c
         kustomizeName: quay.io/medik8s/fence-agents-remediation-operator
+        pullRef: quay.io/medik8s/fence-agents-remediation-operator:latest
     overlay: config/default
   mdr:
     repo: https://github.com/medik8s/machine-deletion-remediation
@@ -70,8 +70,8 @@ components:
     images:
       RELATED_IMAGE_MDR_MANAGER:
         tagged: quay.io/medik8s/machine-deletion-remediation-operator:latest
-        pinned: quay.io/medik8s/machine-deletion-remediation-operator@sha256:421090014368c5c29bd96a6e99a4062570de9d3dbfe91cb12d3fd0a9420b1b01
         kustomizeName: quay.io/medik8s/machine-deletion-remediation-operator
+        pullRef: quay.io/medik8s/machine-deletion-remediation-operator:latest
     overlay: config/default
   nmo:
     repo: https://github.com/medik8s/node-maintenance-operator
@@ -80,6 +80,6 @@ components:
     images:
       RELATED_IMAGE_NMO_MANAGER:
         tagged: quay.io/medik8s/node-maintenance-operator:latest
-        pinned: quay.io/medik8s/node-maintenance-operator@sha256:d0ae352a382193ed587b9fe6c4d1b24586ca007f98417e8ebae33b31f540c235
         kustomizeName: quay.io/medik8s/node-maintenance-operator
+        pullRef: quay.io/medik8s/node-maintenance-operator:latest
     overlay: config/default

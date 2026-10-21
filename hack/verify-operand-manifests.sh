@@ -43,13 +43,12 @@ for path in "${generated[@]}"; do
   fi
 done
 
-# 3. RELATED_IMAGE_* equal the pinned digests.
-for env in $("$YQ" '[.components[].images | keys | .[]] | .[]' "$RS"); do
-  want=$("$YQ" ".components[].images.$env.pinned // \"\"" "$RS" | grep . || true)
-  [ -n "$want" ] || { problem "release-set.yaml has no pinned digest for $env"; continue; }
+# 3. RELATED_IMAGE_* equal the validated deployment references.
+refs=$(YQ="$YQ" hack/operand-image-refs.sh)
+while IFS=$'\t' read -r env want; do
   got=$("$YQ" "select(.kind == \"Deployment\") | .spec.template.spec.containers[0].env[] | select(.name == \"$env\") | .value" config/manager/manager.yaml)
-  [ "$want" = "$got" ] || problem "manager.yaml $env=$got, release-set.yaml pins $want"
-done
+  [ "$want" = "$got" ] || problem "manager.yaml $env=$got, release-set.yaml pullRef is $want"
+done <<< "$refs"
 
 # 4. Every operand ServiceAccount is in exactly one of OPERAND_SERVICE_ACCOUNTS (roles folded into
 # the CSV) or OPERAND_STANDALONE_SERVICE_ACCOUNTS (ServiceAccount, ClusterRole and binding shipped as

@@ -302,7 +302,8 @@ spec:
                 type: integer
               releaseSet:
                 items:
-                  description: ImageReference is one pinned image in the release set.
+                  description: ImageReference is one configured image pull reference
+                    in the release set.
                   properties:
                     image:
                       type: string
