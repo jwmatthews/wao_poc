@@ -37,6 +37,12 @@ func Render(def components.Definition, namespace string, imgs images.Set) ([]*un
 		return nil, err
 	}
 	out := make([]*unstructured.Unstructured, 0, len(files))
+	latest := map[string]bool{}
+	for _, binding := range def.Images {
+		if ref := imgs.Get(binding.Env); strings.HasSuffix(ref, ":latest") {
+			latest[ref] = true
+		}
+	}
 	for _, name := range sortedNames(files) {
 		text := strings.ReplaceAll(string(files[name]), NamespacePlaceholder, namespace)
 		for _, b := range def.Images {
@@ -60,6 +66,9 @@ func Render(def components.Definition, namespace string, imgs images.Set) ([]*un
 		if _, known := kindOrder[u.GetKind()]; !known {
 			return nil, fmt.Errorf("%s/%s: unsupported kind %s", def.Key, name, u.GetKind())
 		}
+		if err := setLatestPullPolicy(u, latest); err != nil {
+			return nil, fmt.Errorf("%s/%s: %w", def.Key, name, err)
+		}
 		if IsNamespaced(u.GetKind()) && u.GetNamespace() != namespace {
 			return nil, fmt.Errorf("%s/%s: namespace %q, want %q", def.Key, name, u.GetNamespace(), namespace)
 		}
@@ -79,4 +88,39 @@ func Render(def components.Definition, namespace string, imgs images.Set) ([]*un
 		return out[i].GetName() < out[j].GetName()
 	})
 	return out, nil
+}
+
+// Set the policy explicitly so switching an existing Deployment from a digest
+// to latest also replaces its previously defaulted IfNotPresent policy.
+func setLatestPullPolicy(obj *unstructured.Unstructured, latest map[string]bool) error {
+	if obj.GetKind() != "Deployment" || len(latest) == 0 {
+		return nil
+	}
+	for _, field := range []string{"containers", "initContainers"} {
+		path := []string{"spec", "template", "spec", field}
+		containers, found, err := unstructured.NestedSlice(obj.Object, path...)
+		if err != nil {
+			return err
+		}
+		if !found {
+			continue
+		}
+		for _, raw := range containers {
+			container, ok := raw.(map[string]interface{})
+			if !ok {
+				return fmt.Errorf("%s entry must be an object", field)
+			}
+			ref, _, err := unstructured.NestedString(container, "image")
+			if err != nil {
+				return err
+			}
+			if latest[ref] {
+				container["imagePullPolicy"] = "Always"
+			}
+		}
+		if err := unstructured.SetNestedSlice(obj.Object, containers, path...); err != nil {
+			return err
+		}
+	}
+	return nil
 }

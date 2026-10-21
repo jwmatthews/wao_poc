@@ -15,16 +15,6 @@ The POC installs all six upstream components as managed operands:
 | [Machine Deletion Remediation (MDR)](https://github.com/medik8s/machine-deletion-remediation) | Remediates nodes by deleting their Machine so the Machine API replaces it |
 | [Node Maintenance (NMO)](https://github.com/medik8s/node-maintenance-operator) | Cordons and drains a node on explicit request |
 
-The selected component tags, pull references and embedded commits are in
-[release-set.yaml](release-set.yaml). Each image has a `pullRef`: `latest` uses the
-floating `:latest` tag; every other tag uses a pinned digest. WAO deploys these
-references, including those passed to operands for their agents. For latest, the
-recorded commit identifies the vendored manifest snapshot; future image pulls can
-run newer code. Refresh operands again to synchronize that snapshot. Latest operand
-Deployment containers explicitly use `imagePullPolicy: Always`, which checks the
-registry at startup; moving the tag does not restart running containers. Agent pod
-pull policies remain controlled by the upstream operands.
-
 ## The main idea
 
 Today each component is a separate OLM package with its own CSV, its own API
@@ -59,14 +49,14 @@ items:
         state: Disabled
     ...
 ```
-This operator does NOT intend to change the behavior or functionality of the underlying components.  Success for this operator is to simplify the publishing of the operands as a single entity.  Allow development to continue to happen in their respective repositories, sync the updated bundle artifacts of each component into this repository and publish a single operator from this repository.
+This operator does NOT intend to change the behavior or functionality of the underlying components.  Success for this operator is to simplify the publishing of the operands as a single entity.  Allow development to continue to happen in their respective repositories, sync the updated RBAC and CRD to include WAO's bundle, and publish a single operator from this repository.
 
 
 ## Layout
 
 | Path | Contents |
 | --- | --- |
-| `release-set.yaml` | The upstream tags, commits and image pull references the POC installs |
+| `release-set.yaml` | The upstream tags, commits and image pull references the POC installs.  This allows us to automate refreshing the images to use and the operand RBAC and CRDs |
 | `api/v1alpha1/` | The `WorkloadAvailabilityConfig` API |
 | `internal/controller/` | The lifecycle controller and the default-config bootstrap |
 | `internal/operands/` | The embedded runtime manifests and the renderer |
@@ -81,8 +71,9 @@ This operator does NOT intend to change the behavior or functionality of the und
 Each operand has a copy of its own `config/` tree in `config/operands/<k>/vendored/`, plus
 two kustomize overlays: `rbac/` (rendered into the WAO CSV and bundle) and `runtime/` (rendered
 into `internal/operands/manifests/<k>/objects.yaml`, the Deployments, Services, ConfigMaps and
-webhook configurations the renderer applies at enable time). The operand CRDs ship in the CSV.
-Never hand-edit the generated files; run `make operand-manifests`. This also generates
+webhook configurations the renderer applies at enable time). 
+
+The operand CRDs ship in the CSV. Never hand-edit the generated files; run `make operand-manifests`. This also generates
 `internal/components/zz_generated.images.go` from `release-set.yaml`, keeping the renderer's
 image bindings synchronized with the selected tags. `make verify-operand-manifests` compares
 files before and after regeneration, so it works with uncommitted updates. It checks the
