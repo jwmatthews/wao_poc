@@ -1,5 +1,5 @@
 # Written by hack/update-operand-manifests.sh. Do not edit; run make update-operand-manifests.
 repo: https://github.com/medik8s/storage-based-remediation
 tag: latest
-commit: 50d20b524e1b16fe895e30f7bd52c868a569b125
+commit: 87dafa69fd427dcf796b2ca4bd1f68387fbeb98f
 overlay: config/default

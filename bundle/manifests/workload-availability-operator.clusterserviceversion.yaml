@@ -911,6 +911,7 @@ spec:
                 - networkpolicies
               verbs:
                 - create
+                - delete
                 - get
                 - list
                 - update
@@ -1082,7 +1083,10 @@ spec:
               verbs:
                 - create
                 - delete
+                - get
+                - list
                 - update
+                - watch
             - apiGroups:
                 - security.openshift.io
               resourceNames:
