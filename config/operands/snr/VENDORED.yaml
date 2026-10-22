@@ -1,5 +1,5 @@
 # Written by hack/update-operand-manifests.sh. Do not edit; run make update-operand-manifests.
 repo: https://github.com/medik8s/self-node-remediation
 tag: latest
-commit: 7baef3b210ea5d69dd08c1def063fb5a57eb2c21
+commit: 855fb5a4449a12859a89fb3120cbb460b94ca79c
 overlay: config/default

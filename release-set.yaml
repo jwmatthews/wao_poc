@@ -14,7 +14,7 @@
 # for GitHub release tags, an explicit version, or per-component NHC_TAG=... etc.
 # OPERAND_TAG=pinned keeps the recorded tags and refreshes pull references and commits;
 # it does not freeze latest. The standalone script defaults to release.
-resolvedAt: '2026-10-18T20:55:29Z'
+resolvedAt: '2026-10-22T00:59:28Z'
 components:
   nhc:
     repo: https://github.com/medik8s/node-healthcheck-operator
@@ -33,7 +33,7 @@ components:
   snr:
     repo: https://github.com/medik8s/self-node-remediation
     tag: latest
-    commit: "7baef3b210ea5d69dd08c1def063fb5a57eb2c21"
+    commit: "855fb5a4449a12859a89fb3120cbb460b94ca79c"
     images:
       RELATED_IMAGE_SNR_MANAGER:
         tagged: quay.io/medik8s/self-node-remediation-operator:latest
@@ -43,7 +43,7 @@ components:
   sbr:
     repo: https://github.com/medik8s/storage-based-remediation
     tag: latest
-    commit: "50d20b524e1b16fe895e30f7bd52c868a569b125"
+    commit: "87dafa69fd427dcf796b2ca4bd1f68387fbeb98f"
     images:
       RELATED_IMAGE_SBR_MANAGER:
         tagged: quay.io/medik8s/storage-based-remediation-operator:latest
