@@ -15,11 +15,6 @@ The POC installs all six upstream components as managed operands:
 | [Machine Deletion Remediation (MDR)](https://github.com/medik8s/machine-deletion-remediation) | Remediates nodes by deleting their Machine so the Machine API replaces it |
 | [Node Maintenance (NMO)](https://github.com/medik8s/node-maintenance-operator) | Cordons and drains a node on explicit request |
 
-The selected component versions, operand image digests and embedded commits are in
-[release-set.yaml](release-set.yaml). Floating tags such
-as `latest` are resolved only when refreshing that file. WAO deploys the recorded
-digests, including those passed to operands for their agents.
-
 ## The main idea
 
 Today each component is a separate OLM package with its own CSV, its own API
@@ -54,19 +49,19 @@ items:
         state: Disabled
     ...
 ```
-This operator does NOT intend to change the behavior or functionality of the underlying components.  Success for this operator is to simplify the publishing of the operands as a single entity.  Allow development to continue to happen in their respective repositories, sync the updated bundle artifacts of each component into this repository and publish a single operator from this repository.
+This operator does NOT intend to change the behavior or functionality of the underlying components.  Success for this operator is to simplify the publishing of the operands as a single entity.  Allow development to continue to happen in their respective repositories, sync the updated RBAC and CRD to include WAO's bundle, and publish a single operator from this repository.
 
 
 ## Layout
 
 | Path | Contents |
 | --- | --- |
-| `release-set.yaml` | The pinned upstream release tags, commits and image digests the POC installs |
+| `release-set.yaml` | The upstream tags, commits and image pull references the POC installs.  This allows us to automate refreshing the images to use and the operand RBAC and CRDs |
 | `api/v1alpha1/` | The `WorkloadAvailabilityConfig` API |
 | `internal/controller/` | The lifecycle controller and the default-config bootstrap |
 | `internal/operands/` | The embedded runtime manifests and the renderer |
 | `config/operands/<k>/` | Per operand: `vendored/` (copy of the operand's `config/` tree), `VENDORED.yaml` (source and commit), `rbac/` and `runtime/` kustomize overlays |
-| `hack/update-release-set.sh`, `hack/image-commit.sh` | Resolve tags, image digests and the commit embedded in each published image into `release-set.yaml` |
+| `hack/update-release-set.sh`, `hack/image-commit.sh` | Record floating latest or pinned release references and embedded image commits |
 | `hack/update-operand-manifests.sh`, `hack/verify-operand-manifests.sh` | Copy the upstream trees at the recorded commits; offline CI verification |
 | `bundle/` | The generated OLM bundle (one CSV, thirteen CRDs, twenty-one standalone ClusterRoles, and the SBR agent's ServiceAccount and ClusterRoleBinding) |
 | `config/catalog/`, `catalog/` | Committed CatalogSource and Subscription templates; the rendered file-based catalog |
@@ -76,8 +71,9 @@ This operator does NOT intend to change the behavior or functionality of the und
 Each operand has a copy of its own `config/` tree in `config/operands/<k>/vendored/`, plus
 two kustomize overlays: `rbac/` (rendered into the WAO CSV and bundle) and `runtime/` (rendered
 into `internal/operands/manifests/<k>/objects.yaml`, the Deployments, Services, ConfigMaps and
-webhook configurations the renderer applies at enable time). The operand CRDs ship in the CSV.
-Never hand-edit the generated files; run `make operand-manifests`. This also generates
+webhook configurations the renderer applies at enable time). 
+
+The operand CRDs ship in the CSV. Never hand-edit the generated files; run `make operand-manifests`. This also generates
 `internal/components/zz_generated.images.go` from `release-set.yaml`, keeping the renderer's
 image bindings synchronized with the selected tags. `make verify-operand-manifests` compares
 files before and after regeneration, so it works with uncommitted updates. It checks the
@@ -92,13 +88,14 @@ We can look at how they handle the "update-*" targets in their (Makefile)[https:
 
 Operand manifests are copied from each operand checkout, following OADP's non-admin-controller
 pattern.
-- `make update-release-set` records the latest release tag, image digests and the git
-commit embedded in each published image into `release-set.yaml` 
+- `make update-release-set` records the selected tags, pull references and embedded
+commits into `release-set.yaml`. It defaults to latest; other tags resolve to digests.
 - `make update-operand-manifests` copies `config/` from a checkout at that commit into `config/operands/<k>/vendored/` (checkouts live in `.cache/operands`, or set `NHC_PATH` and friends), renders the runtime manifests the Go renderer embeds, generates Go image bindings, and syncs `RELATED_IMAGE_*`.
 - Use `make bump-operands` for the complete sequence: resolve published images, copy
 configuration, generate manifests and bindings, then verify consistency. 
-    - `OPERAND_TAG` defaultsto `latest`, the post-submit main build; pass `OPERAND_TAG=release` for each component's latest GitHub release, 
-    - `OPERAND_TAG=pinned` to keep the current tags, or override one component with `NHC_TAG=...`. Operand releases can lag files the `config/operands` wrappers rely on.
+    - `OPERAND_TAG` defaults to `latest`, the post-submit main build; pass `OPERAND_TAG=release` for each component's latest GitHub release,
+    - `OPERAND_TAG=pinned` to keep the current tags while refreshing references and commits
+      (latest still floats), or override one component with `NHC_TAG=...`. Operand releases can lag files the `config/operands` wrappers rely on.
 
 
 ## Development
@@ -126,7 +123,7 @@ If you want to refresh the `release-set.yaml`, run:
 ```sh
 
 # Refresh all operands from their published "latest" images.
-# Record image digests and source commits, vendor configuration,
+# Record image pull references and source commits, vendor configuration,
 # regenerate operand manifests/bindings, and verify consistency.
 make bump-operands
 
@@ -160,8 +157,8 @@ GitHub Actions runs the Go suites, lint, `make verify-operand-manifests` and the
 
 **Enabled** applies the component's operand objects with server-side apply: the
 manager Deployment, Services, ConfigMaps and webhook configurations, rendered from the
-vendored `config/default` copy (the `objects.yaml` embedded in the binary) with the pinned
-image digests substituted. The operand ServiceAccounts, Roles and bindings are not part of
+vendored `config/default` copy (the `objects.yaml` embedded in the binary) with the selected
+image pull references substituted. The operand ServiceAccounts, Roles and bindings are not part of
 this: OLM creates them from the WAO CSV at install, and they exist whether or not the
 component is Enabled. The phase becomes
 `Available` once the managers are ready and, for NHC, SNR, FAR and NMO, the

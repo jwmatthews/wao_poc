@@ -7,7 +7,8 @@ as operands in one namespace.
 ## Hard constraints
 
 - Do not modify, fork or rebuild the component operators. Consume the operand
-  images exactly as pinned in `release-set.yaml`, by digest.
+  images exactly as recorded by `pullRef` in `release-set.yaml`: `latest` stays
+  floating; every other tag is pinned by digest.
 - Every component defaults to `Disabled`. Installing WAO must not create a
   remediation policy, remediation request, native config or node agent.
 - Never change a component webhook `failurePolicy`, in particular never `Fail` to `Ignore`.

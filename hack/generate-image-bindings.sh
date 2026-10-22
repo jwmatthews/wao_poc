@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generate the tagged image references that the operand renderer replaces with pinned digests.
+# Generate the tagged image references that the operand renderer replaces with selected pull references.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 RS=${RELEASE_SET:-release-set.yaml}

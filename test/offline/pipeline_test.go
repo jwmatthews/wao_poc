@@ -67,7 +67,8 @@ func (tr *tree) try(name string, args ...string) (string, error) {
 	for _, kv := range os.Environ() {
 		key, _, _ := strings.Cut(kv, "=")
 		switch key {
-		case "MAKEFLAGS", "MFLAGS", "MAKELEVEL", "RELEASE_SET", "GIT_DIR", "GIT_WORK_TREE":
+		case "MAKEFLAGS", "MFLAGS", "MAKELEVEL", "RELEASE_SET", "GIT_DIR", "GIT_WORK_TREE",
+			"OPERAND_TAG", "NHC_TAG", "SNR_TAG", "SBR_TAG", "FAR_TAG", "MDR_TAG", "NMO_TAG":
 			continue
 		}
 		cmd.Env = append(cmd.Env, kv)
@@ -141,7 +142,9 @@ func (tr *tree) changeTags() {
 		for _, img := range comp["images"].(map[string]any) {
 			m := img.(map[string]any)
 			tagged := m["tagged"].(string)
-			m["tagged"] = tagged[:strings.LastIndex(tagged, ":")] + ":" + tag
+			repo := tagged[:strings.LastIndex(tagged, ":")]
+			m["tagged"] = repo + ":" + tag
+			m["pullRef"] = repo + "@" + fixtureDigest
 		}
 		stamp, err := json.Marshal(map[string]any{
 			"repo": comp["repo"], "tag": tag, "commit": comp["commit"], "overlay": comp["overlay"],

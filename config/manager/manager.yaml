@@ -64,7 +64,7 @@ spec:
             - --leader-elect
             - --health-probe-bind-address=:8081
             - --metrics-bind-address=0
-          # Operand images are pinned by digest and must equal the "pinned" references in
+          # Operand images must equal the "pullRef" references (latest tag or digest) in
           # release-set.yaml. They are not configurable through any API field.
           env:
             - name: OPERATOR_NAMESPACE

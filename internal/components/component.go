@@ -2,7 +2,7 @@ package components
 
 // ImageBinding maps an operator image variable to the tagged reference from release-set.yaml
 // that the runtime overlay writes into the embedded manifests;
-// the renderer replaces Original with the pinned value from the image set.
+// the renderer replaces Original with the selected pull reference from the image set.
 type ImageBinding struct {
 	Env      string
 	Original string

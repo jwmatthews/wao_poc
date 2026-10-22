@@ -313,3 +313,59 @@ func TestRenderNHCConsolePlugin(t *testing.T) {
 		t.Errorf("console Service annotations = %v", svc.GetAnnotations())
 	}
 }
+
+func TestRenderLatestImagesPullPolicy(t *testing.T) {
+	imgs := testImages()
+	for env := range imgs {
+		imgs[env] = "example.test/" + strings.ToLower(env) + ":latest"
+	}
+	for _, def := range components.All() {
+		t.Run(def.Key, func(t *testing.T) {
+			objs, err := operands.Render(def, testNamespace, imgs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			seen := map[string]bool{}
+			for _, obj := range objs {
+				if obj.GetKind() != "Deployment" {
+					continue
+				}
+				containers, _, err := unstructured.NestedSlice(obj.Object, "spec", "template", "spec", "containers")
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, raw := range containers {
+					c := raw.(map[string]any)
+					for _, b := range def.Images {
+						if c["image"] == imgs[b.Env] {
+							seen[b.Env] = true
+							if c["imagePullPolicy"] != "Always" {
+								t.Errorf("%s %s: latest policy = %v", obj.GetName(), b.Env, c["imagePullPolicy"])
+							}
+						}
+					}
+					envs, _ := c["env"].([]any)
+					for _, rawEnv := range envs {
+						env := rawEnv.(map[string]any)
+						var want string
+						switch env["name"] {
+						case "SELF_NODE_REMEDIATION_IMAGE":
+							want = imgs[images.SNRManager]
+						case "RELATED_IMAGE_AGENT":
+							want = imgs[images.SBRAgent]
+							seen[images.SBRAgent] = true
+						}
+						if want != "" && env["value"] != want {
+							t.Errorf("%s = %v, want %s", env["name"], env["value"], want)
+						}
+					}
+				}
+			}
+			for _, b := range def.Images {
+				if !seen[b.Env] {
+					t.Errorf("image binding %s not exercised", b.Env)
+				}
+			}
+		})
+	}
+}

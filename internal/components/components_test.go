@@ -91,7 +91,7 @@ func TestEveryComponentDeclaresManagedKinds(t *testing.T) {
 }
 
 // Original image references are the `tagged` values in release-set.yaml: the runtime overlays
-// set them (make operand-manifests) and the renderer swaps them for the pinned RELATED_IMAGE_*.
+// set them (make operand-manifests) and the renderer swaps them for the selected RELATED_IMAGE_*.
 func TestOriginalImagesMatchReleaseSet(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "release-set.yaml"))
 	if err != nil {
