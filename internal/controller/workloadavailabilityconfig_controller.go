@@ -60,6 +60,7 @@ type WorkloadAvailabilityConfigReconciler struct {
 // +kubebuilder:rbac:groups="",resources=services;configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations;mutatingwebhookconfigurations,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingadmissionpolicies;validatingadmissionpolicybindings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=self-node-remediation.medik8s.io,resources=selfnoderemediationconfigs;selfnoderemediations,verbs=get;list;watch
 // +kubebuilder:rbac:groups=storage-based-remediation.medik8s.io,resources=storagebasedremediationconfigs;storagebasedremediations,verbs=get;list;watch
 // +kubebuilder:rbac:groups=remediation.medik8s.io,resources=nodehealthchecks,verbs=get;list;watch
@@ -93,7 +94,7 @@ func (r *WorkloadAvailabilityConfigReconciler) Reconcile(ctx context.Context, re
 		if wac.Spec.StateOf(def.Key) == v1alpha1.ComponentStateEnabled {
 			st, err = r.ensureEnabled(ctx, wac, def)
 		} else {
-			st, err = r.ensureDisabled(ctx, def)
+			st, err = r.ensureDisabled(ctx, wac, def)
 		}
 		if err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", def.Key, err))
@@ -138,16 +139,8 @@ func (r *WorkloadAvailabilityConfigReconciler) ensureEnabled(ctx context.Context
 	if err != nil {
 		return st, err
 	}
-	for _, o := range objs {
-		if err := r.guardForeign(ctx, o); err != nil {
-			return st, err
-		}
-		o.SetOwnerReferences([]metav1.OwnerReference{{APIVersion: v1alpha1.GroupVersion.String(), Kind: "WorkloadAvailabilityConfig",
-			Name: wac.Name, UID: wac.UID, Controller: ptr.To(true), BlockOwnerDeletion: ptr.To(true)}})
-		o.SetManagedFields(nil)
-		if err := r.Patch(ctx, o, client.Apply, client.FieldOwner(FieldOwner), client.ForceOwnership); err != nil {
-			return st, fmt.Errorf("apply %s/%s: %w", o.GetKind(), o.GetName(), err)
-		}
+	if err := r.applyAll(ctx, wac, objs); err != nil {
+		return st, err
 	}
 	ready := true
 	for _, name := range def.Deployments {
@@ -174,13 +167,66 @@ func (r *WorkloadAvailabilityConfigReconciler) ensureEnabled(ctx context.Context
 		st.AdmissionReady = &ok
 		ready = ready && ok
 	}
-	if ready {
-		st.Phase = v1alpha1.ComponentPhaseAvailable
-	} else {
-		st.Phase = v1alpha1.ComponentPhaseProgressing
-		st.Message = "waiting for operand Deployments and admission certificates"
+	gate, err := operands.Gate(def, r.Namespace)
+	if err != nil {
+		return st, err
 	}
+	if !ready {
+		// Keep denying user writes until the component's own admission can answer them.
+		if err := r.applyAll(ctx, wac, gate); err != nil {
+			return st, err
+		}
+		st.Phase = v1alpha1.ComponentPhaseProgressing
+		st.Message = "waiting for operand Deployments and admission certificates; creating or changing this component's resources is denied until then"
+		return st, nil
+	}
+	if _, err := r.deleteManaged(ctx, gate); err != nil {
+		return st, err
+	}
+	st.Phase = v1alpha1.ComponentPhaseAvailable
 	return st, nil
+}
+
+// applyAll server-side applies WAO-owned objects, refusing to adopt any that WAO did not create.
+func (r *WorkloadAvailabilityConfigReconciler) applyAll(ctx context.Context, wac *v1alpha1.WorkloadAvailabilityConfig, objs []*unstructured.Unstructured) error {
+	for _, o := range objs {
+		if err := r.guardForeign(ctx, o); err != nil {
+			return err
+		}
+		o.SetOwnerReferences([]metav1.OwnerReference{{APIVersion: v1alpha1.GroupVersion.String(), Kind: "WorkloadAvailabilityConfig",
+			Name: wac.Name, UID: wac.UID, Controller: ptr.To(true), BlockOwnerDeletion: ptr.To(true)}})
+		o.SetManagedFields(nil)
+		if err := r.Patch(ctx, o, client.Apply, client.FieldOwner(FieldOwner), client.ForceOwnership); err != nil {
+			return fmt.Errorf("apply %s/%s: %w", o.GetKind(), o.GetName(), err)
+		}
+	}
+	return nil
+}
+
+// deleteManaged deletes objs in reverse order, leaving objects WAO did not create untouched and
+// returning their descriptions.
+func (r *WorkloadAvailabilityConfigReconciler) deleteManaged(ctx context.Context, objs []*unstructured.Unstructured) ([]string, error) {
+	var skipped []string
+	for i := len(objs) - 1; i >= 0; i-- {
+		o := objs[i]
+		existing := &unstructured.Unstructured{}
+		existing.SetGroupVersionKind(o.GroupVersionKind())
+		err := r.Get(ctx, client.ObjectKeyFromObject(o), existing)
+		if apierrors.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			return skipped, err
+		}
+		if existing.GetLabels()[operands.LabelManagedBy] != operands.ManagedByValue {
+			skipped = append(skipped, fmt.Sprintf("%s %s/%s", o.GetKind(), o.GetNamespace(), o.GetName()))
+			continue
+		}
+		if err := r.Delete(ctx, existing); err != nil && !apierrors.IsNotFound(err) {
+			return skipped, fmt.Errorf("delete %s/%s: %w", o.GetKind(), o.GetName(), err)
+		}
+	}
+	return skipped, nil
 }
 
 // guardForeign refuses to take over an existing object that WAO did not create.
@@ -230,31 +276,29 @@ func (r *WorkloadAvailabilityConfigReconciler) admissionReady(ctx context.Contex
 	return true, nil
 }
 
-func (r *WorkloadAvailabilityConfigReconciler) ensureDisabled(ctx context.Context, def components.Definition) (v1alpha1.ComponentStatus, error) {
+// ensureDisabled removes the component's manager and installation objects. With a non-nil wac it
+// first installs the admission gate, so there is no moment at which the component's resources can
+// be written without either its webhooks or the gate; finalize passes nil to remove the gate too.
+func (r *WorkloadAvailabilityConfigReconciler) ensureDisabled(ctx context.Context, wac *v1alpha1.WorkloadAvailabilityConfig, def components.Definition) (v1alpha1.ComponentStatus, error) {
 	st := v1alpha1.ComponentStatus{Name: def.Key, DesiredState: v1alpha1.ComponentStateDisabled, Phase: v1alpha1.ComponentPhaseDisabled}
 	objs, err := operands.Render(def, r.Namespace, r.Images)
 	if err != nil {
 		return st, err
 	}
-	var skipped []string
-	for i := len(objs) - 1; i >= 0; i-- { // webhooks first, service accounts last
-		o := objs[i]
-		existing := &unstructured.Unstructured{}
-		existing.SetGroupVersionKind(o.GroupVersionKind())
-		err := r.Get(ctx, client.ObjectKeyFromObject(o), existing)
-		if apierrors.IsNotFound(err) {
-			continue
-		}
-		if err != nil {
+	gate, err := operands.Gate(def, r.Namespace)
+	if err != nil {
+		return st, err
+	}
+	if wac != nil {
+		if err := r.applyAll(ctx, wac, gate); err != nil {
 			return st, err
 		}
-		if existing.GetLabels()[operands.LabelManagedBy] != operands.ManagedByValue {
-			skipped = append(skipped, fmt.Sprintf("%s %s/%s", o.GetKind(), o.GetNamespace(), o.GetName()))
-			continue
-		}
-		if err := r.Delete(ctx, existing); err != nil && !apierrors.IsNotFound(err) {
-			return st, fmt.Errorf("delete %s/%s: %w", o.GetKind(), o.GetName(), err)
-		}
+	} else {
+		objs = append(gate, objs...) // deleted in reverse: the gate goes last
+	}
+	skipped, err := r.deleteManaged(ctx, objs) // webhooks first, service accounts last
+	if err != nil {
+		return st, err
 	}
 	retained, err := r.retainedResources(ctx, def)
 	if err != nil {
@@ -271,7 +315,9 @@ func (r *WorkloadAvailabilityConfigReconciler) ensureDisabled(ctx context.Contex
 	}
 	if len(def.Webhooks) > 0 {
 		st.AdmissionReady = ptr.To(false)
-		msgs = append(msgs, "admission for this component's APIs is unavailable while Disabled")
+	}
+	if wac != nil {
+		msgs = append(msgs, "creating or changing this component's resources is denied while Disabled")
 	}
 	if len(msgs) > 0 {
 		st.Message = fmt.Sprint(msgs)
@@ -340,7 +386,7 @@ func (r *WorkloadAvailabilityConfigReconciler) finalize(ctx context.Context, wac
 	}
 	log := logf.FromContext(ctx)
 	for _, def := range components.All() {
-		st, err := r.ensureDisabled(ctx, def)
+		st, err := r.ensureDisabled(ctx, nil, def)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -364,6 +410,8 @@ func (r *WorkloadAvailabilityConfigReconciler) SetupWithManager(mgr ctrl.Manager
 		Owns(&corev1.Service{}).
 		Owns(&admissionregistrationv1.ValidatingWebhookConfiguration{}).
 		Owns(&admissionregistrationv1.MutatingWebhookConfiguration{}).
+		Owns(&admissionregistrationv1.ValidatingAdmissionPolicy{}).
+		Owns(&admissionregistrationv1.ValidatingAdmissionPolicyBinding{}).
 		Watches(&appsv1.DaemonSet{}, toSingleton, builder.WithPredicates(inNamespace)).
 		Named("workloadavailabilityconfig").
 		Complete(r)

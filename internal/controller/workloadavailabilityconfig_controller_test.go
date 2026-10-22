@@ -163,7 +163,7 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 			c := component(getWAC(ctx), v1alpha1.ComponentKeyNodeHealthCheck)
 			g.Expect(c.Phase).To(Equal(v1alpha1.ComponentPhaseDisabled))
 			g.Expect(c.AdmissionReady).To(Equal(ptr.To(false)))
-			g.Expect(c.Message).To(ContainSubstring("admission"))
+			g.Expect(c.Message).To(ContainSubstring("denied while Disabled"))
 		}).Should(Succeed())
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-controller-manager"}, &appsv1.Deployment{}))).To(BeTrue())
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: "node-healthcheck-validating-webhook-configuration"}, &admissionregistrationv1.ValidatingWebhookConfiguration{}))).To(BeTrue())
@@ -206,13 +206,14 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 	})
 
 	It("reports DisableIncomplete when SNR agents survive a manager-level disable", func() {
-		// Simulate what the SNR manager creates at runtime. Do it while SNR is Disabled: once enabled,
-		// SNR's Fail-policy webhooks are registered and envtest has no backend to answer them.
+		// Simulate what the SNR manager creates at runtime, as an install-namespace service account
+		// (exempt from the gate). Do it while SNR is Disabled: once enabled, SNR's Fail-policy
+		// webhooks are registered and envtest has no backend to answer them.
 		cfg := &unstructured.Unstructured{}
 		cfg.SetGroupVersionKind(schema.GroupVersionKind{Group: "self-node-remediation.medik8s.io", Version: "v1alpha1", Kind: "SelfNodeRemediationConfig"})
 		cfg.SetName("self-node-remediation-config")
 		cfg.SetNamespace(ns)
-		Expect(k8sClient.Create(ctx, cfg)).To(Succeed())
+		Expect(operandClient.Create(ctx, cfg)).To(Succeed())
 		ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: "self-node-remediation-ds", Namespace: ns,
 			OwnerReferences: []metav1.OwnerReference{{APIVersion: "self-node-remediation.medik8s.io/v1alpha1", Kind: "SelfNodeRemediationConfig", Name: cfg.GetName(), UID: cfg.GetUID(), Controller: ptr.To(true)}}},
 			Spec: appsv1.DaemonSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "snr-agent"}},
@@ -271,13 +272,14 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 	})
 
 	It("reports a NodeMaintenance left behind by a disabled NMO as retained", func() {
-		// Created while NMO is Disabled: its Fail-policy webhook would otherwise need a backend.
+		// Created while NMO is Disabled: its Fail-policy webhook would otherwise need a backend. Users
+		// are denied by the gate then, so this stands in for one left from an earlier Enabled period.
 		nm := &unstructured.Unstructured{}
 		nm.SetGroupVersionKind(schema.GroupVersionKind{Group: "nodemaintenance.medik8s.io", Version: "v1beta1", Kind: "NodeMaintenance"})
 		nm.SetName("wao-test-maintenance")
 		Expect(unstructured.SetNestedField(nm.Object, "wao-test-node", "spec", "nodeName")).To(Succeed())
 		Expect(unstructured.SetNestedField(nm.Object, "envtest", "spec", "reason")).To(Succeed())
-		Expect(k8sClient.Create(ctx, nm)).To(Succeed())
+		Expect(operandClient.Create(ctx, nm)).To(Succeed())
 		setState(ctx, v1alpha1.ComponentKeyNodeMaintenance, v1alpha1.ComponentStateEnabled)
 		Eventually(func(g Gomega) {
 			g.Expect(component(getWAC(ctx), v1alpha1.ComponentKeyNodeMaintenance).Phase).To(Equal(v1alpha1.ComponentPhaseProgressing))
@@ -294,6 +296,77 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		}, 90*time.Second, time.Second).Should(Succeed())
 	})
 
+	It("gates every Disabled component's API groups with an in-tree admission policy", func() {
+		for _, def := range components.All() {
+			name := operands.GateName(def)
+			p := &admissionregistrationv1.ValidatingAdmissionPolicy{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name}, p)).To(Succeed(), def.Key)
+			Expect(p.Labels[operands.LabelManagedBy]).To(Equal(operands.ManagedByValue))
+			Expect(p.OwnerReferences).To(HaveLen(1))
+			Expect(p.Spec.MatchConstraints.ResourceRules[0].APIGroups).To(Equal(def.APIGroups()))
+			b := &admissionregistrationv1.ValidatingAdmissionPolicyBinding{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name}, b)).To(Succeed(), def.Key)
+			Expect(b.Spec.ValidationActions).To(Equal([]admissionregistrationv1.ValidationAction{admissionregistrationv1.Deny}))
+		}
+		Expect(component(getWAC(ctx), v1alpha1.ComponentKeyNodeHealthCheck).Message).To(ContainSubstring("denied while Disabled"))
+
+		nhc := func(name string) *unstructured.Unstructured {
+			u := &unstructured.Unstructured{}
+			u.SetGroupVersionKind(schema.GroupVersionKind{Group: "remediation.medik8s.io", Version: "v1alpha1", Kind: "NodeHealthCheck"})
+			u.SetName(name)
+			Expect(unstructured.SetNestedField(u.Object, "100%", "spec", "minHealthy")).To(Succeed())
+			Expect(unstructured.SetNestedSlice(u.Object, []any{map[string]any{"type": "Ready", "status": "False", "duration": "300s"}}, "spec", "unhealthyConditions")).To(Succeed())
+			return u
+		}
+		// A user cannot create a native resource that would skip NHC's webhook.
+		Eventually(func(g Gomega) {
+			err := k8sClient.Create(ctx, nhc("wao-test-denied"), client.DryRunAll)
+			g.Expect(apierrors.IsForbidden(err)).To(BeTrue(), "got %v", err)
+			g.Expect(err.Error()).To(ContainSubstring("nodeHealthCheck is not Available"))
+		}).Should(Succeed())
+
+		// One that already exists can still be cleaned up: metadata-only changes and deletes pass,
+		// spec changes do not.
+		existing := nhc("wao-test-existing")
+		Expect(operandClient.Create(ctx, existing)).To(Succeed())
+		existing.SetFinalizers([]string{"example.test/hold"})
+		Expect(k8sClient.Update(ctx, existing)).To(Succeed())
+		Expect(unstructured.SetNestedField(existing.Object, "50%", "spec", "minHealthy")).To(Succeed())
+		Expect(apierrors.IsForbidden(k8sClient.Update(ctx, existing))).To(BeTrue())
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(existing), existing)).To(Succeed())
+		existing.SetFinalizers(nil)
+		Expect(k8sClient.Update(ctx, existing)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, existing)).To(Succeed())
+	})
+
+	It("keeps the gate until the component is Available and restores it on disable", func() {
+		def, _ := components.ByKey(v1alpha1.ComponentKeyMachineDeletionRemediation) // no webhooks: readiness is the Deployment alone
+		gateKey := types.NamespacedName{Name: operands.GateName(def)}
+		setState(ctx, def.Key, v1alpha1.ComponentStateEnabled)
+		Eventually(func(g Gomega) {
+			g.Expect(component(getWAC(ctx), def.Key).Phase).To(Equal(v1alpha1.ComponentPhaseProgressing))
+		}).Should(Succeed())
+		Expect(k8sClient.Get(ctx, gateKey, &admissionregistrationv1.ValidatingAdmissionPolicy{})).To(Succeed(), "gate stays while Progressing")
+
+		// envtest has no kubelet: report the Deployment ready by hand.
+		dep := &appsv1.Deployment{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: def.Deployments[0]}, dep)).To(Succeed())
+		dep.Status = appsv1.DeploymentStatus{ObservedGeneration: dep.Generation, Replicas: 1, ReadyReplicas: 1, UpdatedReplicas: 1, AvailableReplicas: 1}
+		Expect(k8sClient.Status().Update(ctx, dep)).To(Succeed())
+		Eventually(func(g Gomega) {
+			g.Expect(component(getWAC(ctx), def.Key).Phase).To(Equal(v1alpha1.ComponentPhaseAvailable))
+			g.Expect(apierrors.IsNotFound(k8sClient.Get(ctx, gateKey, &admissionregistrationv1.ValidatingAdmissionPolicy{}))).To(BeTrue())
+			g.Expect(apierrors.IsNotFound(k8sClient.Get(ctx, gateKey, &admissionregistrationv1.ValidatingAdmissionPolicyBinding{}))).To(BeTrue())
+		}, 60*time.Second, time.Second).Should(Succeed())
+
+		setState(ctx, def.Key, v1alpha1.ComponentStateDisabled)
+		Eventually(func(g Gomega) {
+			g.Expect(component(getWAC(ctx), def.Key).Phase).To(Equal(v1alpha1.ComponentPhaseDisabled))
+			g.Expect(k8sClient.Get(ctx, gateKey, &admissionregistrationv1.ValidatingAdmissionPolicy{})).To(Succeed())
+			g.Expect(k8sClient.Get(ctx, gateKey, &admissionregistrationv1.ValidatingAdmissionPolicyBinding{})).To(Succeed())
+		}).Should(Succeed())
+	})
+
 	It("runs the disable sequence and drops its finalizer on deletion", func() {
 		setState(ctx, v1alpha1.ComponentKeyStorageBasedRemediation, v1alpha1.ComponentStateEnabled)
 		Eventually(func() error {
@@ -304,5 +377,9 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 			return apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: v1alpha1.SingletonName}, &v1alpha1.WorkloadAvailabilityConfig{}))
 		}).Should(BeTrue())
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "sbr-operator-controller-manager"}, &appsv1.Deployment{}))).To(BeTrue(), "explicit deletion; envtest has no garbage collector")
+		for _, def := range components.All() {
+			Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: operands.GateName(def)}, &admissionregistrationv1.ValidatingAdmissionPolicy{}))).To(BeTrue(), "gates must not outlive WAO: %s", def.Key)
+			Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Name: operands.GateName(def)}, &admissionregistrationv1.ValidatingAdmissionPolicyBinding{}))).To(BeTrue(), def.Key)
+		}
 	})
 })
