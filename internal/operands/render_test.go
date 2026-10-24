@@ -83,7 +83,7 @@ func TestRenderOrdersServicesBeforeDeploymentsAndWebhooksLast(t *testing.T) {
 	}
 }
 
-// RBAC is created by OLM from the WAO CSV (config/operands/<k>/rbac); the renderer must never emit it.
+// RBAC is created by OLM from the WAO CSV (config/operands/<k>/overlays/rbac); the renderer must never emit it.
 func TestRenderEmitsNoRBAC(t *testing.T) {
 	for _, def := range components.All() {
 		objs, err := operands.Render(def, testNamespace, testImages())

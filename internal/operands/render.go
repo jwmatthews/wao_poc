@@ -22,7 +22,7 @@ const (
 var namespacedKinds = map[string]bool{"Deployment": true, "Service": true, "ConfigMap": true}
 
 // Only workload and admission kinds are rendered. Operand RBAC is part of the WAO CSV
-// (config/operands/<k>/rbac) and is created by OLM at install time.
+// (config/operands/<k>/overlays/rbac) and is created by OLM at install time.
 var kindOrder = map[string]int{"ConfigMap": 30, "Service": 40, "Deployment": 50,
 	"ValidatingWebhookConfiguration": 60, "MutatingWebhookConfiguration": 61}
 

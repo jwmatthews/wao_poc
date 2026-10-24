@@ -14,9 +14,9 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: __WAO_NAMESPACE__
 resources:
-- ../vendored/config/manifests/ocp
+- ../../config/manifests/ocp
 # newName and newTag are kept equal to release-set.yaml images.*.tagged by `make operand-manifests`;
-# `name` is the image name as the vendored overlay leaves it (release-set.yaml images.*.kustomizeName):
+# `name` is the image name as the copied overlay leaves it (release-set.yaml images.*.kustomizeName):
 # the overlay already maps its `controller` and `console-plugin` placeholders to these names.
 images:
 - name: quay.io/medik8s/node-healthcheck-operator

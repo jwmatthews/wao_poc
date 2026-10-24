@@ -60,7 +60,7 @@ This operator does NOT intend to change the behavior or functionality of the und
 | `api/v1alpha1/` | The `WorkloadAvailabilityConfig` API |
 | `internal/controller/` | The lifecycle controller and the default-config bootstrap |
 | `internal/operands/` | The embedded runtime manifests and the renderer |
-| `config/operands/<k>/` | Per operand: `vendored/` (copy of the operand's `config/` tree), `VENDORED.yaml` (source and commit), `rbac/` and `runtime/` kustomize overlays |
+| `config/operands/<k>/` | Per operand: `config/` (copied upstream configuration), `VENDORED.yaml` (source and commit), and WAO-owned `overlays/{rbac,runtime}/` |
 | `hack/update-release-set.sh`, `hack/image-commit.sh` | Record floating latest or pinned release references and embedded image commits |
 | `hack/update-operand-manifests.sh`, `hack/verify-operand-manifests.sh` | Copy the upstream trees at the recorded commits; offline CI verification |
 | `bundle/` | The generated OLM bundle (one CSV, thirteen CRDs, twenty-one standalone ClusterRoles, and the SBR agent's ServiceAccount and ClusterRoleBinding) |
@@ -68,8 +68,8 @@ This operator does NOT intend to change the behavior or functionality of the und
 
 ## Operand manifests
 
-Each operand has a copy of its own `config/` tree in `config/operands/<k>/vendored/`, plus
-two kustomize overlays: `rbac/` (rendered into the WAO CSV and bundle) and `runtime/` (rendered
+Each operand has a copy of its own `config/` tree in `config/operands/<k>/config/`, plus
+two kustomize overlays: `overlays/rbac/` (rendered into the WAO CSV and bundle) and `overlays/runtime/` (rendered
 into `internal/operands/manifests/<k>/objects.yaml`, the Deployments, Services, ConfigMaps and
 webhook configurations the renderer applies at enable time). 
 
@@ -90,7 +90,7 @@ Operand manifests are copied from each operand checkout, following OADP's non-ad
 pattern.
 - `make update-release-set` records the selected tags, pull references and embedded
 commits into `release-set.yaml`. It defaults to latest; other tags resolve to digests.
-- `make update-operand-manifests` copies `config/` from a checkout at that commit into `config/operands/<k>/vendored/` (checkouts live in `.cache/operands`, or set `NHC_PATH` and friends), renders the runtime manifests the Go renderer embeds, generates Go image bindings, and syncs `RELATED_IMAGE_*`.
+- `make update-operand-manifests` copies `config/` from a checkout at that commit into `config/operands/<k>/config/` (checkouts live in `.cache/operands`, or set `NHC_PATH` and friends), renders the runtime manifests the Go renderer embeds, generates Go image bindings, and syncs `RELATED_IMAGE_*`.
 - Use `make bump-operands` for the complete sequence: resolve published images, copy
 configuration, generate manifests and bindings, then verify consistency. 
     - `OPERAND_TAG` defaults to `latest`, the post-submit main build; pass `OPERAND_TAG=release` for each component's latest GitHub release,
@@ -157,7 +157,7 @@ GitHub Actions runs the Go suites, lint, `make verify-operand-manifests` and the
 
 **Enabled** applies the component's operand objects with server-side apply: the
 manager Deployment, Services, ConfigMaps and webhook configurations, rendered from the
-vendored `config/default` copy (the `objects.yaml` embedded in the binary) with the selected
+copied upstream configuration (the `objects.yaml` embedded in the binary) with the selected
 image pull references substituted. The operand ServiceAccounts, Roles and bindings are not part of
 this: OLM creates them from the WAO CSV at install, and they exist whether or not the
 component is Enabled. The phase becomes

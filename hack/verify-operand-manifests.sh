@@ -20,11 +20,11 @@ for k in $("$YQ" '.components | keys | .[]' "$RS"); do
     want=$("$YQ" ".components.$k.$f" "$RS"); got=$("$YQ" ".$f" "$stamp")
     [ "$want" = "$got" ] || problem "$k: $f is $got in $stamp but $want in $RS; run make update-operand-manifests"
   done
-  # The runtime overlay renders the vendored directory the release set names.
+  # The runtime overlay renders the copied directory the release set names.
   overlay=$("$YQ" ".components.$k.overlay" "$RS")
-  got=$("$YQ" ".resources[0]" "config/operands/$k/runtime/kustomization.yaml")
-  [ "$got" = "../vendored/$overlay" ] || problem "$k: config/operands/$k/runtime builds $got, release-set.yaml overlay is $overlay"
-  [ -d "config/operands/$k/vendored/$overlay" ] || problem "$k: overlay directory config/operands/$k/vendored/$overlay is missing; run make update-operand-manifests"
+  got=$("$YQ" ".resources[0]" "config/operands/$k/overlays/runtime/kustomization.yaml")
+  [ "$got" = "../../$overlay" ] || problem "$k: config/operands/$k/overlays/runtime builds $got, release-set.yaml overlay is $overlay"
+  [ -d "config/operands/$k/$overlay" ] || problem "$k: overlay directory config/operands/$k/$overlay is missing; run make update-operand-manifests"
 done
 
 # 2. Regeneration reproduces the current files, including unstaged operand updates.
@@ -65,25 +65,25 @@ for sa in $standalone; do
 done
 for k in $("$YQ" '.components | keys | .[]' "$RS"); do
   errf=$(mktemp)
-  # LoadRestrictionsNone: config/operands/sbr/rbac lists a vendored file that SBR's own kustomization omits.
-  if ! rbac=$("$KUSTOMIZE" build --load-restrictor LoadRestrictionsNone "config/operands/$k/rbac" 2>"$errf"); then
-    problem "$k: kustomize build config/operands/$k/rbac failed: $(tail -1 "$errf")"; rm -f "$errf"; continue
+  # LoadRestrictionsNone: config/operands/sbr/overlays/rbac lists a copied file that SBR's own kustomization omits.
+  if ! rbac=$("$KUSTOMIZE" build --load-restrictor LoadRestrictionsNone "config/operands/$k/overlays/rbac" 2>"$errf"); then
+    problem "$k: kustomize build config/operands/$k/overlays/rbac failed: $(tail -1 "$errf")"; rm -f "$errf"; continue
   fi
   rm -f "$errf"
   kinds=$(printf '%s\n' "$rbac" | "$YQ" -N '.kind' | grep -v -E '^(ServiceAccount|Role|RoleBinding|ClusterRole|ClusterRoleBinding)$' || true)
-  [ -z "$kinds" ] || problem "$k: config/operands/$k/rbac emits non-RBAC kinds: $(tr '\n' ' ' <<<"$kinds")"
+  [ -z "$kinds" ] || problem "$k: config/operands/$k/overlays/rbac emits non-RBAC kinds: $(tr '\n' ' ' <<<"$kinds")"
   sas=$(printf '%s\n' "$rbac" | "$YQ" -N 'select(.kind == "ServiceAccount") | .metadata.name')
-  [ -n "$sas" ] || problem "$k: no ServiceAccount in config/operands/$k/rbac"
+  [ -n "$sas" ] || problem "$k: no ServiceAccount in config/operands/$k/overlays/rbac"
   for sa in $sas; do
     grep -qx "$sa" <<<"$extra" || grep -qx "$sa" <<<"$standalone" || problem "$k: ServiceAccount $sa is not in OPERAND_SERVICE_ACCOUNTS; its roles would become standalone bundle files"
   done
 done
 
 # 4b. NHC enables metrics mTLS only when its ServiceAccount can read the client CA in
-# kube-system/extension-apiserver-authentication; the vendored OCP overlay grants it through a
-# kube-system Role whose binding config/operands/nhc/rbac points at the operand ServiceAccount, so
+# kube-system/extension-apiserver-authentication; the copied OCP overlay grants it through a
+# kube-system Role whose binding config/operands/nhc/overlays/rbac points at the operand ServiceAccount, so
 # operator-sdk folds it into the CSV and OLM promotes it cluster-wide (AllNamespaces).
-nhc_rbac=$("$KUSTOMIZE" build config/operands/nhc/rbac 2>/dev/null || true)
+nhc_rbac=$("$KUSTOMIZE" build config/operands/nhc/overlays/rbac 2>/dev/null || true)
 ca_roles=$(printf '%s\n' "$nhc_rbac" | "$YQ" -N 'select(.kind == "Role" and ([.rules[] | select(.resources[] == "configmaps") | .resourceNames[]?] | contains(["extension-apiserver-authentication"]))) | .metadata.name')
 [ -n "$ca_roles" ] || problem "nhc: no Role grants node-healthcheck-controller-manager read of configmaps/extension-apiserver-authentication, so NHC cannot enable metrics mTLS"
 for r in $ca_roles; do

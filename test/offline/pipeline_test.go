@@ -279,7 +279,7 @@ touch .completed-%s
 	}
 }
 
-// Each component records which vendored kustomize overlay WAO renders (release-set.yaml
+// Each component records which copied kustomize overlay WAO renders (release-set.yaml
 // `overlay`). The stamp and the runtime kustomization must agree with it, so an operand's
 // packaging entrypoint cannot drift silently when the manifests are refreshed.
 func TestVerificationRejectsOverlayDrift(t *testing.T) {
@@ -297,11 +297,11 @@ func TestVerificationRejectsOverlayDrift(t *testing.T) {
 }
 
 // NHC enables metrics mTLS only if its ServiceAccount can read the client CA in
-// kube-system/extension-apiserver-authentication. The vendored Role grants that, but its
+// kube-system/extension-apiserver-authentication. The copied Role grants that, but its
 // RoleBinding names the unprefixed ServiceAccount, so WAO must rebind it or the CSV drops it.
 func TestVerificationRejectsNHCWithoutClientCARead(t *testing.T) {
 	tr := newTree(t)
-	role := "config/operands/nhc/vendored/config/optional/kube-system-rbac/kube_system_role.yaml"
+	role := "config/operands/nhc/config/optional/kube-system-rbac/kube_system_role.yaml"
 	data := strings.Replace(string(tr.read(role)), "extension-apiserver-authentication", "some-other-configmap", 1)
 	tr.write(role, []byte(data))
 	out, err := tr.try("make", "-s", "verify-operand-manifests")

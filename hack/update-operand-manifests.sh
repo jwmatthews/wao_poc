@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copy each operand's config/ tree at the commit recorded in release-set.yaml into
-# config/operands/<k>/vendored/, following OADP's update-non-admin-manifests. Checkouts live in
+# config/operands/<k>/config/, following OADP's update-non-admin-manifests. Checkouts live in
 # $OPERAND_SRC_DIR/<k> (default .cache/operands/<k>, git-ignored) unless <K>_PATH names one.
 # A user-supplied checkout is never modified: objects are read with `git archive <commit>`.
 set -euo pipefail
@@ -17,7 +17,7 @@ for k in $("$YQ" '.components | keys | .[]' "$RS"); do
   tag=$("$YQ" ".components.$k.tag" "$RS")
   commit=$("$YQ" ".components.$k.commit" "$RS")
   overlay=$("$YQ" ".components.$k.overlay" "$RS")
-  [[ "$overlay" =~ ^config/[A-Za-z0-9_/.-]+$ ]] || { echo "$k: release-set.yaml has no overlay (the vendored kustomize directory WAO renders, e.g. config/default)" >&2; exit 1; }
+  [[ "$overlay" =~ ^config/[A-Za-z0-9_/.-]+$ ]] || { echo "$k: release-set.yaml has no overlay (the copied kustomize directory WAO renders, e.g. config/default)" >&2; exit 1; }
   [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || { echo "$k: release-set.yaml has no commit; run make update-release-set" >&2; exit 1; }
   dir=${!path_var:-$SRC_DIR/$k}
   if [ ! -d "$dir/.git" ]; then
@@ -30,9 +30,9 @@ for k in $("$YQ" '.components | keys | .[]' "$RS"); do
   echo "== $k: copying config/ at $commit (tag: $tag) from $dir"
   tmp=$work/$k; rm -rf "$tmp"; mkdir -p "$tmp"
   git -C "$dir" archive "$commit" config | tar -x -C "$tmp"
-  mkdir -p "config/operands/$k/vendored"
-  rm -rf "config/operands/$k/vendored/config"
-  mv "$tmp/config" "config/operands/$k/vendored/config"
+  mkdir -p "config/operands/$k"
+  rm -rf "config/operands/$k/config"
+  mv "$tmp/config" "config/operands/$k/config"
   cat > "config/operands/$k/VENDORED.yaml" <<EOF
 # Written by hack/update-operand-manifests.sh. Do not edit; run make update-operand-manifests.
 repo: $repo

@@ -14,7 +14,7 @@ import (
 var manifests embed.FS
 
 // Load returns the objects of one component's objects.yaml keyed by "<Kind>/<name>".
-// The file is written by `make operand-manifests` from config/operands/<dir>/runtime.
+// The file is written by `make operand-manifests` from config/operands/<dir>/overlays/runtime.
 func Load(dir string) (map[string][]byte, error) {
 	b, err := manifests.ReadFile(path.Join("manifests", dir, "objects.yaml"))
 	if err != nil {

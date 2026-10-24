@@ -5,16 +5,16 @@ resources:
 - ../default
 - ../samples
 - ../scorecard
-# Operand RBAC, copied from each operand checkout (config/operands/<k>/vendored) and wrapped with
+# Operand RBAC, copied from each operand checkout (config/operands/<k>/config) and wrapped with
 # the operand name prefix. operator-sdk folds it into the CSV for the ServiceAccounts listed in
 # OPERAND_SERVICE_ACCOUNTS (Makefile); OLM creates it at install. Same pattern as OADP's
 # config/non-admin-controller_rbac.
-- ../operands/nhc/rbac
-- ../operands/snr/rbac
-- ../operands/sbr/rbac
-- ../operands/far/rbac
-- ../operands/mdr/rbac
-- ../operands/nmo/rbac
+- ../operands/nhc/overlays/rbac
+- ../operands/snr/overlays/rbac
+- ../operands/sbr/overlays/rbac
+- ../operands/far/overlays/rbac
+- ../operands/mdr/overlays/rbac
+- ../operands/nmo/overlays/rbac
 
 # [WEBHOOK] To enable webhooks, uncomment all the sections with [WEBHOOK] prefix.
 # Do NOT uncomment sections with prefix [CERTMANAGER], as OLM does not support cert-manager.
