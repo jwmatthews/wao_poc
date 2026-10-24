@@ -10,7 +10,7 @@
 
 **Spec:** [Simple operand configuration updates](../specs/2026-10-24-simplify-operand-updates-design.md)
 
-**Status:** Approved for implementation on 2026-10-24. Execution is on the existing feature branch, preserving unrelated untracked files; final freshness checks will use a clean temporary checkout. The user additionally authorized live validation on their named development cluster; credentials and cluster identifiers remain outside version control.
+**Status:** Implemented and verified on 2026-10-24 following approval. Execution is on the existing feature branch, preserving unrelated untracked files; final freshness checks will use a clean temporary checkout. The user additionally authorized live validation on their named development cluster; credentials and cluster identifiers remain outside version control.
 
 ## Global Constraints
 
@@ -25,10 +25,10 @@
 ## Execution preconditions
 
 - [x] Obtain approval of this plan before implementation. Read the spec and the current `AGENTS.md`.
-- [ ] Use the existing feature branch after offering worktree isolation; run final clean-tree checks in a temporary checkout. The current checkout contains unrelated untracked files; preserve them in place. Do not remove or stage them to satisfy cleanliness checks.
+- [x] Use the existing feature branch after offering worktree isolation; run final clean-tree checks in a temporary checkout. The current checkout contains unrelated untracked files; preserve them in place. Do not remove or stage them to satisfy cleanliness checks.
 - [x] Keep the approved planning documents on the feature branch. Run the required `make check` before any local commit, including a planning-document commit. No GitHub write or push is authorized by approval of implementation.
 - [x] Record the baseline with `make check`, `make test-offline`, and `go test ./internal/components ./internal/operands -count=1`. Install existing local build tools through their existing Make targets if needed. Stop on a pre-existing failure and report it before attributing it to these changes.
-- [ ] Make the three implementation commits below separately. Do not sync the user's real operand checkouts as part of migration or validation; use temporary local fixtures for source-copy tests.
+- [x] Make the three implementation commits below separately (plus one focused review correction). Do not sync the user's real operand checkouts as part of migration or validation; use temporary local fixtures for source-copy tests.
 
 ## File responsibilities and final interfaces
 
@@ -346,21 +346,21 @@ make bundle-reset
 
 Document that supported Make builds perform the middle step automatically. Document the middle step explicitly before direct `podman build`/`docker build`. Keep Kubernetes/OpenShift selection in later overlays/packaging; do not claim this change implements a generic Kubernetes bundle or certificate solution.
 
-- [ ] **Step 5: Run integration checks and commit.** Run the new build-order tests, `make check`, `make test-offline`, and focused component/operand tests. Separately run `make bundle-reset` and inspect its diff; expect no bundle behavior changes from path/schema migration with preserved image references. Stage only Task 3 files and any justified generated normalization, then commit as `build: prepare operand manifests before compiling WAO`.
+- [x] **Step 5: Run integration checks and commit.** Run the new build-order tests, `make check`, `make test-offline`, and focused component/operand tests. Separately run `make bundle-reset` and inspect its diff; expect no bundle behavior changes from path/schema migration with preserved image references. Stage only Task 3 files and any justified generated normalization, then commit as `build: prepare operand manifests before compiling WAO`.
 
-- [ ] **Step 6: Run final required checks on the clean implementation checkout.** After commits, ensure `git status --short` is empty. Run `make test-offline` and `make test` as required by `AGENTS.md`, then inspect `git status --short` again. If generation exposes real drift, review and fix it, run `make check`, commit that focused correction, and repeat the affected checks on the resulting clean tree. Do not remove unrelated files or weaken freshness checks to force a pass.
+- [x] **Step 6: Run final required checks on the clean implementation checkout.** After commits, ensure `git status --short` is empty. Run `make test-offline` and `make test` as required by `AGENTS.md`, then inspect `git status --short` again. If generation exposes real drift, review and fix it, run `make check`, commit that focused correction, and repeat the affected checks on the resulting clean tree. Do not remove unrelated files or weaken freshness checks to force a pass.
 
 ## Final review checklist
 
-- [ ] All six copy targets are discoverable through `make help`; the aggregate is the only all-operand entry point.
-- [ ] Copied config is replaceable; WAO overlays survive refreshes; no new stamps, lockfiles, compatibility modes, or source/image inference remain.
-- [ ] Source copy succeeds before an operand image is published and includes config edits not yet committed.
-- [ ] All eight image references are selected independently and used consistently, including NHC console, SNR self image, and SBR agent environment values.
-- [ ] Neither copying nor rendering changes `operands.yaml` or generates the bundle; rendering/building requires no operand checkout.
-- [ ] NHC OCP configuration, webhook failure policies, SBR agent roles/SCC access, default Disabled state, and foreign-object conflict behavior are preserved.
-- [ ] Active code/docs reference the new layout/input; historical docs are unchanged. Search runtime/build paths rather than treating historical mentions or ordinary Go dependency vendoring as obsolete workflow references.
-- [ ] No operand repository, shared tools checkout, or GitHub state was changed. Cluster changes are limited to the separately authorized live validation.
-- [ ] Present the resulting diff and verification evidence. Any proposed GitHub action is drafted and separately approved before it is performed.
+- [x] All six copy targets are discoverable through `make help`; the aggregate is the only all-operand entry point.
+- [x] Copied config is replaceable; WAO overlays survive refreshes; no new stamps, lockfiles, compatibility modes, or source/image inference remain.
+- [x] Source copy succeeds before an operand image is published and includes config edits not yet committed.
+- [x] All eight image references are selected independently and used consistently, including NHC console, SNR self image, and SBR agent environment values.
+- [x] Neither copying nor rendering changes `operands.yaml` or generates the bundle; rendering/building requires no operand checkout.
+- [x] NHC OCP configuration, webhook failure policies, SBR agent roles/SCC access, default Disabled state, and foreign-object conflict behavior are preserved.
+- [x] Active code/docs reference the new layout/input; historical docs are unchanged. Search runtime/build paths rather than treating historical mentions or ordinary Go dependency vendoring as obsolete workflow references.
+- [x] No operand repository, shared tools checkout, or GitHub state was changed. Cluster changes are limited to the separately authorized live validation.
+- [x] Present the resulting diff and verification evidence. Any proposed GitHub action is drafted and separately approved before it is performed.
 
 ## Execution evidence
 
@@ -372,5 +372,9 @@ Document that supported Make builds perform the middle step automatically. Docum
 - Build-order tests passed for all four supported paths under parallel Make, including
   generation failure and the lazy shared-tools fallback.
 - Separate `make bundle-reset` validation passed without changing bundle content.
-- Final clean-checkout checks and the separately authorized live validation are in progress.
-  Live-test evidence and credentials are kept outside the repository.
+- Final `make test-offline` and `make test` passed in a clean temporary checkout;
+  regeneration left that checkout clean. Focused API, image, component, and renderer tests passed.
+- Independent read-only review found one reused-image-selector case. Its regression tests
+  reproduced the bug, and a small follow-up commit now rejects it before mutation.
+- Live-test evidence is stored separately for user review and is not committed.
+  Credentials and cluster identifiers remain outside version control.
