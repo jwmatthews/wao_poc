@@ -140,6 +140,9 @@ func configureSourceFailure(tr *tree, name, source string) string {
 		tr.write(path, []byte(strings.ReplaceAll(string(tr.read(path)),
 			"name: quay.io/medik8s/node-healthcheck-operator", "name: removed-selector")))
 		return "RELATED_IMAGE_NHC_MANAGER"
+	case "reused-selector":
+		imageEntry(inputs, "nhc", "RELATED_IMAGE_NHC_CONSOLE")["kustomizeName"] =
+			imageEntry(inputs, "nhc", "RELATED_IMAGE_NHC_MANAGER")["kustomizeName"]
 	}
 	tr.saveOperands(inputs)
 	return "nhc"
@@ -147,7 +150,8 @@ func configureSourceFailure(tr *tree, name, source string) string {
 
 func TestUpdatePreflightPreservesAllDestinations(t *testing.T) {
 	for _, name := range []string{
-		"missing-checkout", "missing-config", "branch", "detached", "overlap", "not-root", "manager-env", "selector",
+		"missing-checkout", "missing-config", "branch", "detached", "overlap", "not-root",
+		"manager-env", "selector", "reused-selector",
 	} {
 		t.Run(name, func(t *testing.T) {
 			tr := newTree(t)

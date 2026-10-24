@@ -45,6 +45,9 @@ work=$(mktemp); trap 'rm -f "$work"' EXIT
           if (.image | has("kustomizeName")) then error($where + "agent uses an environment value; omit kustomizeName") else . end
         elif (.image.kustomizeName | nonempty | not) then error($where + "missing kustomizeName")
         else . end)
+  | (map(select(.image.kustomizeName != null))
+      | group_by([.key, .image.kustomizeName]) | map(select(length > 1)) | first) as $reused
+  | if $reused != null then error($reused[0].key + ": kustomizeName selectors must be unique within an operand") else . end
   | sort_by(.env)[] | select(.key as $key | $ARGS.positional | index($key))
   | [.key, .env, .image.repository, .image.tag, (.image.kustomizeName // "")] | @tsv
 ' "${keys[@]}" > "$work"

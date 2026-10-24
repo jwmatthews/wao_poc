@@ -63,6 +63,10 @@ func TestImageReferenceValidation(t *testing.T) {
 		{"missing-selector", func(in operandInputs) {
 			delete(imageEntry(in, "nhc", "RELATED_IMAGE_NHC_MANAGER"), "kustomizeName")
 		}, false},
+		{"reused-selector", func(in operandInputs) {
+			imageEntry(in, "nhc", "RELATED_IMAGE_NHC_CONSOLE")["kustomizeName"] =
+				imageEntry(in, "nhc", "RELATED_IMAGE_NHC_MANAGER")["kustomizeName"]
+		}, false},
 		{"empty-source-path", func(in operandInputs) { in.Operands["nhc"]["source"].(map[string]any)["path"] = "" }, false},
 		{"missing-source-branch", func(in operandInputs) {
 			delete(in.Operands["nhc"]["source"].(map[string]any), "branch")
