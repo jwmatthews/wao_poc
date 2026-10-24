@@ -280,15 +280,21 @@ e2e-test: ## Run end to end tests against an already deployed operator
 ##@ Build
 
 .PHONY: manager
-manager: generate fmt vet ## Build manager binary
+manager: ## Prepare operand manifests and build manager binary.
+	$(MAKE) operand-manifests
+	$(MAKE) generate fmt vet
 	./hack/build.sh ./bin
 
 .PHONY: run
-run: manifests generate fmt vet ## Run a controller from your host.
+run: ## Prepare operand manifests and run a controller from your host.
+	$(MAKE) operand-manifests
+	$(MAKE) manifests generate fmt vet
 	go run ./cmd/main.go
 
 .PHONY: docker-build
-docker-build: test-no-verify-changes ## Build docker image with the manager.
+docker-build: ## Prepare operand manifests, test, and build the manager image.
+	$(MAKE) operand-manifests
+	$(MAKE) test-no-verify-changes
 	$(CONTAINER_TOOL) build --platform $(PLATFORM) --build-arg VERSION="$(VERSION)" -t ${IMG} .
 
 .PHONY: docker-push
@@ -573,6 +579,11 @@ ifeq ($(wildcard $(DEV_MK)),)
   DEV_MK := $(TOOLS_DIR)/dev/dev.mk
 endif
 -include $(DEV_MK)
+# Shared dev-build invokes the container tool directly; prepare embeds before its recipe.
+# Keep this conditional so the lazy dev-% fallback still works when tools are absent.
+ifneq ($(wildcard $(DEV_MK)),)
+dev-build: operand-manifests
+endif
 ifeq ($(wildcard $(DEV_MK)),)
 dev-%:
 	@echo "Downloading medik8s/tools into $(TOOLS_DIR)..."

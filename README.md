@@ -131,6 +131,11 @@ existing upstream container-image selector; normally leave it unchanged. The SBR
 agent has no selector because its image is passed through an environment value.
 This does not add tag polling, automatic rollouts, or different pull policies.
 
+Supported Make builds (`manager`, `run`, `docker-build`, and the shared `dev-build`)
+perform the render step before compiling WAO. They never refresh source checkouts.
+Before bypassing Make with a direct `podman build` or `docker build`, run
+`make operand-manifests` yourself; the Dockerfile consumes the prepared files.
+
 Never hand-edit generated runtime objects or Go bindings. Verification compares
 files before and after regeneration, including uncommitted updates, and can refresh
 stale files in place; review any reported diff. `make verify-operand-manifests` checks
