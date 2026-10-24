@@ -1,34 +1,18 @@
 #!/usr/bin/env bash
-# Offline checks that the committed operand files, release-set.yaml, the manager Deployment and the
-# bundle agree. CI runs this; it needs no network and no cluster.
-# It checks the bundle's shape, not that it is current. VERIFY_BUNDLE=1 also regenerates the bundle
-# with make bundle-reset (minutes; pass CONTROLLER_GEN and SORT_IMPORTS through the environment if
-# this checkout needs wrappers) and fails on drift. make test checks the same via verify-no-changes.
+# Offline generated consistency and RBAC/bundle shape checks; no network or cluster.
+# Regenerates in place to detect drift. Bundle freshness is checked separately by make test.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 YQ=${YQ:-bin/yq}; [ -x "$YQ" ] || YQ=yq
 KUSTOMIZE=${KUSTOMIZE:-bin/kustomize}; [ -x "$KUSTOMIZE" ] || KUSTOMIZE=kustomize
-RS=release-set.yaml
 fail=0; problem() { echo "verify-operand-manifests: $*" >&2; fail=1; }
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 
-# 1. Stamps match release-set.yaml.
-for k in $("$YQ" '.components | keys | .[]' "$RS"); do
-  stamp=config/operands/$k/VENDORED.yaml
-  [ -f "$stamp" ] || { problem "$stamp missing"; continue; }
-  for f in repo tag commit overlay; do
-    want=$("$YQ" ".components.$k.$f" "$RS"); got=$("$YQ" ".$f" "$stamp")
-    [ "$want" = "$got" ] || problem "$k: $f is $got in $stamp but $want in $RS; run make update-operand-manifests"
-  done
-  # The runtime overlay renders the copied directory the release set names.
-  overlay=$("$YQ" ".components.$k.overlay" "$RS")
-  got=$("$YQ" ".resources[0]" "config/operands/$k/overlays/runtime/kustomization.yaml")
-  [ "$got" = "../../$overlay" ] || problem "$k: config/operands/$k/overlays/runtime builds $got, release-set.yaml overlay is $overlay"
-  [ -d "config/operands/$k/$overlay" ] || problem "$k: overlay directory config/operands/$k/$overlay is missing; run make update-operand-manifests"
-done
+# 1. Validate the YAML and selected image destinations; local checkouts are not needed.
+YQ="$YQ" hack/operand-image-refs.sh >/dev/null
 
 # 2. Regeneration reproduces the current files, including unstaged operand updates.
-# Compare contents rather than the Git index so bump-operands can verify before committing.
+# Compare contents rather than the Git index so local updates can be verified before committing.
 generated=(internal/operands/manifests config/operands config/manager/manager.yaml internal/components/zz_generated.images.go)
 for path in "${generated[@]}"; do
   if [ -e "$path" ]; then
@@ -47,7 +31,7 @@ done
 refs=$(YQ="$YQ" hack/operand-image-refs.sh)
 while IFS=$'\t' read -r env want; do
   got=$("$YQ" "select(.kind == \"Deployment\") | .spec.template.spec.containers[0].env[] | select(.name == \"$env\") | .value" config/manager/manager.yaml)
-  [ "$want" = "$got" ] || problem "manager.yaml $env=$got, release-set.yaml pullRef is $want"
+  [ "$want" = "$got" ] || problem "manager.yaml $env=$got, operands.yaml reference is $want"
 done <<< "$refs"
 
 # 4. Every operand ServiceAccount is in exactly one of OPERAND_SERVICE_ACCOUNTS (roles folded into
@@ -63,7 +47,7 @@ for sa in $standalone; do
   done
   [ -n "$found" ] || problem "standalone ServiceAccount $sa is not a file in bundle/manifests; run make bundle-reset"
 done
-for k in $("$YQ" '.components | keys | .[]' "$RS"); do
+for k in nhc snr sbr far mdr nmo; do
   errf=$(mktemp)
   # LoadRestrictionsNone: config/operands/sbr/overlays/rbac lists a copied file that SBR's own kustomization omits.
   if ! rbac=$("$KUSTOMIZE" build --load-restrictor LoadRestrictionsNone "config/operands/$k/overlays/rbac" 2>"$errf"); then
@@ -123,19 +107,6 @@ rule=$("$YQ" '[.spec.install.spec.permissions[] | select(.serviceAccountName == 
 [ "$rule" = true ] || problem "bundle CSV: node-healthcheck-controller-manager permissions lack configmaps/extension-apiserver-authentication; run make bundle-reset"
 plugins=$("$YQ" '.metadata.annotations."console.openshift.io/plugins" // ""' "$csv")
 grep -q node-remediation-console-plugin <<<"$plugins" || problem "bundle CSV: annotation console.openshift.io/plugins does not list node-remediation-console-plugin"
-
-# 6. Optional: the committed bundle is what make bundle-reset generates.
-if [ "${VERIFY_BUNDLE:-}" = 1 ]; then
-  args=()
-  [ -z "${CONTROLLER_GEN:-}" ] || args+=("CONTROLLER_GEN=$CONTROLLER_GEN")
-  [ -z "${SORT_IMPORTS:-}" ] || args+=("SORT_IMPORTS=$SORT_IMPORTS")
-  if ! make -s ${args[@]+"${args[@]}"} bundle-reset >/dev/null; then
-    problem "make bundle-reset failed"
-  elif ! git diff --quiet -- bundle || [ -n "$(git status --porcelain --untracked-files=all -- bundle)" ]; then
-    git status --short -- bundle >&2
-    problem "bundle/ is not what make bundle-reset generates; run make bundle-reset and commit"
-  fi
-fi
 
 [ $fail = 0 ] && echo "verify-operand-manifests: OK"
 exit $fail

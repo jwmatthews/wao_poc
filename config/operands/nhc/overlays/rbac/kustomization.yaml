@@ -3,7 +3,7 @@
 # CSV; unbound ClusterRoles become standalone bundle objects. OLM creates all of it at install.
 #
 # Built from the same copied OpenShift overlay as ../runtime so the two stay one packaging
-# (release-set.yaml overlay). Names are already prefixed by the overlay. Everything that is not
+# from the copied config tree. Names are already prefixed by the overlay. Everything that is not
 # RBAC is deleted here: the runtime kinds are rendered by WAO, the CRDs come from
 # config/operands/crd, and the operand's CSV, Namespace, sample CR and scorecard config are not
 # WAO's to ship.

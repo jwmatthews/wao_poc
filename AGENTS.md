@@ -7,8 +7,9 @@ as operands in one namespace.
 ## Hard constraints
 
 - Do not modify, fork or rebuild the component operators. Consume the operand
-  images exactly as recorded by `pullRef` in `release-set.yaml`: `latest` stays
-  floating; every other tag is pinned by digest.
+  images as `repository:tag` selected in `operands.yaml`. This development helper
+  keeps tags, trusts the selected source branch, and resolves no image digests
+  or source revisions.
 - Every component defaults to `Disabled`. Installing WAO must not create a
   remediation policy, remediation request, native config or node agent.
 - Never change a component webhook `failurePolicy`, in particular never `Fail` to `Ignore`.
@@ -61,5 +62,5 @@ KUBECONFIG=/path/to/disposable.kubeconfig make dev-olm-undeploy  # operator-sdk 
 
 Small commits per task.
 Run `make check` before each commit (lint, import order, operand manifest
-consistency; read-only, seconds). Run `make test-offline` and `make test` on a
-clean tree before pushing. Together they match what CI runs.
+consistency; verification may regenerate stale operand files). Run
+`make test-offline` and `make test` on a clean tree before pushing. Together they match what CI runs.

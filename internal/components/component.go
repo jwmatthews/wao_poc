@@ -1,6 +1,6 @@
 package components
 
-// ImageBinding maps an operator image variable to the tagged reference from release-set.yaml
+// ImageBinding maps an operator image variable to the tagged reference from operands.yaml
 // that the runtime overlay writes into the embedded manifests;
 // the renderer replaces Original with the selected pull reference from the image set.
 type ImageBinding struct {
@@ -8,7 +8,7 @@ type ImageBinding struct {
 	Original string
 }
 
-// imageBinding uses the generated release-set reference so tag updates need no manual Go edits.
+// imageBinding uses the generated tagged reference so tag updates need no manual Go edits.
 func imageBinding(env string) ImageBinding {
 	original := taggedImageReferences[env]
 	if original == "" {

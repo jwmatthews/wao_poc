@@ -64,8 +64,8 @@ spec:
             - --leader-elect
             - --health-probe-bind-address=:8081
             - --metrics-bind-address=0
-          # Operand images must equal the "pullRef" references (latest tag or digest) in
-          # release-set.yaml. They are not configurable through any API field.
+          # Operand images must equal repository:tag selected in operands.yaml.
+          # They are not configurable through any API field.
           env:
             - name: OPERATOR_NAMESPACE
               valueFrom:

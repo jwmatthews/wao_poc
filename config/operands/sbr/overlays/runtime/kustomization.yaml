@@ -7,7 +7,7 @@ kind: Kustomization
 namespace: __WAO_NAMESPACE__
 resources:
 - ../../config/default
-# newName and newTag are kept equal to release-set.yaml images.*.tagged by `make operand-manifests`.
+# newName and newTag are kept equal to operands.yaml image repositories/tags by `make operand-manifests`.
 images:
 - name: quay.io/medik8s/storage-based-remediation-operator
   newName: quay.io/medik8s/storage-based-remediation-operator

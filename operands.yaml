@@ -1,0 +1,66 @@
+# Developer inputs: local checkout root/expected branch and explicit image tags.
+# Relative paths are resolved from the WAO root. Working-tree config edits are included.
+# Trust the selected source/image combination; no registry or source revision discovery.
+# kustomizeName is the upstream image selector; normally leave it unchanged.
+operands:
+  nhc:
+    source:
+      path: ../node-healthcheck-operator
+      branch: main
+    images:
+      RELATED_IMAGE_NHC_MANAGER:
+        repository: quay.io/medik8s/node-healthcheck-operator
+        tag: latest
+        kustomizeName: quay.io/medik8s/node-healthcheck-operator
+      RELATED_IMAGE_NHC_CONSOLE:
+        repository: quay.io/medik8s/node-remediation-console
+        tag: latest
+        kustomizeName: quay.io/medik8s/node-remediation-console
+  snr:
+    source:
+      path: ../self-node-remediation
+      branch: main
+    images:
+      RELATED_IMAGE_SNR_MANAGER:
+        repository: quay.io/medik8s/self-node-remediation-operator
+        tag: latest
+        kustomizeName: quay.io/medik8s/self-node-remediation-operator
+  sbr:
+    source:
+      path: ../storage-based-remediation
+      branch: main
+    images:
+      RELATED_IMAGE_SBR_MANAGER:
+        repository: quay.io/medik8s/storage-based-remediation-operator
+        tag: latest
+        kustomizeName: quay.io/medik8s/storage-based-remediation-operator
+      RELATED_IMAGE_SBR_AGENT:
+        repository: quay.io/medik8s/storage-based-remediation-agent
+        tag: latest
+  far:
+    source:
+      path: ../fence-agents-remediation
+      branch: main
+    images:
+      RELATED_IMAGE_FAR_MANAGER:
+        repository: quay.io/medik8s/fence-agents-remediation-operator
+        tag: latest
+        kustomizeName: quay.io/medik8s/fence-agents-remediation-operator
+  mdr:
+    source:
+      path: ../machine-deletion-remediation
+      branch: main
+    images:
+      RELATED_IMAGE_MDR_MANAGER:
+        repository: quay.io/medik8s/machine-deletion-remediation-operator
+        tag: latest
+        kustomizeName: quay.io/medik8s/machine-deletion-remediation-operator
+  nmo:
+    source:
+      path: ../node-maintenance-operator
+      branch: main
+    images:
+      RELATED_IMAGE_NMO_MANAGER:
+        repository: quay.io/medik8s/node-maintenance-operator
+        tag: latest
+        kustomizeName: quay.io/medik8s/node-maintenance-operator

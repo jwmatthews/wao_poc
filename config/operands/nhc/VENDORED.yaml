@@ -1,5 +1,0 @@
-# Written by hack/update-operand-manifests.sh. Do not edit; run make update-operand-manifests.
-repo: https://github.com/medik8s/node-healthcheck-operator
-tag: latest
-commit: c6d9ef2dc960cf0af04ce1b89cf1ee5153fe5fd7
-overlay: config/manifests/ocp
