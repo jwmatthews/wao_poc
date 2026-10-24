@@ -11,4 +11,4 @@ spec:
         - name: manager
           env:
             - name: SELF_NODE_REMEDIATION_IMAGE
-              value: quay.io/medik8s/self-node-remediation-operator:latest
+              value: quay.io/medik8s/self-node-remediation-operator:wao

@@ -6,61 +6,61 @@ operands:
   nhc:
     source:
       path: ../node-healthcheck-operator
-      branch: main
+      branch: wao
     images:
       RELATED_IMAGE_NHC_MANAGER:
         repository: quay.io/medik8s/node-healthcheck-operator
-        tag: latest
+        tag: wao
         kustomizeName: quay.io/medik8s/node-healthcheck-operator
       RELATED_IMAGE_NHC_CONSOLE:
         repository: quay.io/medik8s/node-remediation-console
-        tag: latest
+        tag: wao
         kustomizeName: quay.io/medik8s/node-remediation-console
   snr:
     source:
       path: ../self-node-remediation
-      branch: main
+      branch: wao
     images:
       RELATED_IMAGE_SNR_MANAGER:
         repository: quay.io/medik8s/self-node-remediation-operator
-        tag: latest
+        tag: wao
         kustomizeName: quay.io/medik8s/self-node-remediation-operator
   sbr:
     source:
       path: ../storage-based-remediation
-      branch: main
+      branch: wao
     images:
       RELATED_IMAGE_SBR_MANAGER:
         repository: quay.io/medik8s/storage-based-remediation-operator
-        tag: latest
+        tag: wao
         kustomizeName: quay.io/medik8s/storage-based-remediation-operator
       RELATED_IMAGE_SBR_AGENT:
         repository: quay.io/medik8s/storage-based-remediation-agent
-        tag: latest
+        tag: wao
   far:
     source:
       path: ../fence-agents-remediation
-      branch: main
+      branch: wao
     images:
       RELATED_IMAGE_FAR_MANAGER:
         repository: quay.io/medik8s/fence-agents-remediation-operator
-        tag: latest
+        tag: wao
         kustomizeName: quay.io/medik8s/fence-agents-remediation-operator
   mdr:
     source:
       path: ../machine-deletion-remediation
-      branch: main
+      branch: wao
     images:
       RELATED_IMAGE_MDR_MANAGER:
         repository: quay.io/medik8s/machine-deletion-remediation-operator
-        tag: latest
+        tag: wao
         kustomizeName: quay.io/medik8s/machine-deletion-remediation-operator
   nmo:
     source:
       path: ../node-maintenance-operator
-      branch: main
+      branch: wao
     images:
       RELATED_IMAGE_NMO_MANAGER:
         repository: quay.io/medik8s/node-maintenance-operator
-        tag: latest
+        tag: wao
         kustomizeName: quay.io/medik8s/node-maintenance-operator

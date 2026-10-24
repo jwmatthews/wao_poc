@@ -542,6 +542,14 @@ spec:
                 - ""
               resources:
                 - nodes
+              verbs:
+                - get
+                - list
+                - patch
+                - watch
+            - apiGroups:
+                - ""
+              resources:
                 - pods
               verbs:
                 - get
@@ -1316,21 +1324,21 @@ spec:
                           fieldRef:
                             fieldPath: metadata.namespace
                       - name: RELATED_IMAGE_NHC_MANAGER
-                        value: quay.io/medik8s/node-healthcheck-operator:latest
+                        value: quay.io/medik8s/node-healthcheck-operator:wao
                       - name: RELATED_IMAGE_NHC_CONSOLE
-                        value: quay.io/medik8s/node-remediation-console:latest
+                        value: quay.io/medik8s/node-remediation-console:wao
                       - name: RELATED_IMAGE_SNR_MANAGER
-                        value: quay.io/medik8s/self-node-remediation-operator:latest
+                        value: quay.io/medik8s/self-node-remediation-operator:wao
                       - name: RELATED_IMAGE_SBR_MANAGER
-                        value: quay.io/medik8s/storage-based-remediation-operator:latest
+                        value: quay.io/medik8s/storage-based-remediation-operator:wao
                       - name: RELATED_IMAGE_SBR_AGENT
-                        value: quay.io/medik8s/storage-based-remediation-agent:latest
+                        value: quay.io/medik8s/storage-based-remediation-agent:wao
                       - name: RELATED_IMAGE_FAR_MANAGER
-                        value: quay.io/medik8s/fence-agents-remediation-operator:latest
+                        value: quay.io/medik8s/fence-agents-remediation-operator:wao
                       - name: RELATED_IMAGE_MDR_MANAGER
-                        value: quay.io/medik8s/machine-deletion-remediation-operator:latest
+                        value: quay.io/medik8s/machine-deletion-remediation-operator:wao
                       - name: RELATED_IMAGE_NMO_MANAGER
-                        value: quay.io/medik8s/node-maintenance-operator:latest
+                        value: quay.io/medik8s/node-maintenance-operator:wao
                     image: quay.io/medik8s/workload-availability-operator:v0.1.0
                     livenessProbe:
                       httpGet:
@@ -1633,21 +1641,21 @@ spec:
   provider:
     name: wao_poc
   relatedImages:
-    - image: quay.io/medik8s/node-healthcheck-operator:latest
+    - image: quay.io/medik8s/node-healthcheck-operator:wao
       name: nhc-manager
-    - image: quay.io/medik8s/node-remediation-console:latest
+    - image: quay.io/medik8s/node-remediation-console:wao
       name: nhc-console
-    - image: quay.io/medik8s/self-node-remediation-operator:latest
+    - image: quay.io/medik8s/self-node-remediation-operator:wao
       name: snr-manager
-    - image: quay.io/medik8s/storage-based-remediation-operator:latest
+    - image: quay.io/medik8s/storage-based-remediation-operator:wao
       name: sbr-manager
-    - image: quay.io/medik8s/storage-based-remediation-agent:latest
+    - image: quay.io/medik8s/storage-based-remediation-agent:wao
       name: sbr-agent
-    - image: quay.io/medik8s/fence-agents-remediation-operator:latest
+    - image: quay.io/medik8s/fence-agents-remediation-operator:wao
       name: far-manager
-    - image: quay.io/medik8s/machine-deletion-remediation-operator:latest
+    - image: quay.io/medik8s/machine-deletion-remediation-operator:wao
       name: mdr-manager
-    - image: quay.io/medik8s/node-maintenance-operator:latest
+    - image: quay.io/medik8s/node-maintenance-operator:wao
       name: nmo-manager
   version: 0.1.0
   icon:

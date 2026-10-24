@@ -141,7 +141,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-          image: quay.io/medik8s/node-healthcheck-operator:latest
+          image: quay.io/medik8s/node-healthcheck-operator:wao
           lifecycle:
             postStart:
               exec:
@@ -270,7 +270,7 @@ spec:
                     operator: Exists
               weight: 1
       containers:
-        - image: quay.io/medik8s/node-remediation-console:latest
+        - image: quay.io/medik8s/node-remediation-console:wao
           lifecycle:
             postStart:
               exec:

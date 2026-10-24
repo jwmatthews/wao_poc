@@ -11,4 +11,4 @@ spec:
         - name: manager
           env:
             - name: RELATED_IMAGE_AGENT
-              value: quay.io/medik8s/storage-based-remediation-agent:latest
+              value: quay.io/medik8s/storage-based-remediation-agent:wao

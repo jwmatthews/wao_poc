@@ -5,10 +5,10 @@ metadata:
     alm-examples: '[]'
     capabilities: Basic Install
     categories: OpenShift Optional
-    containerImage: quay.io/medik8s/node-healthcheck-operator:v0.0.1
+    containerImage: quay.io/medik8s/node-healthcheck-operator:v5.8.0
     createdAt: ""
     description: Detect failed Nodes and trigger remediation with a remediation operator.
-    olm.skipRange: '>=0.0.1'
+    olm.skipRange: '>=0.1.0 <5.8.0'
     operatorframework.io/suggested-namespace: openshift-workload-availability
     operatorframework.io/suggested-namespace-template: '{"kind":"Namespace","apiVersion":"v1","metadata":{"name":"openshift-workload-availability","annotations":{"openshift.io/node-selector":""}}}'
     repository: https://github.com/medik8s/node-healthcheck-operator
@@ -178,7 +178,7 @@ spec:
           Known phases are Disabled, Paused, Remediating and Enabled, based on:\n
           - the status of the Disabled condition\n
           - the value of PauseRequests\n
-          - the value of InFlightRemediations
+          - whether any UnhealthyNodes entry has a non-empty Remediations list
         displayName: Phase
         path: phase
         x-descriptors:
@@ -235,7 +235,7 @@ spec:
     to know that the node has reached a safe state before initiating recovery of the workload.
 
     Unfortunately it is not always practical to require admin intervention in order to confirm the node’s true status.
-    In order to automate the recovery of exclusive workloads, we provide operators for failure detection
+    In order to automate the recovery of exclusive workloads, the following operators provide automated failure detection
     and remediation.
 
     ### Failure detection: Node Health Check operator
@@ -250,6 +250,7 @@ spec:
     There are multiple remediators for handling node failure that we recommend:
     - Self Node Remediation (SNR)
     - Fence Agents Remediation (FAR)
+    - Storage-Based Remediation (SBR)
     - Machine Deletion Remediation (MDR)
 
     #### Self Node Remediation (SNR)
@@ -261,12 +262,26 @@ spec:
     the node rebooting and rejoining the cluster - restoring capacity.
 
     #### Fence Agents Remediation (FAR)
-    FAR uses well-known agents to fence unhealthy nodes, and eventually FAR remediates the nodes.
-    The remediation includes rebooting the unhealthy node using a fence agent,
-    and then evicting workloads from the unhealthy node.
+    The Fence Agents Remediation Operator uses well-known fence agents to
+    reboot unhealthy nodes via out-of-band management (e.g. IPMI, iDRAC).
+    FAR first taints the node to evict stateless workloads and prevent
+    new scheduling, then fences the node for a reboot. This ensures the
+    node returns to a clean state, accelerating workload rescheduling
+    onto healthy nodes.
+
+    #### Storage-Based Remediation (SBR)
+    SBR requires a shared RWX storage volume as a coordination layer for heartbeat-based
+    node liveness detection. When a node loses storage access, its local kernel watchdog
+    performs fencing by triggering a self-reboot, preventing split-brain and enabling
+    workloads to be safely rescheduled. No out-of-band management hardware
+    (e.g. IPMI or iDRAC) is required.
 
     #### Machine Deletion Remediation (MDR)
-    MDR is limited to OpenShift, and it uses Machine API for reprovisioning unhealthy nodes by deleting their machines.
+    The Machine Deletion Remediation Operator is available on OpenShift with
+    Machine API. It reprovisions unhealthy nodes by deleting the underlying
+    machine. When an owning infrastructure controller, such as a MachineSet,
+    can provide replacement capacity, it creates a replacement node and
+    restores cluster capacity.
   displayName: Node Health Check Operator
   icon:
   - base64data: base64EncodedIcon
@@ -286,10 +301,19 @@ spec:
     type: AllNamespaces
   keywords:
   - NHC
+  - Node Health Check
   - Self Node Remediation
   - SNR
+  - Fence Agents Remediation
+  - FAR
+  - Storage Based Remediation
+  - SBR
+  - Machine Deletion Remediation
+  - MDR
   - Remediation
   - Fencing
+  - node remediation
+  - watchdog
   - medik8s
   - k8s
   links:

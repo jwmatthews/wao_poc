@@ -74,6 +74,9 @@ WAO copies each operand's `config/` tree and applies its own Kustomize overlays.
 Refreshing the copy leaves WAO's adjustments intact. This follows OADP's direct-copy
 [update targets](https://github.com/openshift/oadp-operator/blob/oadp-dev/Makefile).
 
+See the [developer guide](docs/updating-operand-manifests.md) for setup, expected
+file changes, and troubleshooting.
+
 ```sh
 # Edit operands.yaml source paths/branches and image repositories/tags.
 make update-nhc-manifests
