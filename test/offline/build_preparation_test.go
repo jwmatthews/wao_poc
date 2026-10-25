@@ -12,6 +12,17 @@ import (
 // the generator so these tests detect both missing generation and parallel races.
 func (tr *tree) buildFixture(withDevTools bool) string {
 	tr.t.Helper()
+	// Match a fresh CI runner: only operand rendering tools are preinstalled.
+	// A developer's cached build tools must not hide missing test overrides.
+	toolDir := tr.path("build-tools")
+	if err := os.Mkdir(toolDir, 0o755); err != nil {
+		tr.t.Fatal(err)
+	}
+	for _, tool := range []string{"kustomize", "yq"} {
+		if err := os.Symlink(tr.path(filepath.Join("bin", tool)), filepath.Join(toolDir, tool)); err != nil {
+			tr.t.Fatal(err)
+		}
+	}
 	mockDir := tr.path("build-mocks")
 	if err := os.Mkdir(mockDir, 0o755); err != nil {
 		tr.t.Fatal(err)
@@ -34,6 +45,9 @@ operand-manifests:
 	@test "$(FAIL_GENERATION)" != yes
 	@sleep 0.15
 	@touch .operand-generation-complete
+# Overriding a recipe retains its original prerequisites, including tool downloads.
+controller-gen goimports sort-imports:
+	@:
 generate fmt vet manifests test-no-verify-changes go-tidy go-vendor go-verify test-imports envtest:
 	@test -f .operand-generation-complete || { echo 'preparation started before operand generation' >&2; exit 1; }
 `))
@@ -63,7 +77,8 @@ touch .tools-cloned
 func (tr *tree) buildArgs(target, toolsDir string, failure bool) []string {
 	tr.t.Helper()
 	args := []string{"PATH=" + tr.path("build-mocks") + ":" + os.Getenv("PATH"),
-		"make", "-s", "-j4", target, "TOOLS_DIR=" + toolsDir, "CONTAINER_TOOL=container"}
+		"make", "-s", "-j4", target, "TOOLS_DIR=" + toolsDir, "CONTAINER_TOOL=container",
+		"LOCALBIN=" + tr.path("build-tools")}
 	if failure {
 		args = append(args, "FAIL_GENERATION=yes")
 	}
