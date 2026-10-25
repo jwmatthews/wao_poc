@@ -162,7 +162,7 @@ func TestVerificationAcceptsUnstagedGeneratedUpdates(t *testing.T) {
 	tr.run("make", "-s", "verify-operand-manifests")
 }
 
-func TestVerificationRejectsStaleRuntimeObjects(t *testing.T) {
+func TestVerificationRejectsStaleRuntimeObjectsWithoutMutating(t *testing.T) {
 	tr := newTree(t)
 	tr.run("make", "-s", "operand-manifests")
 	objects := "internal/operands/manifests/nhc/objects.yaml"
@@ -175,6 +175,9 @@ func TestVerificationRejectsStaleRuntimeObjects(t *testing.T) {
 	}
 	if !strings.Contains(out, "generated") {
 		t.Errorf("expected a generated-files message, got:\n%s", out)
+	}
+	if !strings.Contains(string(tr.read(objects)), "example.test/nhc:stale") {
+		t.Error("verification rewrote the stale file instead of leaving the tree as it found it")
 	}
 }
 

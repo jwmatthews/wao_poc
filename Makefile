@@ -192,7 +192,7 @@ operand-manifests: kustomize yq ## Sync RELATED_IMAGE_* values and generate runt
 	done
 
 .PHONY: verify-operand-manifests
-verify-operand-manifests: kustomize yq ## Compare generated operands/images and check RBAC/bundle shape; may refresh stale files.
+verify-operand-manifests: kustomize yq ## Regenerate, compare and restore operand manifests/images; check RBAC/bundle shape. Leaves the tree unchanged.
 	YQ=$(YQ) KUSTOMIZE=$(KUSTOMIZE) hack/verify-operand-manifests.sh
 
 .PHONY: test-offline

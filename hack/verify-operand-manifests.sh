@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Offline generated consistency and RBAC/bundle shape checks; no network or cluster.
-# Regenerates in place to detect drift. Bundle freshness is checked separately by make test.
+# Regenerates in place to detect drift, then restores the original files when they differ, so the
+# working tree is left as it was found. Bundle freshness is checked separately by make test.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 YQ=${YQ:-bin/yq}; [ -x "$YQ" ] || YQ=yq
@@ -12,7 +13,8 @@ work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 YQ="$YQ" hack/operand-image-refs.sh >/dev/null
 
 # 2. Regeneration reproduces the current files, including unstaged operand updates.
-# Compare contents rather than the Git index so local updates can be verified before committing.
+# Compare contents rather than the Git index so local updates can be verified before committing;
+# on drift, put the pre-regeneration copy back and report.
 generated=(internal/operands/manifests config/operands config/manager/manager.yaml)
 for path in "${generated[@]}"; do
   if [ -e "$path" ]; then
@@ -24,6 +26,7 @@ make -s operand-manifests
 for path in "${generated[@]}"; do
   if ! diff -qr "$work/$path" "$path"; then
     problem "generated files differ in $path; run make operand-manifests and review the changes"
+    rm -rf "$path"; cp -R "$work/$path" "$path"
   fi
 done
 
