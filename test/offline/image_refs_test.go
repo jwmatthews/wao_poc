@@ -17,7 +17,9 @@ func TestImageReferenceValidation(t *testing.T) {
 		mutate func(operandInputs)
 		valid  bool
 	}{
-		{"latest", func(operandInputs) {}, true},
+		{"latest", func(in operandInputs) {
+			imageEntry(in, "nhc", "RELATED_IMAGE_NHC_MANAGER")["tag"] = "latest"
+		}, true},
 		{"wao", func(in operandInputs) {
 			imageEntry(in, "nhc", "RELATED_IMAGE_NHC_MANAGER")["tag"] = "wao"
 		}, true},

@@ -246,6 +246,9 @@ func TestUpdateSupportsGitWorktreeAndAbsolutePath(t *testing.T) {
 func TestUpdateOnlySynchronizesSelectedImagesWithoutHiddenWork(t *testing.T) {
 	tr := newTree(t)
 	tr.sourceFixture("nhc")
+	snrImageQuery := `select(.kind == "Deployment") | .spec.template.spec.containers[]
+ | select(.name == "manager") | .env[] | select(.name == "RELATED_IMAGE_SNR_MANAGER") | .value`
+	snrImageBefore := strings.TrimSpace(tr.run("bin/yq", snrImageQuery, "config/manager/manager.yaml"))
 	inputs := tr.loadOperands()
 	imageEntry(inputs, "nhc", "RELATED_IMAGE_NHC_MANAGER")["tag"] = "unpublished-dev"
 	imageEntry(inputs, "snr", "RELATED_IMAGE_SNR_MANAGER")["tag"] = "other-unpublished"
@@ -278,7 +281,7 @@ esac
 	}
 	manager := string(tr.read("config/manager/manager.yaml"))
 	if !strings.Contains(manager, "node-healthcheck-operator:unpublished-dev") ||
-		!strings.Contains(manager, "self-node-remediation-operator:latest") {
+		strings.TrimSpace(tr.run("bin/yq", snrImageQuery, "config/manager/manager.yaml")) != snrImageBefore {
 		t.Fatal("image updates were not limited to selected operand")
 	}
 }
