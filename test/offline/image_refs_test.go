@@ -59,20 +59,11 @@ func TestImageReferenceValidation(t *testing.T) {
 		{"duplicate-env", func(in operandInputs) {
 			maps.Copy(in.Operands["snr"]["images"].(map[string]any), in.Operands["nhc"]["images"].(map[string]any))
 		}, false},
-		{"missing-env", func(in operandInputs) {
-			delete(in.Operands["nhc"]["images"].(map[string]any), "RELATED_IMAGE_NHC_MANAGER")
-		}, false},
-		{"missing-selector", func(in operandInputs) {
-			delete(imageEntry(in, "nhc", "RELATED_IMAGE_NHC_MANAGER"), "kustomizeName")
-		}, false},
-		{"reused-selector", func(in operandInputs) {
-			imageEntry(in, "nhc", "RELATED_IMAGE_NHC_CONSOLE")["kustomizeName"] =
-				imageEntry(in, "nhc", "RELATED_IMAGE_NHC_MANAGER")["kustomizeName"]
-		}, false},
-		{"empty-source-path", func(in operandInputs) { in.Operands["nhc"]["source"].(map[string]any)["path"] = "" }, false},
+		// Image work never reads source settings; only the copy script validates them.
+		{"empty-source-path", func(in operandInputs) { in.Operands["nhc"]["source"].(map[string]any)["path"] = "" }, true},
 		{"missing-source-branch", func(in operandInputs) {
 			delete(in.Operands["nhc"]["source"].(map[string]any), "branch")
-		}, false},
+		}, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -80,7 +71,7 @@ func TestImageReferenceValidation(t *testing.T) {
 			in := tr.loadOperands()
 			tc.mutate(in)
 			tr.saveOperands(in)
-			before := tr.snapshot("config/manager", "config/operands", bindings)
+			before := tr.snapshot("config/manager", "config/operands")
 			out, err := tr.try("bash", "hack/operand-image-refs.sh")
 			if tc.valid {
 				if err != nil {
@@ -108,7 +99,7 @@ func TestImageReferenceValidation(t *testing.T) {
 				if out, err := tr.try("make", "-s", "operand-manifests"); err == nil {
 					t.Fatalf("generation accepted invalid input: %s", out)
 				}
-				if !maps.Equal(before, tr.snapshot("config/manager", "config/operands", bindings)) {
+				if !maps.Equal(before, tr.snapshot("config/manager", "config/operands")) {
 					t.Fatal("invalid input changed generated settings")
 				}
 			}
@@ -138,11 +129,9 @@ func TestIndependentTaggedImagesStayAligned(t *testing.T) {
 			if got := strings.TrimSpace(tr.run("bin/yq", query, "config/manager/manager.yaml")); got != want {
 				t.Errorf("%s = %s, want %s", env, got, want)
 			}
-			if !strings.Contains(string(tr.read("internal/operands/manifests/"+key+"/objects.yaml")), want) {
-				t.Errorf("runtime does not use %s", want)
-			}
-			if !strings.Contains(string(tr.read(bindings)), want) {
-				t.Errorf("binding does not use %s", want)
+			objects := string(tr.read("internal/operands/manifests/" + key + "/objects.yaml"))
+			if strings.Contains(objects, want) || !strings.Contains(objects, "__WAO_"+env+"__:placeholder") {
+				t.Errorf("%s runtime objects must carry the %s placeholder, not %s", key, env, want)
 			}
 		}
 	}
@@ -158,22 +147,16 @@ func TestImagePreflightRejectsMissingAndDuplicateDestinations(t *testing.T) {
     | select(.name == "RELATED_IMAGE_NHC_MANAGER"))`, "config/manager/manager.yaml"},
 		{"duplicate-manager", `(select(.kind == "Deployment") | .spec.template.spec.containers[0].env)
     += [{"name":"RELATED_IMAGE_NHC_MANAGER","value":"duplicate"}]`, "config/manager/manager.yaml"},
-		{"selector", `del(.images[0])`, "config/operands/nhc/overlays/runtime/kustomization.yaml"},
-		{"duplicate-selector", `.images += [.images[0]]`, "config/operands/nhc/overlays/runtime/kustomization.yaml"},
-		{"snr-self", `del(.spec.template.spec.containers[0].env)`,
-			"config/operands/snr/overlays/runtime/manager_image_env_patch.yaml"},
-		{"sbr-agent", `del(.spec.template.spec.containers[0].env)`,
-			"config/operands/sbr/overlays/runtime/agent_image_env_patch.yaml"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			tr := newTree(t)
 			tr.run("bin/yq", "-i", tc.query, tc.path)
-			before := tr.snapshot("config", bindings)
+			before := tr.snapshot("config")
 			if out, err := tr.try("bash", "hack/sync-operand-images.sh"); err == nil {
 				t.Fatalf("invalid destination accepted: %s", out)
 			}
-			if !maps.Equal(before, tr.snapshot("config", bindings)) {
+			if !maps.Equal(before, tr.snapshot("config")) {
 				t.Fatal("failed sync changed image settings")
 			}
 		})

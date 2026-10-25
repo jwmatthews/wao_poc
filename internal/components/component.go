@@ -1,22 +1,5 @@
 package components
 
-// ImageBinding maps an operator image variable to the tagged reference from operands.yaml
-// that the runtime overlay writes into the embedded manifests;
-// the renderer replaces Original with the selected pull reference from the image set.
-type ImageBinding struct {
-	Env      string
-	Original string
-}
-
-// imageBinding uses the generated tagged reference so tag updates need no manual Go edits.
-func imageBinding(env string) ImageBinding {
-	original := taggedImageReferences[env]
-	if original == "" {
-		panic("no generated image binding for " + env + "; run make operand-manifests")
-	}
-	return ImageBinding{Env: env, Original: original}
-}
-
 // WebhookConfiguration names an admission configuration rendered for the component.
 type WebhookConfiguration struct {
 	Kind string // ValidatingWebhookConfiguration or MutatingWebhookConfiguration
@@ -34,7 +17,7 @@ type Definition struct {
 	ShortName   string // nhc
 	ManifestDir string // directory under internal/operands/manifests
 	Deployments []string
-	Images      []ImageBinding
+	Images      []string // RELATED_IMAGE_* names; see images.Placeholder
 	Webhooks    []WebhookConfiguration
 	// AgentOwners are config kinds, in the install namespace, whose DaemonSets are node agents
 	// that keep running after the manager is removed.

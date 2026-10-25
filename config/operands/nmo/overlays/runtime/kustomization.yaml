@@ -1,17 +1,18 @@
 # Runtime objects WAO applies when the component is enabled: Deployment, Services, ConfigMaps and
 # webhook configurations. `make operand-manifests` builds this, drops every other kind, and writes
-# internal/operands/manifests/nmo/objects.yaml. The namespace placeholder and the tagged image
-# reference are replaced by the Go renderer at reconcile time.
+# internal/operands/manifests/nmo/objects.yaml. The namespace and image placeholders
+# are replaced by the Go renderer at reconcile time.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: __WAO_NAMESPACE__
 resources:
   - ../../config/default
-# newName and newTag are kept equal to operands.yaml image repositories/tags by `make operand-manifests`.
+# `name` is the upstream image selector. newName/newTag are static WAO placeholders; the Go renderer
+# replaces `__WAO_<ENV>__:placeholder` with the RELATED_IMAGE_<...> runtime value at reconcile time.
 images:
   - name: quay.io/medik8s/node-maintenance-operator
-    newName: quay.io/medik8s/node-maintenance-operator
-    newTag: wao
+    newName: __WAO_RELATED_IMAGE_NMO_MANAGER__
+    newTag: placeholder
 # Every operand pod and every Service selector carries the component label (design brief D10):
 # all six managers share one namespace and some operand selectors would match other managers.
 labels:

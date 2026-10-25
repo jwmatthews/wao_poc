@@ -181,18 +181,18 @@ RUNTIME_KINDS := Deployment Service ConfigMap ValidatingWebhookConfiguration Mut
 RUNTIME_FILTER := select($(foreach k,$(RUNTIME_KINDS),.kind == "$(k)" or) false)
 
 .PHONY: operand-manifests
-operand-manifests: kustomize yq ## Sync tagged image settings and generate runtime manifests and Go bindings (offline).
+operand-manifests: kustomize yq ## Sync RELATED_IMAGE_* values and generate runtime manifests (offline).
 	YQ=$(YQ) hack/sync-operand-images.sh
-	YQ=$(YQ) hack/generate-image-bindings.sh
 	@set -euo pipefail; for k in $(OPERANDS); do \
 	  mkdir -p internal/operands/manifests/$$k; \
 	  $(KUSTOMIZE) build config/operands/$$k/overlays/runtime | $(YQ) '$(RUNTIME_FILTER)' > internal/operands/manifests/$$k/objects.yaml; \
 	  test -s internal/operands/manifests/$$k/objects.yaml; \
 	  if grep -q '\$${' internal/operands/manifests/$$k/objects.yaml; then echo "$$k: unreplaced placeholder"; exit 1; fi; \
+	  if grep -E '^[[:space:]]*-?[[:space:]]*image: ' internal/operands/manifests/$$k/objects.yaml | grep -v '__WAO_' >/dev/null; then echo "$$k: image field is not a WAO placeholder"; exit 1; fi; \
 	done
 
 .PHONY: verify-operand-manifests
-verify-operand-manifests: kustomize yq ## Compare generated operands/images and check RBAC/bundle shape; may refresh stale files.
+verify-operand-manifests: kustomize yq ## Regenerate, compare and restore operand manifests/images; check RBAC/bundle shape. Leaves the tree unchanged.
 	YQ=$(YQ) KUSTOMIZE=$(KUSTOMIZE) hack/verify-operand-manifests.sh
 
 .PHONY: test-offline

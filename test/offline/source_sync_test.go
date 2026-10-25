@@ -73,7 +73,7 @@ func TestUpdateCopiesWorkingTreeAndPreservesOverlays(t *testing.T) {
 	source := tr.sourceFixture("nhc")
 	unchanged := []string{
 		"config/operands/nhc/overlays", "config/operands/snr", "internal/operands/manifests",
-		bindings, "bundle", "operands.yaml",
+		"bundle", "operands.yaml",
 	}
 	before := tr.snapshot(unchanged...)
 	tr.write("config/operands/nhc/config/stale.yaml", []byte("removed upstream\n"))
@@ -131,18 +131,18 @@ func configureSourceFailure(tr *tree, name, source string) string {
 		inputs.Operands["nhc"]["source"] = map[string]any{"path": ".", "branch": branch}
 	case "not-root":
 		inputs.Operands["nhc"]["source"].(map[string]any)["path"] = filepath.Join(source, "config")
+	case "empty-source-path":
+		inputs.Operands["nhc"]["source"].(map[string]any)["path"] = ""
+		tr.saveOperands(inputs)
+		return "source.path"
+	case "missing-source-branch":
+		delete(inputs.Operands["nhc"]["source"].(map[string]any), "branch")
+		tr.saveOperands(inputs)
+		return "source.branch"
 	case "manager-env":
 		path := "config/manager/manager.yaml"
 		tr.write(path, []byte(strings.ReplaceAll(string(tr.read(path)), "RELATED_IMAGE_NHC_MANAGER", "REMOVED_IMAGE")))
 		return "RELATED_IMAGE_NHC_MANAGER"
-	case "selector":
-		path := "config/operands/nhc/overlays/runtime/kustomization.yaml"
-		tr.write(path, []byte(strings.ReplaceAll(string(tr.read(path)),
-			"name: quay.io/medik8s/node-healthcheck-operator", "name: removed-selector")))
-		return "RELATED_IMAGE_NHC_MANAGER"
-	case "reused-selector":
-		imageEntry(inputs, "nhc", "RELATED_IMAGE_NHC_CONSOLE")["kustomizeName"] =
-			imageEntry(inputs, "nhc", "RELATED_IMAGE_NHC_MANAGER")["kustomizeName"]
 	}
 	tr.saveOperands(inputs)
 	return "nhc"
@@ -151,13 +151,13 @@ func configureSourceFailure(tr *tree, name, source string) string {
 func TestUpdatePreflightPreservesAllDestinations(t *testing.T) {
 	for _, name := range []string{
 		"missing-checkout", "missing-config", "branch", "detached", "overlap", "not-root",
-		"manager-env", "selector", "reused-selector",
+		"manager-env", "empty-source-path", "missing-source-branch",
 	} {
 		t.Run(name, func(t *testing.T) {
 			tr := newTree(t)
 			source := tr.sourceFixture("nhc")
 			diagnostic := configureSourceFailure(tr, name, source)
-			paths := []string{"config/operands", "config/manager", "internal/operands/manifests", bindings, "bundle"}
+			paths := []string{"config/operands", "config/manager", "internal/operands/manifests", "bundle"}
 			before := tr.snapshot(paths...)
 			out, err := tr.try("make", "-s", "update-nhc-manifests")
 			if err == nil || !strings.Contains(out, diagnostic) {
@@ -253,7 +253,7 @@ func TestUpdateOnlySynchronizesSelectedImagesWithoutHiddenWork(t *testing.T) {
 	imageEntry(inputs, "nhc", "RELATED_IMAGE_NHC_MANAGER")["tag"] = "unpublished-dev"
 	imageEntry(inputs, "snr", "RELATED_IMAGE_SNR_MANAGER")["tag"] = "other-unpublished"
 	tr.saveOperands(inputs)
-	paths := []string{"internal/operands/manifests", bindings, "bundle", "operands.yaml", "config/operands/snr"}
+	paths := []string{"internal/operands/manifests", "bundle", "operands.yaml", "config/operands/snr"}
 	before := tr.snapshot(paths...)
 	mocks := tr.path("mocks")
 	if err := os.Mkdir(mocks, 0o755); err != nil {

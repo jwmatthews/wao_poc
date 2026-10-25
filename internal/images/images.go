@@ -20,6 +20,10 @@ const (
 // Required lists every image environment variable the operator needs at startup.
 var Required = []string{NHCManager, NHCConsole, SNRManager, SBRManager, SBRAgent, FARManager, MDRManager, NMOManager}
 
+// Placeholder is the token the runtime kustomize overlays bake into the embedded operand
+// objects for an image variable; the renderer replaces it with the variable's runtime value.
+func Placeholder(env string) string { return "__WAO_" + env + "__:placeholder" }
+
 // Set maps RELATED_IMAGE_* names to selected image pull references.
 type Set map[string]string
 

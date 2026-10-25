@@ -1,5 +1,5 @@
-# The operand leaves ${IMG} for envsubst; WAO sets the tagged reference, which the renderer
-# replaces with RELATED_IMAGE_SNR_MANAGER. `make operand-manifests` keeps the value current.
+# The operand leaves an envsubst placeholder here; WAO sets a static token that the renderer
+# replaces with the RELATED_IMAGE_SNR_MANAGER runtime value.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -11,4 +11,4 @@ spec:
         - name: manager
           env:
             - name: SELF_NODE_REMEDIATION_IMAGE
-              value: quay.io/medik8s/self-node-remediation-operator:wao
+              value: __WAO_RELATED_IMAGE_SNR_MANAGER__:placeholder

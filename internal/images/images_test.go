@@ -1,8 +1,13 @@
 package images
 
 import (
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	"sigs.k8s.io/yaml"
 )
 
 func lookupFrom(m map[string]string) func(string) (string, bool) {
@@ -50,5 +55,35 @@ func TestFromEnvReturnsAllValuesSorted(t *testing.T) {
 	keys := s.Sorted()
 	if len(keys) != len(Required) || keys[0] != FARManager {
 		t.Fatalf("Sorted() = %v", keys)
+	}
+}
+
+func TestOperandsYAMLDeclaresExactlyRequiredImages(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "operands.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Operands map[string]struct {
+			Images map[string]map[string]any `json:"images"`
+		} `json:"operands"`
+	}
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for key, op := range doc.Operands {
+		for env, fields := range op.Images {
+			got = append(got, env)
+			if _, ok := fields["kustomizeName"]; ok {
+				t.Errorf("%s/%s: kustomizeName is no longer used; the runtime overlays are static", key, env)
+			}
+		}
+	}
+	want := slices.Clone(Required)
+	slices.Sort(got)
+	slices.Sort(want)
+	if !slices.Equal(got, want) {
+		t.Fatalf("operands.yaml images = %v, want %v", got, want)
 	}
 }

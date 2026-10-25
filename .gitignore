@@ -76,3 +76,5 @@ kubeconfig*
 __pycache__/
 testbin
 
+.tools
+

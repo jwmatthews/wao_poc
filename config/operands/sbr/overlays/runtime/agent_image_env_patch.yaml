@@ -1,5 +1,5 @@
-# The operand leaves ${AGENT_IMG} for envsubst; WAO sets the tagged agent reference, which the
-# renderer replaces with the selected agent image. `make operand-manifests` keeps the value current.
+# The operand leaves an envsubst placeholder here; WAO sets a static token that the renderer
+# replaces with the RELATED_IMAGE_SBR_AGENT runtime value.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -11,4 +11,4 @@ spec:
         - name: manager
           env:
             - name: RELATED_IMAGE_AGENT
-              value: quay.io/medik8s/storage-based-remediation-agent:wao
+              value: __WAO_RELATED_IMAGE_SBR_AGENT__:placeholder
