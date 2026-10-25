@@ -188,7 +188,7 @@ operand-manifests: kustomize yq ## Sync RELATED_IMAGE_* values and generate runt
 	  $(KUSTOMIZE) build config/operands/$$k/overlays/runtime | $(YQ) '$(RUNTIME_FILTER)' > internal/operands/manifests/$$k/objects.yaml; \
 	  test -s internal/operands/manifests/$$k/objects.yaml; \
 	  if grep -q '\$${' internal/operands/manifests/$$k/objects.yaml; then echo "$$k: unreplaced placeholder"; exit 1; fi; \
-	  if grep -E '^[[:space:]]*-?[[:space:]]*image: ' internal/operands/manifests/$$k/objects.yaml | grep -qv '__WAO_'; then echo "$$k: image field is not a WAO placeholder"; exit 1; fi; \
+	  if grep -E '^[[:space:]]*-?[[:space:]]*image: ' internal/operands/manifests/$$k/objects.yaml | grep -v '__WAO_' >/dev/null; then echo "$$k: image field is not a WAO placeholder"; exit 1; fi; \
 	done
 
 .PHONY: verify-operand-manifests
