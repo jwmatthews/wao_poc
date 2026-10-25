@@ -1,0 +1,157 @@
+# Updating operand manifests
+
+WAO copies an operand's local `config/` tree and applies its own Kustomize
+overlays. Choose the source and image tags in [operands.yaml](../operands.yaml),
+refresh the copy, then generate runtime objects and package the bundle when ready.
+
+Run these commands from the WAO repository root. You need Git, Bash, Make, Go,
+and jq. Make installs yq, Kustomize, and packaging tools through their existing
+dependency targets when needed.
+
+## Quick start
+
+```sh
+# First edit operands.yaml: checkout paths, expected branches, image repositories/tags.
+
+# Copy one operand's config and synchronize its image settings.
+make update-nhc-manifests
+
+# Generate runtime YAML and Go image bindings from WAO's copied config.
+make operand-manifests
+
+# Review the changes.
+git status --short
+git diff
+
+# Generate normalized bundle content when ready to package.
+make bundle-reset
+
+# Check consistency and run the offline regression tests.
+make check
+make test-offline
+```
+
+To refresh all six operands, use `make update-operand-manifests` in place of the
+single-operand update. Configure all six checkout paths and branches first.
+
+## Configure the source and images
+
+Edit the existing entries in `operands.yaml`. For example, the NHC entry contains:
+
+```yaml
+operands:
+  nhc:
+    source:
+      path: ../node-healthcheck-operator
+      branch: main
+    images:
+      RELATED_IMAGE_NHC_MANAGER:
+        repository: quay.io/medik8s/node-healthcheck-operator
+        tag: latest
+        kustomizeName: quay.io/medik8s/node-healthcheck-operator
+      RELATED_IMAGE_NHC_CONSOLE:
+        repository: quay.io/medik8s/node-remediation-console
+        tag: latest
+        kustomizeName: quay.io/medik8s/node-remediation-console
+```
+
+Keep the other operand entries in the file. Set these values for your checkout:
+
+- `source.path`: the operand's Git repository root. Relative paths resolve from
+  WAO's root; absolute paths also work. Use explicit paths; `~` and `$VARIABLE`
+  are not expanded inside YAML.
+- `source.branch`: the branch already checked out in that repository. The helper
+  checks the name and leaves the checkout unchanged. Uncommitted and untracked
+  files under `config/` are included in the copy. Git worktrees are supported.
+- `images.*.repository` and `tag`: the image to use, expressed separately. Tags
+  such as `latest`, `wao`, or `v0.12.0` are used literally. Each image is selected
+  independently, including the NHC console and SBR agent.
+- `kustomizeName`: the upstream image selector used by the WAO runtime overlay.
+  Normally leave it unchanged. The SBR agent omits it because its image is passed
+  through an environment value.
+
+The helper trusts your source/image combination. Copying and rendering require
+no published image, registry access, digest resolution, or source commit
+discovery. The selected images must be available when you later run the operands.
+
+If only image selections changed, run `make operand-manifests` directly. A source
+refresh is needed when you want to copy updated configuration from a checkout.
+
+## Choose the update target
+
+These targets each refresh one operand:
+
+```sh
+make update-nhc-manifests
+make update-snr-manifests
+make update-sbr-manifests
+make update-far-manifests
+make update-mdr-manifests
+make update-nmo-manifests
+```
+
+For all operands, use:
+
+```sh
+make update-operand-manifests
+```
+
+The aggregate validates all selected inputs before replacement and processes the
+six operands sequentially, including under parallel Make. Use it for an all-operand
+refresh; individual update targets share the manager YAML file and should not be
+invoked together with `make -j`.
+
+## What to expect
+
+An update prints a line for each copied operand, for example:
+
+```text
+== nhc: copying config/ from the selected working tree
+```
+
+The commands have separate outputs:
+
+| Command | Expected changes |
+| --- | --- |
+| `make update-nhc-manifests` | Replace `config/operands/nhc/config/`; synchronize NHC image values in its runtime overlay and `config/manager/manager.yaml` |
+| `make update-operand-manifests` | Perform the same update for all six operands |
+| `make operand-manifests` | Synchronize all image settings; generate `internal/components/zz_generated.images.go` and `internal/operands/manifests/<key>/objects.yaml` |
+| `make bundle-reset` | Generate and normalize `bundle/` from copied CRDs and WAO packaging configuration |
+
+Refreshing a copy removes stale files deleted upstream. WAO-owned
+`config/operands/<key>/overlays/{rbac,runtime}/` directories are retained; their
+selected image fields are synchronized. SNR's self-image and SBR's agent-image
+environment patches are synchronized as part of their image settings.
+
+Update targets stop after copying and image synchronization. Runtime generation
+uses the configuration already copied into WAO and requires no operand checkout.
+Neither step generates a bundle, applies resources to a cluster, or enables a
+component. Repeating a command with identical inputs may produce no diff.
+
+Supported Make build targets (`manager`, `run`, `docker-build`, and shared
+`dev-build`) run `operand-manifests` before compiling. Before a direct
+`podman build` or `docker build`, run `make operand-manifests` yourself.
+
+## Review and troubleshoot
+
+Review `operands.yaml`, copied configuration, image settings, generated runtime
+objects, and any later bundle diff. Keep machine-specific checkout paths out of
+shared changes unless they are intentional. Make integration adjustments in WAO's
+overlays; a later refresh replaces files inside the copied `config/` directory.
+
+`make verify-operand-manifests` compares generated content and checks RBAC/bundle
+shape. It regenerates files in place and may refresh stale outputs before
+reporting drift. Review those changes. Bundle freshness is checked separately by
+`make test`, which requires a clean checkout; see [AGENTS.md](../AGENTS.md) for the
+full commit/test workflow.
+
+| Error | Action |
+| --- | --- |
+| Missing checkout, wrong Git root, or missing `config/` | Correct `source.path` to a local operand repository root containing `config/` |
+| Branch mismatch or detached HEAD | Put the checkout on the intended branch yourself, or correct `source.branch` |
+| Invalid image input or missing/duplicate image destination | Check the repository/tag fields and retained Kustomize selectors; inspect the named manager/overlay entry |
+| Kustomize failure or unreplaced placeholder during generation | Check whether upstream files or resource names changed and adjust WAO's overlays accordingly |
+
+Input and branch checks fail before copied configuration is replaced. After
+correcting an error, rerun the affected update or generation command. Review any
+generated changes already present from an earlier attempt.
