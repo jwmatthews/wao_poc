@@ -96,7 +96,7 @@ spec:
             - /manager
           env:
             - name: SELF_NODE_REMEDIATION_IMAGE
-              value: quay.io/medik8s/self-node-remediation-operator:wao
+              value: __WAO_RELATED_IMAGE_SNR_MANAGER__:placeholder
             - name: MY_NODE_NAME
               valueFrom:
                 fieldRef:
@@ -105,7 +105,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          image: quay.io/medik8s/self-node-remediation-operator:wao
+          image: __WAO_RELATED_IMAGE_SNR_MANAGER__:placeholder
           lifecycle:
             postStart:
               exec:

@@ -38,22 +38,23 @@ func Render(def components.Definition, namespace string, imgs images.Set) ([]*un
 	}
 	out := make([]*unstructured.Unstructured, 0, len(files))
 	latest := map[string]bool{}
-	for _, binding := range def.Images {
-		if ref := imgs.Get(binding.Env); strings.HasSuffix(ref, ":latest") {
+	for _, env := range def.Images {
+		if ref := imgs.Get(env); strings.HasSuffix(ref, ":latest") {
 			latest[ref] = true
 		}
 	}
 	for _, name := range sortedNames(files) {
 		text := strings.ReplaceAll(string(files[name]), NamespacePlaceholder, namespace)
-		for _, b := range def.Images {
-			img := imgs.Get(b.Env)
+		for _, env := range def.Images {
+			img := imgs.Get(env)
 			if img == "" {
-				return nil, fmt.Errorf("%s: no image configured for %s", def.Key, b.Env)
+				return nil, fmt.Errorf("%s: no image configured for %s", def.Key, env)
 			}
-			text = strings.ReplaceAll(text, b.Original, img)
+			text = strings.ReplaceAll(text, images.Placeholder(env), img)
 		}
-		if strings.Contains(text, NamespacePlaceholder) {
-			return nil, fmt.Errorf("%s/%s: unresolved namespace placeholder", def.Key, name)
+		// Every WAO token (namespace or image) must be gone before the object is parsed.
+		if strings.Contains(text, "__WAO_") {
+			return nil, fmt.Errorf("%s/%s: unresolved placeholder", def.Key, name)
 		}
 		j, err := yaml.YAMLToJSON([]byte(text))
 		if err != nil {

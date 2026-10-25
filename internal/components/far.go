@@ -9,9 +9,7 @@ func FAR() Definition {
 	return Definition{
 		Key: v1alpha1.ComponentKeyFenceAgentsRemediation, ShortName: "far", ManifestDir: "far",
 		Deployments: []string{"fence-agents-remediation-controller-manager"},
-		Images: []ImageBinding{
-			imageBinding(images.FARManager),
-		},
+		Images:      []string{images.FARManager},
 		Webhooks: []WebhookConfiguration{
 			{Kind: "ValidatingWebhookConfiguration", Name: "fence-agents-remediation-validating-webhook-configuration"},
 			{Kind: "MutatingWebhookConfiguration", Name: "fence-agents-remediation-mutating-webhook-configuration"},

@@ -45,7 +45,7 @@ func TestRenderNHCReplacesNamespaceImagesAndLabels(t *testing.T) {
 	if image != testImages().Get(images.NHCManager) {
 		t.Fatalf("manager image = %q", image)
 	}
-	if strings.Contains(image, def.Images[0].Original) {
+	if strings.Contains(image, images.Placeholder(def.Images[0])) {
 		t.Fatalf("tagged image was not replaced: %q", image)
 	}
 	for _, o := range objs {
@@ -221,9 +221,9 @@ func TestRenderReplacesEveryOperandImage(t *testing.T) {
 		}
 		for _, o := range objs {
 			b, _ := o.MarshalJSON()
-			for _, img := range def.Images {
-				if strings.Contains(string(b), img.Original) {
-					t.Errorf("%s: %s/%s still references tagged image %s", def.Key, o.GetKind(), o.GetName(), img.Original)
+			for _, env := range def.Images {
+				if ph := images.Placeholder(env); strings.Contains(string(b), ph) {
+					t.Errorf("%s: %s/%s still references placeholder %s", def.Key, o.GetKind(), o.GetName(), ph)
 				}
 			}
 			if strings.Contains(string(b), "quay.io/medik8s/") {
@@ -336,11 +336,11 @@ func TestRenderLatestImagesPullPolicy(t *testing.T) {
 				}
 				for _, raw := range containers {
 					c := raw.(map[string]any)
-					for _, b := range def.Images {
-						if c["image"] == imgs[b.Env] {
-							seen[b.Env] = true
+					for _, env := range def.Images {
+						if c["image"] == imgs[env] {
+							seen[env] = true
 							if c["imagePullPolicy"] != "Always" {
-								t.Errorf("%s %s: latest policy = %v", obj.GetName(), b.Env, c["imagePullPolicy"])
+								t.Errorf("%s %s: latest policy = %v", obj.GetName(), env, c["imagePullPolicy"])
 							}
 						}
 					}
@@ -361,11 +361,36 @@ func TestRenderLatestImagesPullPolicy(t *testing.T) {
 					}
 				}
 			}
-			for _, b := range def.Images {
-				if !seen[b.Env] {
-					t.Errorf("image binding %s not exercised", b.Env)
+			for _, env := range def.Images {
+				if !seen[env] {
+					t.Errorf("image binding %s not exercised", env)
 				}
 			}
 		})
+	}
+}
+
+func TestRenderRejectsUnresolvedImagePlaceholder(t *testing.T) {
+	def, _ := components.ByKey(v1alpha1.ComponentKeyNodeHealthCheck)
+	def.Images = def.Images[:1] // the console placeholder stays in the manifests
+	_, err := operands.Render(def, testNamespace, testImages())
+	if err == nil || !strings.Contains(err.Error(), "unresolved placeholder") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+// Passes before and after the placeholder change; it pins that bindings resolve independently.
+func TestRenderIdenticalImagesResolveIndependently(t *testing.T) {
+	def, _ := components.ByKey(v1alpha1.ComponentKeyNodeHealthCheck)
+	imgs := testImages()
+	imgs[images.NHCConsole] = imgs[images.NHCManager]
+	objs, err := operands.Render(def, testNamespace, imgs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	console := find(t, objs, "Deployment", "node-healthcheck-node-remediation-console-plugin")
+	c, _, _ := unstructured.NestedSlice(console.Object, "spec", "template", "spec", "containers")
+	if got := c[0].(map[string]interface{})["image"]; got != imgs[images.NHCManager] {
+		t.Fatalf("console image = %v", got)
 	}
 }

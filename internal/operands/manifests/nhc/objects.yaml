@@ -141,7 +141,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-          image: quay.io/medik8s/node-healthcheck-operator:wao
+          image: __WAO_RELATED_IMAGE_NHC_MANAGER__:placeholder
           lifecycle:
             postStart:
               exec:
@@ -270,7 +270,7 @@ spec:
                     operator: Exists
               weight: 1
       containers:
-        - image: quay.io/medik8s/node-remediation-console:wao
+        - image: __WAO_RELATED_IMAGE_NHC_CONSOLE__:placeholder
           lifecycle:
             postStart:
               exec:

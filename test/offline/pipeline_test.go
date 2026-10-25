@@ -223,6 +223,18 @@ func TestGeneratorRejectsDuplicateEnvironmentNames(t *testing.T) {
 	}
 }
 
+// An upstream container whose image WAO does not map must fail generation rather than
+// deploy the upstream default.
+func TestOperandManifestsRejectsUnmappedImage(t *testing.T) {
+	tr := newTree(t)
+	path := "config/operands/nhc/overlays/runtime/kustomization.yaml"
+	tr.run("bin/yq", "-i", `del(.images[] | select(.name == "quay.io/medik8s/node-remediation-console"))`, path)
+	out, err := tr.try("make", "-s", "operand-manifests")
+	if err == nil || !strings.Contains(out, "not a WAO placeholder") {
+		t.Fatalf("expected unmapped-image failure: %v\n%s", err, out)
+	}
+}
+
 // NHC enables metrics mTLS only if its ServiceAccount can read the client CA in
 // kube-system/extension-apiserver-authentication. The copied Role grants that, but its
 // RoleBinding names the unprefixed ServiceAccount, so WAO must rebind it or the CSV drops it.

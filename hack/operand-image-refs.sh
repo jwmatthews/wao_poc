@@ -58,22 +58,11 @@ require_one() {
   [ "$count" = 1 ] || { echo "$key/$env: expected exactly one image destination in $file" >&2; exit 1; }
 }
 
-# Preflight every selected destination before emitting records or allowing any mutation.
+# Preflight the manager Deployment env entries before emitting records or allowing any mutation.
 while IFS=$'\t' read -r key env repository tag name; do
   export WAO_IMAGE_ENV="$env" WAO_IMAGE_NAME="$name"
   require_one config/manager/manager.yaml \
     '[.[] | select(.kind == "Deployment") | .spec.template.spec.containers[] | select(.name == "manager") | .env[] | select(.name == env.WAO_IMAGE_ENV)]'
-  runtime=config/operands/$key/overlays/runtime
-  if [ -n "$name" ]; then
-    require_one "$runtime/kustomization.yaml" '[.[] | .images[] | select(.name == env.WAO_IMAGE_NAME)]'
-  fi
-  case "$env" in
-    RELATED_IMAGE_SNR_MANAGER) patch=manager_image_env_patch.yaml; export WAO_IMAGE_ENV=SELF_NODE_REMEDIATION_IMAGE ;;
-    RELATED_IMAGE_SBR_AGENT) patch=agent_image_env_patch.yaml; export WAO_IMAGE_ENV=RELATED_IMAGE_AGENT ;;
-    *) continue ;;
-  esac
-  require_one "$runtime/$patch" \
-    '[.[] | .spec.template.spec.containers[] | select(.name == "manager") | .env[] | select(.name == env.WAO_IMAGE_ENV)]'
 done < "$work"
 while IFS=$'\t' read -r key env repository tag name; do
   printf '%s\t%s:%s\n' "$env" "$repository" "$tag"
