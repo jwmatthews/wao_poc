@@ -19,7 +19,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	"github.com/medik8s/workload-availability-operator/api/v1alpha1"
 	"github.com/medik8s/workload-availability-operator/internal/components"
@@ -93,9 +95,59 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		Expect(deps.Items).To(BeEmpty())
 	})
 
-	It("does not rewrite status when nothing changes", func() {
+	It("does not submit status updates when nothing changes", func() {
+		c, err := client.NewWithWatch(testEnv.Config, client.Options{Scheme: k8sClient.Scheme()})
+		Expect(err).NotTo(HaveOccurred())
+		writes := 0
+		observed := interceptor.NewClient(c, interceptor.Funcs{
+			SubResourceUpdate: func(ctx context.Context, c client.Client, subresource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+				writes++
+				return c.SubResource(subresource).Update(ctx, obj, opts...)
+			},
+		})
+		r := &WorkloadAvailabilityConfigReconciler{Client: observed, Namespace: ns, Images: testImages()}
 		rv := getWAC(ctx).ResourceVersion
-		Consistently(func() string { return getWAC(ctx).ResourceVersion }, 5*time.Second, 250*time.Millisecond).Should(Equal(rv))
+		for range 3 {
+			result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: v1alpha1.SingletonName}})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+		}
+		Expect(writes).To(BeZero(), "unchanged status should not be sent to the API server")
+		Expect(getWAC(ctx).ResourceVersion).To(Equal(rv))
+	})
+
+	It("recovers from a stale-version status conflict and publishes current status", func() {
+		// Enabling NHC changes the resourceVersion. Submit its first status write with the
+		// previous version so the real API server rejects it, then let the controller retry.
+		stale := getWAC(ctx).ResourceVersion
+		statusConflictSeen.Store(false)
+		staleStatusVersion.Store(&stale)
+		DeferCleanup(func() { staleStatusVersion.Store(nil) })
+		setState(ctx, v1alpha1.ComponentKeyNodeHealthCheck, v1alpha1.ComponentStateEnabled)
+		Eventually(statusConflictSeen.Load).Should(BeTrue(), "the API server must reject a stale status write")
+		Eventually(func(g Gomega) {
+			w := getWAC(ctx)
+			g.Expect(w.Status.ObservedGeneration).To(Equal(w.Generation))
+			c := component(w, v1alpha1.ComponentKeyNodeHealthCheck)
+			g.Expect(c).NotTo(BeNil())
+			g.Expect(c.DesiredState).To(Equal(v1alpha1.ComponentStateEnabled))
+			g.Expect(c.Phase).To(Equal(v1alpha1.ComponentPhaseProgressing)) // envtest has no kubelet or service-ca
+			g.Expect(c.Deployments).To(HaveLen(2))
+			g.Expect(c.AdmissionReady).To(Equal(ptr.To(false)))
+			g.Expect(meta.IsStatusConditionFalse(w.Status.Conditions, v1alpha1.ConditionDegraded)).To(BeTrue())
+		}).Should(Succeed())
+
+		// A stable Progressing status must still schedule another readiness check.
+		r := &WorkloadAvailabilityConfigReconciler{Client: k8sClient, Namespace: ns, Images: testImages()}
+		result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: v1alpha1.SingletonName}})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result.RequeueAfter).To(BeNumerically(">", 0))
+
+		setState(ctx, v1alpha1.ComponentKeyNodeHealthCheck, v1alpha1.ComponentStateDisabled)
+		Eventually(func(g Gomega) {
+			c := component(getWAC(ctx), v1alpha1.ComponentKeyNodeHealthCheck)
+			g.Expect(c.Phase).To(Equal(v1alpha1.ComponentPhaseDisabled))
+		}).Should(Succeed())
 	})
 
 	It("installs the NHC operand when enabled", func() {
