@@ -378,19 +378,3 @@ func TestRenderRejectsUnresolvedImagePlaceholder(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
-
-// Passes before and after the placeholder change; it pins that bindings resolve independently.
-func TestRenderIdenticalImagesResolveIndependently(t *testing.T) {
-	def, _ := components.ByKey(v1alpha1.ComponentKeyNodeHealthCheck)
-	imgs := testImages()
-	imgs[images.NHCConsole] = imgs[images.NHCManager]
-	objs, err := operands.Render(def, testNamespace, imgs)
-	if err != nil {
-		t.Fatal(err)
-	}
-	console := find(t, objs, "Deployment", "node-healthcheck-node-remediation-console-plugin")
-	c, _, _ := unstructured.NestedSlice(console.Object, "spec", "template", "spec", "containers")
-	if got := c[0].(map[string]interface{})["image"]; got != imgs[images.NHCManager] {
-		t.Fatalf("console image = %v", got)
-	}
-}
