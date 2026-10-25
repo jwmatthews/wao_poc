@@ -63,8 +63,8 @@ This operator does NOT intend to change the behavior or functionality of the und
 | `config/operands/<key>/config/` | Complete copied upstream `config/` tree; replaced when refreshing that operand |
 | `config/operands/<key>/overlays/{rbac,runtime}/` | WAO-owned packaging and runtime adjustments; retained when refreshing |
 | `hack/update-operand-manifests.sh` | Local config copying and selected image synchronization |
-| `hack/operand-image-refs.sh`, `hack/sync-operand-images.sh` | Shared offline validation and image-setting synchronization |
-| `hack/generate-image-bindings.sh`, `hack/verify-operand-manifests.sh` | Image-binding generation and generated consistency/RBAC checks |
+| `hack/operand-image-refs.sh`, `hack/sync-operand-images.sh` | Offline validation of `operands.yaml` and `RELATED_IMAGE_*` synchronization into the manager Deployment |
+| `hack/verify-operand-manifests.sh` | Generated consistency and RBAC/bundle shape checks |
 | `bundle/` | Generated OLM bundle: one CSV, thirteen CRDs, operand RBAC |
 | `config/catalog/`, `catalog/` | Catalog templates and rendered file-based catalog |
 
@@ -81,7 +81,7 @@ file changes, and troubleshooting.
 # Edit operands.yaml source paths/branches and image repositories/tags.
 make update-nhc-manifests
 
-# Prepare runtime objects and image bindings for the WAO binary.
+# Prepare runtime objects for the WAO binary.
 make operand-manifests
 
 # Generate normalized bundle content when ready for packaging.
@@ -94,9 +94,10 @@ The three steps have separate responsibilities:
   `update-far-manifests`, `update-mdr-manifests`, and `update-nmo-manifests` refresh one
   operand and synchronize its image settings. `update-operand-manifests` does all six
   sequentially. These targets neither render objects nor generate a bundle.
-- **Render:** `operand-manifests` synchronizes all image settings and generates
-  `internal/components/zz_generated.images.go` and
-  `internal/operands/manifests/<key>/objects.yaml`. It needs no operand checkout.
+- **Render:** `operand-manifests` synchronizes `RELATED_IMAGE_*` in
+  `config/manager/manager.yaml` and generates `internal/operands/manifests/<key>/objects.yaml`.
+  The embedded objects carry `__WAO_<ENV>__:placeholder` image tokens that the operator
+  replaces with its `RELATED_IMAGE_*` values at reconcile time. It needs no operand checkout.
 - **Package:** `bundle` or `bundle-reset` generates the OLM bundle from copied CRDs
   and WAO RBAC overlays. Platform-specific adjustments belong in overlays/packaging,
   selected through `MANIFESTS_DIR`. This change retains the existing OpenShift
@@ -114,7 +115,6 @@ operands:
       RELATED_IMAGE_NHC_MANAGER:
         repository: quay.io/medik8s/node-healthcheck-operator
         tag: latest
-        kustomizeName: quay.io/medik8s/node-healthcheck-operator
       # NHC also selects its console image independently; see operands.yaml.
 ```
 
@@ -129,20 +129,18 @@ copied as source content; updating does not apply them or add them to WAO sample
 Each image has its own repository and tag, including the NHC console and SBR agent.
 Tags such as `latest`, `wao`, and `v0.12.0` are used literally. The helper trusts your
 source/image combination: it does not contact a registry, resolve digests, infer
-source commits, or require an image to have been published. `kustomizeName` is the
-existing upstream container-image selector; normally leave it unchanged. The SBR
-agent has no selector because its image is passed through an environment value.
-This does not add tag polling, automatic rollouts, or different pull policies.
+source commits, or require an image to have been published. The runtime overlays are
+static and need no edit when a tag changes. This does not add tag polling, automatic
+rollouts, or different pull policies.
 
 Supported Make builds (`manager`, `run`, `docker-build`, and the shared `dev-build`)
 perform the render step before compiling WAO. They never refresh source checkouts.
 Before bypassing Make with a direct `podman build` or `docker build`, run
 `make operand-manifests` yourself; the Dockerfile consumes the prepared files.
 
-Never hand-edit generated runtime objects or Go bindings. Verification compares
-files before and after regeneration, including uncommitted updates, and can refresh
-stale files in place; review any reported diff. `make verify-operand-manifests` checks
-generated consistency and bundle shape. Bundle freshness is checked separately by
+Never hand-edit generated runtime objects. `make verify-operand-manifests` regenerates,
+compares against the files it found, including uncommitted updates, restores them, and
+reports any drift; it also checks RBAC and bundle shape. Bundle freshness is checked separately by
 `make test` through `bundle-reset` and `verify-no-changes`.
 
 ## Development

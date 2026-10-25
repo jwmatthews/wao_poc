@@ -49,7 +49,7 @@ config/
     snr/ ... sbr/ ... far/ ... mdr/ ... nmo/
     crd/kustomization.yaml              # stable list of copied operand CRD directories
 internal/
-  components/zz_generated.images.go      # generated image matching references
+  components/zz_generated.images.go      # removed 2026-10-25; see 2026-10-25-image-placeholder-design.md
   operands/manifests/<key>/objects.yaml  # generated runtime objects embedded in Go
 ```
 
