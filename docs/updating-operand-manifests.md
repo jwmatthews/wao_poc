@@ -1,7 +1,7 @@
 # Updating operand manifests
 
 WAO copies an operand's local `config/` tree and applies its own Kustomize
-overlays. Choose the source and image tags in [operands.yaml](../operands.yaml),
+overlays; [operand-config-overlays.md](operand-config-overlays.md) explains why. Choose the source and image tags in [operands.yaml](../operands.yaml),
 refresh the copy, then generate runtime objects and package the bundle when ready.
 
 Run these commands from the WAO repository root. You need Git, Bash, Make, Go,
