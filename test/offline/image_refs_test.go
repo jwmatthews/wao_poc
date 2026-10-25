@@ -59,10 +59,11 @@ func TestImageReferenceValidation(t *testing.T) {
 		{"duplicate-env", func(in operandInputs) {
 			maps.Copy(in.Operands["snr"]["images"].(map[string]any), in.Operands["nhc"]["images"].(map[string]any))
 		}, false},
-		{"empty-source-path", func(in operandInputs) { in.Operands["nhc"]["source"].(map[string]any)["path"] = "" }, false},
+		// Image work never reads source settings; only the copy script validates them.
+		{"empty-source-path", func(in operandInputs) { in.Operands["nhc"]["source"].(map[string]any)["path"] = "" }, true},
 		{"missing-source-branch", func(in operandInputs) {
 			delete(in.Operands["nhc"]["source"].(map[string]any), "branch")
-		}, false},
+		}, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

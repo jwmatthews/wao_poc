@@ -13,8 +13,10 @@ fail() { echo "$key: $*" >&2; exit 1; }
 # Validate and stage all selected sources before replacing the first destination.
 for key in "${keys[@]}"; do
   export WAO_OPERAND_KEY="$key"
-  source_path=$("$YQ" '.operands[strenv(WAO_OPERAND_KEY)].source.path' operands.yaml)
-  expected=$("$YQ" '.operands[strenv(WAO_OPERAND_KEY)].source.branch' operands.yaml)
+  source_path=$("$YQ" '.operands[strenv(WAO_OPERAND_KEY)].source.path // ""' operands.yaml)
+  expected=$("$YQ" '.operands[strenv(WAO_OPERAND_KEY)].source.branch // ""' operands.yaml)
+  [ -n "$source_path" ] || fail "source.path must be set in operands.yaml"
+  [ -n "$expected" ] || fail "source.branch must be set in operands.yaml"
   source=$(cd "$source_path" 2>/dev/null && pwd -P) || fail "source.path does not exist: $source_path"
   git_root=$(git -C "$source" rev-parse --show-toplevel 2>/dev/null) || fail "$source is not a Git repository"
   [ "$source" = "$(cd "$git_root" && pwd -P)" ] || fail "source.path must name the Git repository root: $source"

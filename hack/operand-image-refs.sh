@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Validate operands.yaml and selected image destinations offline, then emit ENV<TAB>repository:tag.
-# Source fields are checked for shape only; rendering never needs operand checkouts.
+# Validate operands.yaml image settings and their manager.yaml destinations offline, then emit
+# ENV<TAB>repository:tag. Source settings are the copy script's concern and are not checked here.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 YQ=${YQ:-bin/yq}; [ -x "$YQ" ] || YQ=yq
@@ -16,12 +16,9 @@ work=$(mktemp); trap 'rm -f "$work"' EXIT
 # Validate the six-operand contract and the image fields; the image set itself is checked in Go
 # against internal/images.Required.
 "$YQ" -o=json '.' operands.yaml | jq -er --args '
-  def nonempty: type == "string" and test("\\S") and (test("[\\t\\r\\n]") | not);
   if (.operands | type) != "object" or (.operands | keys) != ["far", "mdr", "nhc", "nmo", "sbr", "snr"]
       then error("operands.yaml must contain exactly nhc, snr, sbr, far, mdr, nmo") else . end
   | [.operands | to_entries[] | .key as $key | .value
-      | if (.source.path | nonempty) and (.source.branch | nonempty) then .
-        else error($key + ": source.path and source.branch must be nonempty strings") end
       | if (.images | type) == "object" and (.images | length) > 0 then .
         else error($key + ": no images") end
       | .images | to_entries[] | {key: $key, env: .key, image: .value}]

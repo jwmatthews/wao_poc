@@ -131,6 +131,14 @@ func configureSourceFailure(tr *tree, name, source string) string {
 		inputs.Operands["nhc"]["source"] = map[string]any{"path": ".", "branch": branch}
 	case "not-root":
 		inputs.Operands["nhc"]["source"].(map[string]any)["path"] = filepath.Join(source, "config")
+	case "empty-source-path":
+		inputs.Operands["nhc"]["source"].(map[string]any)["path"] = ""
+		tr.saveOperands(inputs)
+		return "source.path"
+	case "missing-source-branch":
+		delete(inputs.Operands["nhc"]["source"].(map[string]any), "branch")
+		tr.saveOperands(inputs)
+		return "source.branch"
 	case "manager-env":
 		path := "config/manager/manager.yaml"
 		tr.write(path, []byte(strings.ReplaceAll(string(tr.read(path)), "RELATED_IMAGE_NHC_MANAGER", "REMOVED_IMAGE")))
@@ -143,7 +151,7 @@ func configureSourceFailure(tr *tree, name, source string) string {
 func TestUpdatePreflightPreservesAllDestinations(t *testing.T) {
 	for _, name := range []string{
 		"missing-checkout", "missing-config", "branch", "detached", "overlap", "not-root",
-		"manager-env",
+		"manager-env", "empty-source-path", "missing-source-branch",
 	} {
 		t.Run(name, func(t *testing.T) {
 			tr := newTree(t)
