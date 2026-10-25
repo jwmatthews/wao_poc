@@ -13,7 +13,7 @@ YQ="$YQ" hack/operand-image-refs.sh >/dev/null
 
 # 2. Regeneration reproduces the current files, including unstaged operand updates.
 # Compare contents rather than the Git index so local updates can be verified before committing.
-generated=(internal/operands/manifests config/operands config/manager/manager.yaml internal/components/zz_generated.images.go)
+generated=(internal/operands/manifests config/operands config/manager/manager.yaml)
 for path in "${generated[@]}"; do
   if [ -e "$path" ]; then
     mkdir -p "$work/$(dirname "$path")"

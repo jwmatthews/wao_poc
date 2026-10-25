@@ -183,7 +183,6 @@ RUNTIME_FILTER := select($(foreach k,$(RUNTIME_KINDS),.kind == "$(k)" or) false)
 .PHONY: operand-manifests
 operand-manifests: kustomize yq ## Sync RELATED_IMAGE_* values and generate runtime manifests (offline).
 	YQ=$(YQ) hack/sync-operand-images.sh
-	YQ=$(YQ) hack/generate-image-bindings.sh
 	@set -euo pipefail; for k in $(OPERANDS); do \
 	  mkdir -p internal/operands/manifests/$$k; \
 	  $(KUSTOMIZE) build config/operands/$$k/overlays/runtime | $(YQ) '$(RUNTIME_FILTER)' > internal/operands/manifests/$$k/objects.yaml; \

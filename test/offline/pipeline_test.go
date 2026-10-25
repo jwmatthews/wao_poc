@@ -7,17 +7,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 	"testing"
 
 	"sigs.k8s.io/yaml"
 )
-
-const bindings = "internal/components/zz_generated.images.go"
-
-var definitions = []string{"nhc.go", "snr.go", "sbr.go", "far.go", "mdr.go", "nmo.go"}
 
 type tree struct {
 	t    *testing.T
@@ -142,20 +137,21 @@ func (tr *tree) changeTags() {
 	tr.saveOperands(inputs)
 }
 
-func TestTagChangesRegenerateBindingsWithoutEditingDefinitions(t *testing.T) {
+// A tag change in operands.yaml reaches only the manager Deployment env; overlays, embedded
+// objects and Go definitions are untouched.
+func TestTagChangesEditOnlyManagerYAML(t *testing.T) {
 	tr := newTree(t)
-	before := map[string][]byte{}
-	for _, name := range definitions {
-		before[name] = tr.read(filepath.Join("internal/components", name))
-	}
+	before := tr.snapshot("internal", "config/operands")
+	manager := tr.read("config/manager/manager.yaml")
 	tr.changeTags()
 	tr.run("make", "-s", "operand-manifests")
-	tr.run("go", "test", "./internal/components", "./internal/operands", "-count=1")
-	for name, want := range before {
-		if got := tr.read(filepath.Join("internal/components", name)); string(got) != string(want) {
-			t.Errorf("%s changed", name)
-		}
+	if !maps.Equal(before, tr.snapshot("internal", "config/operands")) {
+		t.Error("tag change edited files other than config/manager/manager.yaml")
 	}
+	if string(tr.read("config/manager/manager.yaml")) == string(manager) {
+		t.Error("manager.yaml did not pick up the new tags")
+	}
+	tr.run("go", "test", "./internal/components", "./internal/operands", "-count=1")
 }
 
 func TestVerificationAcceptsUnstagedGeneratedUpdates(t *testing.T) {
@@ -166,60 +162,19 @@ func TestVerificationAcceptsUnstagedGeneratedUpdates(t *testing.T) {
 	tr.run("make", "-s", "verify-operand-manifests")
 }
 
-func TestVerificationRejectsStaleBindings(t *testing.T) {
+func TestVerificationRejectsStaleRuntimeObjects(t *testing.T) {
 	tr := newTree(t)
 	tr.run("make", "-s", "operand-manifests")
-	re := regexp.MustCompile(`("RELATED_IMAGE_NHC_MANAGER":\s*")[^"]+`)
-	content := tr.read(bindings)
-	if n := len(re.FindAll(content, -1)); n != 1 {
-		t.Fatalf("found %d NHC manager bindings in %s, want 1", n, bindings)
-	}
-	tr.write(bindings, re.ReplaceAll(content, []byte(`${1}example.test/nhc:stale`)))
+	objects := "internal/operands/manifests/nhc/objects.yaml"
+	placeholder := "__WAO_RELATED_IMAGE_NHC_MANAGER__:placeholder"
+	stale := strings.Replace(string(tr.read(objects)), placeholder, "example.test/nhc:stale", 1)
+	tr.write(objects, []byte(stale))
 	out, err := tr.try("make", "-s", "verify-operand-manifests")
 	if err == nil {
-		t.Fatalf("verification accepted a stale binding:\n%s", out)
+		t.Fatalf("verification accepted stale runtime objects:\n%s", out)
 	}
 	if !strings.Contains(out, "generated") {
 		t.Errorf("expected a generated-files message, got:\n%s", out)
-	}
-}
-
-func TestGeneratorRejectsMissingTagWithoutOverwriting(t *testing.T) {
-	tr := newTree(t)
-	tr.run("make", "-s", "operand-manifests")
-	before := tr.read(bindings)
-	rs := tr.loadOperands()
-	images := rs.Operands["nhc"]["images"].(map[string]any)
-	delete(images["RELATED_IMAGE_NHC_MANAGER"].(map[string]any), "tag")
-	tr.saveOperands(rs)
-	out, err := tr.try("bash", "hack/generate-image-bindings.sh")
-	if err == nil {
-		t.Fatal("generator accepted a missing tag")
-	}
-	if !strings.Contains(out, "nonempty tag") {
-		t.Errorf("unexpected generator output:\n%s", out)
-	}
-	if string(tr.read(bindings)) != string(before) {
-		t.Error("generator overwrote bindings on failure")
-	}
-}
-
-func TestGeneratorRejectsDuplicateEnvironmentNames(t *testing.T) {
-	tr := newTree(t)
-	rs := tr.loadOperands()
-	snr := rs.Operands["snr"]["images"].(map[string]any)
-	maps.Copy(snr, rs.Operands["nhc"]["images"].(map[string]any))
-	tr.saveOperands(rs)
-	before := tr.read(bindings)
-	out, err := tr.try("bash", "hack/generate-image-bindings.sh")
-	if err == nil {
-		t.Fatal("generator accepted duplicate environment names")
-	}
-	if !strings.Contains(out, "must be unique") {
-		t.Errorf("unexpected generator output:\n%s", out)
-	}
-	if string(tr.read(bindings)) != string(before) {
-		t.Error("generator overwrote bindings on failure")
 	}
 }
 

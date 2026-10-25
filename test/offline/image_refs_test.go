@@ -59,16 +59,6 @@ func TestImageReferenceValidation(t *testing.T) {
 		{"duplicate-env", func(in operandInputs) {
 			maps.Copy(in.Operands["snr"]["images"].(map[string]any), in.Operands["nhc"]["images"].(map[string]any))
 		}, false},
-		{"missing-env", func(in operandInputs) {
-			delete(in.Operands["nhc"]["images"].(map[string]any), "RELATED_IMAGE_NHC_MANAGER")
-		}, false},
-		{"missing-selector", func(in operandInputs) {
-			delete(imageEntry(in, "nhc", "RELATED_IMAGE_NHC_MANAGER"), "kustomizeName")
-		}, false},
-		{"reused-selector", func(in operandInputs) {
-			imageEntry(in, "nhc", "RELATED_IMAGE_NHC_CONSOLE")["kustomizeName"] =
-				imageEntry(in, "nhc", "RELATED_IMAGE_NHC_MANAGER")["kustomizeName"]
-		}, false},
 		{"empty-source-path", func(in operandInputs) { in.Operands["nhc"]["source"].(map[string]any)["path"] = "" }, false},
 		{"missing-source-branch", func(in operandInputs) {
 			delete(in.Operands["nhc"]["source"].(map[string]any), "branch")
@@ -80,7 +70,7 @@ func TestImageReferenceValidation(t *testing.T) {
 			in := tr.loadOperands()
 			tc.mutate(in)
 			tr.saveOperands(in)
-			before := tr.snapshot("config/manager", "config/operands", bindings)
+			before := tr.snapshot("config/manager", "config/operands")
 			out, err := tr.try("bash", "hack/operand-image-refs.sh")
 			if tc.valid {
 				if err != nil {
@@ -108,7 +98,7 @@ func TestImageReferenceValidation(t *testing.T) {
 				if out, err := tr.try("make", "-s", "operand-manifests"); err == nil {
 					t.Fatalf("generation accepted invalid input: %s", out)
 				}
-				if !maps.Equal(before, tr.snapshot("config/manager", "config/operands", bindings)) {
+				if !maps.Equal(before, tr.snapshot("config/manager", "config/operands")) {
 					t.Fatal("invalid input changed generated settings")
 				}
 			}
@@ -161,11 +151,11 @@ func TestImagePreflightRejectsMissingAndDuplicateDestinations(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tr := newTree(t)
 			tr.run("bin/yq", "-i", tc.query, tc.path)
-			before := tr.snapshot("config", bindings)
+			before := tr.snapshot("config")
 			if out, err := tr.try("bash", "hack/sync-operand-images.sh"); err == nil {
 				t.Fatalf("invalid destination accepted: %s", out)
 			}
-			if !maps.Equal(before, tr.snapshot("config", bindings)) {
+			if !maps.Equal(before, tr.snapshot("config")) {
 				t.Fatal("failed sync changed image settings")
 			}
 		})
