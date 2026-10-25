@@ -90,29 +90,29 @@ func TestEveryComponentDeclaresManagedKinds(t *testing.T) {
 	}
 }
 
-// Original image references are the `tagged` values in release-set.yaml: the runtime overlays
+// Original image references are repository:tag from operands.yaml: the runtime overlays
 // set them (make operand-manifests) and the renderer swaps them for the selected RELATED_IMAGE_*.
-func TestOriginalImagesMatchReleaseSet(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "release-set.yaml"))
+func TestOriginalImagesMatchOperandInputs(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "operands.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var rs struct {
-		Components map[string]struct {
-			Images map[string]struct{ Tagged string } `json:"images"`
-		} `json:"components"`
+		Operands map[string]struct {
+			Images map[string]struct{ Repository, Tag string } `json:"images"`
+		} `json:"operands"`
 	}
 	if err := yaml.Unmarshal(raw, &rs); err != nil {
 		t.Fatal(err)
 	}
 	for _, d := range components.All() {
-		comp, ok := rs.Components[d.ShortName]
+		comp, ok := rs.Operands[d.ShortName]
 		if !ok {
-			t.Fatalf("%s: no release-set entry %q", d.Key, d.ShortName)
+			t.Fatalf("%s: no operand entry %q", d.Key, d.ShortName)
 		}
 		for _, img := range d.Images {
-			if got := comp.Images[img.Env].Tagged; got != img.Original {
-				t.Errorf("%s: Original for %s = %q, release-set.yaml tagged = %q", d.Key, img.Env, img.Original, got)
+			if got := comp.Images[img.Env].Repository + ":" + comp.Images[img.Env].Tag; got != img.Original {
+				t.Errorf("%s: Original for %s = %q, operands.yaml reference = %q", d.Key, img.Env, img.Original, got)
 			}
 		}
 	}

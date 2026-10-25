@@ -1,0 +1,40 @@
+# Runtime objects WAO applies when the component is enabled: Deployment, Services, ConfigMaps and
+# webhook configurations. `make operand-manifests` builds this, drops every other kind, and writes
+# internal/operands/manifests/far/objects.yaml. The namespace placeholder and the tagged image
+# reference are replaced by the Go renderer at reconcile time.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: __WAO_NAMESPACE__
+resources:
+  - ../../config/default
+# newName and newTag are kept equal to operands.yaml image repositories/tags by `make operand-manifests`.
+images:
+  - name: quay.io/medik8s/fence-agents-remediation-operator
+    newName: quay.io/medik8s/fence-agents-remediation-operator
+    newTag: wao
+# Every operand pod and every Service selector carries the component label (design brief D10):
+# all six managers share one namespace and some operand selectors would match other managers.
+labels:
+  - fields:
+      - create: true
+        kind: Deployment
+        path: spec/template/metadata/labels
+      - create: true
+        kind: Service
+        path: spec/selector
+    pairs:
+      workloadavailability.medik8s.io/component: fenceAgentsRemediation
+patches:
+  - path: webhook_cert_patch.yaml
+    target:
+      kind: Deployment
+  - path: webhook_mutating_patch.yaml
+    target:
+      kind: MutatingWebhookConfiguration
+  - path: webhook_service_patch.yaml
+    target:
+      kind: Service
+      name: fence-agents-remediation-webhook-service
+  - path: webhook_validating_patch.yaml
+    target:
+      kind: ValidatingWebhookConfiguration

@@ -25,7 +25,7 @@ type tree struct {
 }
 
 // newTree copies the parts of the repository the operand pipeline reads into a
-// fresh git checkout so the tests can mutate release-set.yaml and regenerate.
+// fresh git checkout so the tests can mutate operands.yaml and regenerate.
 func newTree(t *testing.T) *tree {
 	t.Helper()
 	src, err := filepath.Abs(filepath.Join("..", ".."))
@@ -38,7 +38,7 @@ func newTree(t *testing.T) *tree {
 			t.Fatal(err)
 		}
 	}
-	for _, file := range []string{"Makefile", "release-set.yaml", "go.mod", "go.sum"} {
+	for _, file := range []string{"Makefile", "operands.yaml", "go.mod", "go.sum"} {
 		data, err := os.ReadFile(filepath.Join(src, file))
 		if err != nil {
 			t.Fatal(err)
@@ -67,8 +67,7 @@ func (tr *tree) try(name string, args ...string) (string, error) {
 	for _, kv := range os.Environ() {
 		key, _, _ := strings.Cut(kv, "=")
 		switch key {
-		case "MAKEFLAGS", "MFLAGS", "MAKELEVEL", "RELEASE_SET", "GIT_DIR", "GIT_WORK_TREE",
-			"OPERAND_TAG", "NHC_TAG", "SNR_TAG", "SBR_TAG", "FAR_TAG", "MDR_TAG", "NMO_TAG":
+		case "MAKEFLAGS", "MFLAGS", "MAKELEVEL", "GIT_DIR", "GIT_WORK_TREE":
 			continue
 		}
 		cmd.Env = append(cmd.Env, kv)
@@ -105,56 +104,42 @@ func (tr *tree) write(rel string, data []byte) {
 	}
 }
 
-// releaseSet is the subset of release-set.yaml the tests mutate. Other top-level
-// keys are dropped on rewrite; the generator and verifier only read components.
-type releaseSet struct {
-	Components map[string]map[string]any `json:"components"`
+// operandInputs contains the developer selections used by the offline pipeline.
+type operandInputs struct {
+	Operands map[string]map[string]any `json:"operands"`
 }
 
-func (tr *tree) loadReleaseSet() releaseSet {
+func (tr *tree) loadOperands() operandInputs {
 	tr.t.Helper()
-	var rs releaseSet
-	if err := yaml.Unmarshal(tr.read("release-set.yaml"), &rs); err != nil {
+	var inputs operandInputs
+	if err := yaml.Unmarshal(tr.read("operands.yaml"), &inputs); err != nil {
 		tr.t.Fatal(err)
 	}
-	return rs
+	return inputs
 }
 
-// saveReleaseSet writes the release set as JSON, which yq and the YAML parsers accept.
-func (tr *tree) saveReleaseSet(rs releaseSet) {
+func (tr *tree) saveOperands(inputs operandInputs) {
 	tr.t.Helper()
-	data, err := json.Marshal(rs)
+	data, err := json.Marshal(inputs)
 	if err != nil {
 		tr.t.Fatal(err)
 	}
-	tr.write("release-set.yaml", data)
+	tr.write("operands.yaml", data)
 }
 
-// changeTags gives every component a new tag, retags its images and rewrites
-// the VENDORED.yaml stamps so verification sees a consistent bump.
+// Give every image an independent tag without changing any component definition.
 func (tr *tree) changeTags() {
 	tr.t.Helper()
-	rs := tr.loadReleaseSet()
-	for i, name := range slices.Sorted(maps.Keys(rs.Components)) {
-		comp := rs.Components[name]
-		tag := fmt.Sprintf("v9.8.%d-test", i)
-		comp["tag"] = tag
-		for _, img := range comp["images"].(map[string]any) {
-			m := img.(map[string]any)
-			tagged := m["tagged"].(string)
-			repo := tagged[:strings.LastIndex(tagged, ":")]
-			m["tagged"] = repo + ":" + tag
-			m["pullRef"] = repo + "@" + fixtureDigest
+	inputs := tr.loadOperands()
+	i := 0
+	for _, key := range slices.Sorted(maps.Keys(inputs.Operands)) {
+		images := inputs.Operands[key]["images"].(map[string]any)
+		for _, env := range slices.Sorted(maps.Keys(images)) {
+			images[env].(map[string]any)["tag"] = fmt.Sprintf("v9.8.%d-test", i)
+			i++
 		}
-		stamp, err := json.Marshal(map[string]any{
-			"repo": comp["repo"], "tag": tag, "commit": comp["commit"], "overlay": comp["overlay"],
-		})
-		if err != nil {
-			tr.t.Fatal(err)
-		}
-		tr.write(filepath.Join("config/operands", name, "VENDORED.yaml"), stamp)
 	}
-	tr.saveReleaseSet(rs)
+	tr.saveOperands(inputs)
 }
 
 func TestTagChangesRegenerateBindingsWithoutEditingDefinitions(t *testing.T) {
@@ -199,19 +184,19 @@ func TestVerificationRejectsStaleBindings(t *testing.T) {
 	}
 }
 
-func TestGeneratorRejectsMissingTaggedReferenceWithoutOverwriting(t *testing.T) {
+func TestGeneratorRejectsMissingTagWithoutOverwriting(t *testing.T) {
 	tr := newTree(t)
 	tr.run("make", "-s", "operand-manifests")
 	before := tr.read(bindings)
-	rs := tr.loadReleaseSet()
-	images := rs.Components["nhc"]["images"].(map[string]any)
-	delete(images["RELATED_IMAGE_NHC_MANAGER"].(map[string]any), "tagged")
-	tr.saveReleaseSet(rs)
+	rs := tr.loadOperands()
+	images := rs.Operands["nhc"]["images"].(map[string]any)
+	delete(images["RELATED_IMAGE_NHC_MANAGER"].(map[string]any), "tag")
+	tr.saveOperands(rs)
 	out, err := tr.try("bash", "hack/generate-image-bindings.sh")
 	if err == nil {
-		t.Fatal("generator accepted a missing tagged reference")
+		t.Fatal("generator accepted a missing tag")
 	}
-	if !strings.Contains(out, "nonempty tagged reference") {
+	if !strings.Contains(out, "nonempty tag") {
 		t.Errorf("unexpected generator output:\n%s", out)
 	}
 	if string(tr.read(bindings)) != string(before) {
@@ -221,10 +206,10 @@ func TestGeneratorRejectsMissingTaggedReferenceWithoutOverwriting(t *testing.T) 
 
 func TestGeneratorRejectsDuplicateEnvironmentNames(t *testing.T) {
 	tr := newTree(t)
-	rs := tr.loadReleaseSet()
-	snr := rs.Components["snr"]["images"].(map[string]any)
-	maps.Copy(snr, rs.Components["nhc"]["images"].(map[string]any))
-	tr.saveReleaseSet(rs)
+	rs := tr.loadOperands()
+	snr := rs.Operands["snr"]["images"].(map[string]any)
+	maps.Copy(snr, rs.Operands["nhc"]["images"].(map[string]any))
+	tr.saveOperands(rs)
 	before := tr.read(bindings)
 	out, err := tr.try("bash", "hack/generate-image-bindings.sh")
 	if err == nil {
@@ -238,70 +223,12 @@ func TestGeneratorRejectsDuplicateEnvironmentNames(t *testing.T) {
 	}
 }
 
-func TestBumpRunsStepsInOrderUnderParallelMakeAndStopsOnFailure(t *testing.T) {
-	tr := newTree(t)
-	log := tr.path("steps.log")
-	steps := []string{"update-release-set", "update-operand-manifests", "verify-operand-manifests"}
-	for i, step := range steps {
-		previous := ""
-		if i > 0 {
-			previous = steps[i-1]
-		}
-		script := fmt.Sprintf(`#!/usr/bin/env bash
-echo %q >> %q
-if [ -n %q ] && [ ! -e .completed-%s ]; then echo "previous step has not completed: %s" >&2; exit 1; fi
-if [ "$FAIL_STEP" = %q ]; then exit 1; fi
-sleep 0.15
-touch .completed-%s
-`, step, log, previous, previous, previous, step, step)
-		if err := os.WriteFile(tr.path("hack/"+step+".sh"), []byte(script), 0o755); err != nil {
-			t.Fatal(err)
-		}
-	}
-	tr.run("make", "-j4", "bump-operands")
-	if got := strings.Fields(string(tr.read("steps.log"))); !slices.Equal(got, steps) {
-		t.Fatalf("steps ran as %v, want %v", got, steps)
-	}
-	if err := os.Remove(log); err != nil {
-		t.Fatal(err)
-	}
-	for _, step := range steps {
-		if err := os.Remove(tr.path(".completed-" + step)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	out, err := tr.try("make", "-j4", "bump-operands", "FAIL_STEP=update-operand-manifests")
-	if err == nil {
-		t.Fatalf("bump-operands succeeded past a failing step:\n%s", out)
-	}
-	if got := strings.Fields(string(tr.read("steps.log"))); !slices.Equal(got, steps[:2]) {
-		t.Errorf("steps ran as %v after failure, want %v", got, steps[:2])
-	}
-}
-
-// Each component records which vendored kustomize overlay WAO renders (release-set.yaml
-// `overlay`). The stamp and the runtime kustomization must agree with it, so an operand's
-// packaging entrypoint cannot drift silently when the manifests are refreshed.
-func TestVerificationRejectsOverlayDrift(t *testing.T) {
-	tr := newTree(t)
-	rs := tr.loadReleaseSet()
-	rs.Components["nhc"]["overlay"] = "config/default"
-	tr.saveReleaseSet(rs)
-	out, err := tr.try("make", "-s", "verify-operand-manifests")
-	if err == nil {
-		t.Fatalf("verification passed with a release-set overlay that differs from the stamp\n%s", out)
-	}
-	if !strings.Contains(out, "overlay") {
-		t.Fatalf("expected an overlay mismatch, got:\n%s", out)
-	}
-}
-
 // NHC enables metrics mTLS only if its ServiceAccount can read the client CA in
-// kube-system/extension-apiserver-authentication. The vendored Role grants that, but its
+// kube-system/extension-apiserver-authentication. The copied Role grants that, but its
 // RoleBinding names the unprefixed ServiceAccount, so WAO must rebind it or the CSV drops it.
 func TestVerificationRejectsNHCWithoutClientCARead(t *testing.T) {
 	tr := newTree(t)
-	role := "config/operands/nhc/vendored/config/optional/kube-system-rbac/kube_system_role.yaml"
+	role := "config/operands/nhc/config/optional/kube-system-rbac/kube_system_role.yaml"
 	data := strings.Replace(string(tr.read(role)), "extension-apiserver-authentication", "some-other-configmap", 1)
 	tr.write(role, []byte(data))
 	out, err := tr.try("make", "-s", "verify-operand-manifests")

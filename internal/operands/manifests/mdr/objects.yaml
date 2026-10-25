@@ -62,7 +62,7 @@ spec:
             - --leader-elect
           command:
             - /manager
-          image: quay.io/medik8s/machine-deletion-remediation-operator:latest
+          image: quay.io/medik8s/machine-deletion-remediation-operator:wao
           livenessProbe:
             httpGet:
               path: /healthz

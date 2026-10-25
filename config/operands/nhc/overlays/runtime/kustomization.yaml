@@ -1,0 +1,53 @@
+# Runtime objects WAO applies when the component is enabled: Deployments, Services, ConfigMaps and
+# webhook configurations. `make operand-manifests` builds this, drops every other kind, and writes
+# internal/operands/manifests/nhc/objects.yaml. The namespace placeholder and the tagged image
+# references are replaced by the Go renderer at reconcile time.
+#
+# The base is NHC's OpenShift packaging (config/manifests/ocp), the same
+# input as its `make bundle-ocp`. Its manager assumes that packaging on OpenShift: it creates a
+# ServiceMonitor that needs the service-ca injected CA bundle, the instance=metrics Service label
+# and the metrics serving certificate mounted at /etc/tls/private, and it registers a ConsolePlugin
+# backed by the node-remediation-console Deployment. Rendering the overlay inherits all of that,
+# and future OpenShift-specific changes, from the operand. The overlay's CSV, CRD, Namespace,
+# sample and scorecard objects are dropped by RUNTIME_KINDS; its RBAC goes to the WAO CSV (../rbac).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: __WAO_NAMESPACE__
+resources:
+  - ../../config/manifests/ocp
+# newName and newTag are kept equal to operands.yaml image repositories/tags by `make operand-manifests`;
+# `name` is the image name as the copied overlay leaves it (operands.yaml images.*.kustomizeName):
+# the overlay already maps its `controller` and `console-plugin` placeholders to these names.
+images:
+  - name: quay.io/medik8s/node-healthcheck-operator
+    newName: quay.io/medik8s/node-healthcheck-operator
+    newTag: wao
+  - name: quay.io/medik8s/node-remediation-console
+    newName: quay.io/medik8s/node-remediation-console
+    newTag: wao
+# Every operand pod and every Service selector carries the component label (design brief D10):
+# all six managers share one namespace and some operand selectors would match other managers.
+labels:
+  - fields:
+      - create: true
+        kind: Deployment
+        path: spec/template/metadata/labels
+      - create: true
+        kind: Service
+        path: spec/selector
+    pairs:
+      workloadavailability.medik8s.io/component: nodeHealthCheck
+# The webhook patches name the manager Deployment: the overlay has a second Deployment (the
+# console backend) that must not receive the webhook certificate volume.
+patches:
+  - path: webhook_cert_patch.yaml
+    target:
+      kind: Deployment
+      name: node-healthcheck-controller-manager
+  - path: webhook_service_patch.yaml
+    target:
+      kind: Service
+      name: node-healthcheck-webhook-service
+  - path: webhook_validating_patch.yaml
+    target:
+      kind: ValidatingWebhookConfiguration

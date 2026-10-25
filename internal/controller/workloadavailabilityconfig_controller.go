@@ -50,7 +50,7 @@ type WorkloadAvailabilityConfigReconciler struct {
 }
 
 // RBAC for WAO's own objects. Operand RBAC is not created here: it is part of the WAO CSV
-// (config/operands/<k>/rbac) and OLM creates it at install time, as OLM does for OADP's
+// (config/operands/<k>/overlays/rbac) and OLM creates it at install time, as OLM does for OADP's
 // non-admin controller.
 // +kubebuilder:rbac:groups=workloadavailability.medik8s.io,resources=workloadavailabilityconfigs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=workloadavailability.medik8s.io,resources=workloadavailabilityconfigs/status,verbs=get;update;patch

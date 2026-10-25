@@ -56,91 +56,108 @@ This operator does NOT intend to change the behavior or functionality of the und
 
 | Path | Contents |
 | --- | --- |
-| `release-set.yaml` | The upstream tags, commits and image pull references the POC installs.  This allows us to automate refreshing the images to use and the operand RBAC and CRDs |
+| `operands.yaml` | Developer-selected source checkout paths, expected branches, and image repositories/tags |
 | `api/v1alpha1/` | The `WorkloadAvailabilityConfig` API |
-| `internal/controller/` | The lifecycle controller and the default-config bootstrap |
-| `internal/operands/` | The embedded runtime manifests and the renderer |
-| `config/operands/<k>/` | Per operand: `vendored/` (copy of the operand's `config/` tree), `VENDORED.yaml` (source and commit), `rbac/` and `runtime/` kustomize overlays |
-| `hack/update-release-set.sh`, `hack/image-commit.sh` | Record floating latest or pinned release references and embedded image commits |
-| `hack/update-operand-manifests.sh`, `hack/verify-operand-manifests.sh` | Copy the upstream trees at the recorded commits; offline CI verification |
-| `bundle/` | The generated OLM bundle (one CSV, thirteen CRDs, twenty-one standalone ClusterRoles, and the SBR agent's ServiceAccount and ClusterRoleBinding) |
-| `config/catalog/`, `catalog/` | Committed CatalogSource and Subscription templates; the rendered file-based catalog |
+| `internal/controller/` | The lifecycle controller and default-config bootstrap |
+| `internal/operands/` | Embedded runtime manifests and renderer |
+| `config/operands/<key>/config/` | Complete copied upstream `config/` tree; replaced when refreshing that operand |
+| `config/operands/<key>/overlays/{rbac,runtime}/` | WAO-owned packaging and runtime adjustments; retained when refreshing |
+| `hack/update-operand-manifests.sh` | Local config copying and selected image synchronization |
+| `hack/operand-image-refs.sh`, `hack/sync-operand-images.sh` | Shared offline validation and image-setting synchronization |
+| `hack/generate-image-bindings.sh`, `hack/verify-operand-manifests.sh` | Image-binding generation and generated consistency/RBAC checks |
+| `bundle/` | Generated OLM bundle: one CSV, thirteen CRDs, operand RBAC |
+| `config/catalog/`, `catalog/` | Catalog templates and rendered file-based catalog |
 
-## Operand manifests
+## Updating operand configuration
 
-Each operand has a copy of its own `config/` tree in `config/operands/<k>/vendored/`, plus
-two kustomize overlays: `rbac/` (rendered into the WAO CSV and bundle) and `runtime/` (rendered
-into `internal/operands/manifests/<k>/objects.yaml`, the Deployments, Services, ConfigMaps and
-webhook configurations the renderer applies at enable time). 
+WAO copies each operand's `config/` tree and applies its own Kustomize overlays.
+Refreshing the copy leaves WAO's adjustments intact. This follows OADP's direct-copy
+[update targets](https://github.com/openshift/oadp-operator/blob/oadp-dev/Makefile).
 
-The operand CRDs ship in the CSV. Never hand-edit the generated files; run `make operand-manifests`. This also generates
-`internal/components/zz_generated.images.go` from `release-set.yaml`, keeping the renderer's
-image bindings synchronized with the selected tags. `make verify-operand-manifests` compares
-files before and after regeneration, so it works with uncommitted updates. It checks the
-bundle's shape but not that it is current: `make test` checks that (via
-`verify-no-changes`), or run `VERIFY_BUNDLE=1 make verify-operand-manifests`, which regenerates it
-with `make bundle-reset`.
+See the [developer guide](docs/updating-operand-manifests.md) for setup, expected
+file changes, and troubleshooting.
 
-### Approach to updating operand manifests is inspired from OADP
+```sh
+# Edit operands.yaml source paths/branches and image repositories/tags.
+make update-nhc-manifests
 
-OADP has been successfully following a similar pattern of 1 published operator that manages other operands.
-We can look at how they handle the "update-*" targets in their (Makefile)[https://github.com/openshift/oadp-operator/blob/oadp-dev/Makefile]
+# Prepare runtime objects and image bindings for the WAO binary.
+make operand-manifests
 
-Operand manifests are copied from each operand checkout, following OADP's non-admin-controller
-pattern.
-- `make update-release-set` records the selected tags, pull references and embedded
-commits into `release-set.yaml`. It defaults to latest; other tags resolve to digests.
-- `make update-operand-manifests` copies `config/` from a checkout at that commit into `config/operands/<k>/vendored/` (checkouts live in `.cache/operands`, or set `NHC_PATH` and friends), renders the runtime manifests the Go renderer embeds, generates Go image bindings, and syncs `RELATED_IMAGE_*`.
-- Use `make bump-operands` for the complete sequence: resolve published images, copy
-configuration, generate manifests and bindings, then verify consistency. 
-    - `OPERAND_TAG` defaults to `latest`, the post-submit main build; pass `OPERAND_TAG=release` for each component's latest GitHub release,
-    - `OPERAND_TAG=pinned` to keep the current tags while refreshing references and commits
-      (latest still floats), or override one component with `NHC_TAG=...`. Operand releases can lag files the `config/operands` wrappers rely on.
+# Generate normalized bundle content when ready for packaging.
+make bundle-reset
+```
 
+The three steps have separate responsibilities:
+
+- **Copy:** `update-nhc-manifests`, `update-snr-manifests`, `update-sbr-manifests`,
+  `update-far-manifests`, `update-mdr-manifests`, and `update-nmo-manifests` refresh one
+  operand and synchronize its image settings. `update-operand-manifests` does all six
+  sequentially. These targets neither render objects nor generate a bundle.
+- **Render:** `operand-manifests` synchronizes all image settings and generates
+  `internal/components/zz_generated.images.go` and
+  `internal/operands/manifests/<key>/objects.yaml`. It needs no operand checkout.
+- **Package:** `bundle` or `bundle-reset` generates the OLM bundle from copied CRDs
+  and WAO RBAC overlays. Platform-specific adjustments belong in overlays/packaging,
+  selected through `MANIFESTS_DIR`. This change retains the existing OpenShift
+  integration; `bundle-k8s` is currently an alias, not a separate Kubernetes bundle.
+
+Set checkout paths and branches for your machine in `operands.yaml` before copying:
+
+```yaml
+operands:
+  nhc:
+    source:
+      path: ../node-healthcheck-operator
+      branch: main
+    images:
+      RELATED_IMAGE_NHC_MANAGER:
+        repository: quay.io/medik8s/node-healthcheck-operator
+        tag: latest
+        kustomizeName: quay.io/medik8s/node-healthcheck-operator
+      # NHC also selects its console image independently; see operands.yaml.
+```
+
+`source.path` names a Git repository root, relative to WAO's root or absolute.
+Use an explicit path rather than `~` or `$VARIABLE`; YAML values have no shell
+expansion. The expected branch must already be checked out. Missing paths,
+detached HEAD, or a branch mismatch fail before replacing configuration; the helper
+never fetches or switches branches. Copying includes uncommitted and untracked
+files under `config/` and removes stale files from WAO's previous copy. Samples are
+copied as source content; updating does not apply them or add them to WAO samples.
+
+Each image has its own repository and tag, including the NHC console and SBR agent.
+Tags such as `latest`, `wao`, and `v0.12.0` are used literally. The helper trusts your
+source/image combination: it does not contact a registry, resolve digests, infer
+source commits, or require an image to have been published. `kustomizeName` is the
+existing upstream container-image selector; normally leave it unchanged. The SBR
+agent has no selector because its image is passed through an environment value.
+This does not add tag polling, automatic rollouts, or different pull policies.
+
+Supported Make builds (`manager`, `run`, `docker-build`, and the shared `dev-build`)
+perform the render step before compiling WAO. They never refresh source checkouts.
+Before bypassing Make with a direct `podman build` or `docker build`, run
+`make operand-manifests` yourself; the Dockerfile consumes the prepared files.
+
+Never hand-edit generated runtime objects or Go bindings. Verification compares
+files before and after regeneration, including uncommitted updates, and can refresh
+stale files in place; review any reported diff. `make verify-operand-manifests` checks
+generated consistency and bundle shape. Bundle freshness is checked separately by
+`make test` through `bundle-reset` and `verify-no-changes`.
 
 ## Development
 
-### Developer install follows `make dev-olm-deploy` from shared medik8s/tools
+Use the shared medik8s/tools targets to build and install WAO:
 
-#### Deploy the code as-is from the repository to your local cluster
 ```sh
-# Rebuild the manager and bundle, push images, and reinstall on
-# your development OpenShift cluster.
-KUBECONFIG=/path/to/disposable.kubeconfig \
-  make dev-olm-deploy DEV_CLUSTER_TYPE=external. # DEV_CLUSTER_TYPE=external is optional, helps to avoid confusion if you also had a kind cluster available
+KUBECONFIG=/path/to/disposable.kubeconfig make dev-olm-deploy DEV_CLUSTER_TYPE=external
+KUBECONFIG=/path/to/disposable.kubeconfig make dev-olm-undeploy DEV_CLUSTER_TYPE=external
 ```
 
-#### Rebuild the manager and wao's manifests and then deploy to your local cluster 
-```sh
-make generate manifests fmt # Only needed if you changed local code or manifests
-KUBECONFIG=/path/to/disposable.kubeconfig \
-  make dev-olm-deploy DEV_CLUSTER_TYPE=external. # DEV_CLUSTER_TYPE=external is optional, helps to avoid confusion if you also had a kind cluster available
-```
-  * If you changed operand manifest inputs, also run `make operand-manifests` before deploying, so the new manifests are embedded in the manager binary.
-
-#### Update the operands and do a full rebuild and deploy to your local cluster
-If you want to refresh the `release-set.yaml`, run:
-```sh
-
-# Refresh all operands from their published "latest" images.
-# Record image pull references and source commits, vendor configuration,
-# regenerate operand manifests/bindings, and verify consistency.
-make bump-operands
-
-# If you edited WAO source, regenerate code/manifests and format it.
-make generate manifests fmt
-
-# Rebuild the manager and bundle, push images, and reinstall on
-# your development OpenShift cluster.
-KUBECONFIG=/path/to/disposable.kubeconfig \
-  make dev-olm-deploy DEV_CLUSTER_TYPE=external. # DEV_CLUSTER_TYPE=external is optional, helps to avoid confusion if you also had a kind cluster available
-
-```
-
-### Uninstall the dev installation`make dev-olm-undeploy`
-```sh
-make dev-olm-undeploy
-```
+The build includes your uncommitted WAO changes. External-cluster images use ttl.sh
+with a short TTL (default two hours); redeploy if they expire. Development packaging
+rewrites the bundle and manager image setting; run `make bundle-reset` before tests
+or a commit. Every component stays Disabled after installation.
 
 ### Running tests
 The current tests are simple Go unit and envtest suites, we do not have any e2e tests implemented.
@@ -157,8 +174,8 @@ GitHub Actions runs the Go suites, lint, `make verify-operand-manifests` and the
 
 **Enabled** applies the component's operand objects with server-side apply: the
 manager Deployment, Services, ConfigMaps and webhook configurations, rendered from the
-vendored `config/default` copy (the `objects.yaml` embedded in the binary) with the selected
-image pull references substituted. The operand ServiceAccounts, Roles and bindings are not part of
+copied upstream configuration (the `objects.yaml` embedded in the binary) with the selected
+image references substituted. The operand ServiceAccounts, Roles and bindings are not part of
 this: OLM creates them from the WAO CSV at install, and they exist whether or not the
 component is Enabled. The phase becomes
 `Available` once the managers are ready and, for NHC, SNR, FAR and NMO, the

@@ -49,10 +49,10 @@ var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 	var ctx context.Context
 	ctx, cancel = context.WithCancel(context.Background())
-	// The WAO CRD plus the operand CRDs, which live in the vendored copies (config/operands/crd).
+	// The WAO CRD plus the operand CRDs, which live in the copied trees (config/operands/crd).
 	crdPaths := []string{filepath.Join("..", "..", "config", "crd", "bases")}
 	for _, k := range []string{"nhc", "snr", "sbr", "far", "mdr", "nmo"} {
-		crdPaths = append(crdPaths, filepath.Join("..", "..", "config", "operands", k, "vendored", "config", "crd", "bases"))
+		crdPaths = append(crdPaths, filepath.Join("..", "..", "config", "operands", k, "config", "crd", "bases"))
 	}
 	testEnv = &envtest.Environment{CRDDirectoryPaths: crdPaths, ErrorIfCRDPathMissing: true}
 	// Allow running from an IDE without KUBEBUILDER_ASSETS (run 'make setup-envtest' first).
