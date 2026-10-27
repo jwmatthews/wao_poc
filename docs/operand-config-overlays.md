@@ -1,122 +1,154 @@
-# Operand configuration: copy, then split into two slices
+# Operand configuration and Kustomize overlays
 
-WAO installs six medik8s operators as operands without forking them. This page explains
-how an operand's upstream `config/` tree becomes part of WAO: why it is copied verbatim,
-why it cannot be shipped as-is, and how two Kustomize overlays split it into an
-install-time slice for WAO's bundle and an enable-time slice that WAO applies only when a
-component is enabled.
+The Workload Availability Operator (WAO) installs six medik8s operators as operands.
+An operand is a component operator that WAO installs without modification.
 
-## Why copy the upstream config at all
+WAO copies each operand's upstream `config/` directory without changes.
+Kustomize overlays select and adjust the copied resources.
+An overlay is a Kustomize configuration that applies changes to a base configuration.
 
-Each operand's Deployment, Services, webhooks, RBAC and CRDs are defined by that operand's
-own `config/` tree, and they change as the operand evolves. WAO does not want to re-author
-them in Go or maintain a hand-edited copy: either would drift from upstream and violate the
-hard constraint that component operators are consumed unmodified.
+WAO uses two overlays for each operand:
 
-So `make update-<key>-manifests` copies the operand's entire `config/` directory from a
-local checkout into `config/operands/<key>/config/`. The copy is verbatim and is replaced
-wholesale on every refresh. Nothing under it is ever edited by WAO. See
-[updating-operand-manifests.md](updating-operand-manifests.md) for the workflow.
+- The `rbac` overlay selects permissions that WAO needs at installation.
+- The `runtime` overlay adjusts resources that WAO creates when a component becomes `Enabled`.
 
-## Why the copy cannot be shipped as-is
+## Why WAO copies the upstream configuration
 
-A copied `config/` is what the operand's own `make bundle` would package for a standalone
-install. It contains:
+Each operand defines its Deployments, Services, webhooks, permissions, and custom resource definitions (CRDs) in its own `config/` directory.
+These definitions change when the operand changes.
 
-| In the copied tree | What WAO must do with it |
+Separate definitions in WAO's Go code or manually maintained copies could differ from the upstream configuration.
+WAO must consume component operators without modification.
+
+The `make update-<key>-manifests` command copies the complete operand `config/` directory from a local checkout.
+It replaces `config/operands/<key>/config/` on each update.
+WAO does not edit files in that directory.
+
+See [Updating operand manifests](updating-operand-manifests.md) for the update procedure.
+
+## Why WAO separates the copied resources
+
+The copied `config/` directory contains resources that the operand's own `make bundle` command would package for a separate installation.
+WAO must handle these resources as follows:
+
+| Copied resource | WAO action |
 | --- | --- |
-| CRDs | Ship in WAO's bundle so OLM installs them with WAO |
-| ServiceAccounts, Roles, bindings | Fold into WAO's CSV so OLM creates them at install |
-| Manager Deployment, Services, ConfigMaps, webhook configurations | Do **not** create at install. Every component defaults to `Disabled`; WAO creates these only when the component is enabled |
-| The operand's own CSV, Namespace, sample CR, scorecard config | Drop. Not WAO's to ship |
+| CRDs | Include them in WAO's bundle. Operator Lifecycle Manager (OLM) installs them with WAO. |
+| ServiceAccounts, Roles, and role bindings | Include them in WAO's ClusterServiceVersion (CSV). OLM creates them at installation. |
+| Manager Deployments, Services, ConfigMaps, and webhook configurations | Create them only when the component becomes `Enabled`. Every component defaults to `Disabled`. |
+| The operand's CSV, Namespace, sample custom resource, and scorecard configuration | Exclude them from WAO's package. |
 
-Two more things are missing from the upstream tree. A standalone OLM install would wire
-OpenShift service-ca into the webhook Service, the Deployment's certificate mount and the
-webhook configuration; WAO has to do that itself. And six managers in one namespace need a
-component label on every pod and Service selector, or some upstream selectors match other
-managers.
+A CSV describes an operator and the permissions that OLM must create for it.
+Role-based access control (RBAC) defines the permissions that ServiceAccounts receive through roles and role bindings.
 
-The copied tree therefore has to be split by *when* and *by whom* each object is created,
-and adjusted for WAO's single-namespace, enable-on-demand model, all without touching the
-copied files.
+A separate OLM installation connects the OpenShift service-ca controller to the webhook resources.
+The service-ca controller provides service certificates and a certificate authority (CA) bundle.
+WAO must configure these connections itself.
+
+The six managers share one namespace.
+WAO must add a component label to each pod template and Service selector.
+Otherwise, some upstream selectors can select pods from other managers.
+
+WAO separates the resources by their creation stage and the tool that creates them.
+The overlays apply the required changes without editing the copied files.
 
 ## The two overlays
 
-Each operand has WAO-owned Kustomize overlays next to its copy:
+Each operand has WAO overlays beside its copied configuration:
 
 ```text
 config/operands/<key>/
-  config/                 # verbatim upstream copy; replaced on refresh, never edited
+  config/                 # Upstream copy. Each update replaces this directory.
   overlays/
-    rbac/                 # install-time slice: what goes into WAO's CSV
-    runtime/              # enable-time slice: what WAO applies when the component is Enabled
+    rbac/                 # Permissions for WAO's CSV at installation.
+    runtime/              # Resources for a component that is Enabled.
 ```
 
-Both overlays use the same copied packaging as their base (NHC uses its OpenShift overlay,
-`config/manifests/ocp`; the others use `config/default`). They differ only in which kinds
-they keep and which adjustments they apply. Overlays survive a refresh; the copy does not.
+Both overlays use the same copied base configuration.
+NHC uses its OpenShift overlay, `config/manifests/ocp`.
+The other operands use `config/default`.
 
-CRDs are the third slice but need no overlay: `config/operands/crd/kustomization.yaml`
-lists the six copied `config/crd` directories, and WAO's `config/crd` includes it.
+The overlays select different resource kinds and apply different changes.
+An update replaces the copied configuration but preserves the overlays.
 
-### Install-time slice: `overlays/rbac`
+CRDs use a separate path without an overlay.
+The file `config/operands/crd/kustomization.yaml` lists the six copied `config/crd` directories.
+WAO's `config/crd` includes that file.
 
-Keeps only ServiceAccount, Role, RoleBinding, ClusterRole and ClusterRoleBinding; every
-other kind is deleted with a `$patch: delete` entry. Where upstream RBAC does not fit
-WAO's packaging, a patch fixes the binding rather than the copied file. NHC's overlay, for
-example, rebinds a kube-system Role to the operand's prefixed ServiceAccount so
-operator-sdk folds it into the CSV instead of emitting a namespaced object OLM cannot
-create in kube-system.
+### Permissions at installation: `overlays/rbac`
 
-**How it is invoked.** `make bundle` runs `kustomize build config/manifests`, whose
-kustomization lists all six `overlays/rbac` directories as resources, and pipes the result
-into `operator-sdk generate bundle`. The operand ServiceAccounts are passed as
-`--extra-service-accounts` (Makefile `OPERAND_SERVICE_ACCOUNTS`), so operator-sdk folds
-the roles bound to them into the CSV's permissions. OLM creates all of it when WAO is
-installed, whether or not any component is ever enabled.
+The `rbac` overlay keeps only these resource kinds:
 
-`make verify-operand-manifests` checks that each rbac overlay emits only RBAC kinds and
-that every operand ServiceAccount is listed in the Makefile.
+- ServiceAccount
+- Role
+- RoleBinding
+- ClusterRole
+- ClusterRoleBinding
 
-### Enable-time slice: `overlays/runtime`
+The overlay deletes each other kind with a `$patch: delete` entry.
+If an upstream binding does not meet WAO's packaging requirements, an overlay patch changes the binding.
 
-Applies WAO's integration adjustments on top of the copied base:
+For example, NHC's overlay binds a Role in `kube-system` to the operand's ServiceAccount, whose name includes a prefix.
+This lets operator-sdk include the Role in the CSV.
+Otherwise, operator-sdk emits a namespaced object that OLM cannot create in `kube-system`.
 
-- `namespace: __WAO_NAMESPACE__`, a placeholder the operator replaces at reconcile time.
-- `images:` entries that rewrite each upstream image to `__WAO_<ENV>__:placeholder`, also
-  replaced at reconcile time with the `RELATED_IMAGE_<...>` value from the operator's
-  environment. SNR's self-image and SBR's agent image are env values on the manager, so
-  those operands carry a small patch setting the same token there.
-- A `workloadavailability.medik8s.io/component` label on every Deployment pod template
-  and Service selector.
-- Patches wiring OpenShift service-ca into the webhook Service, the manager's certificate
-  volume, and the webhook configuration's CA injection.
+The `make bundle` command processes the permissions as follows:
 
-**How it is invoked.** `make operand-manifests` runs
-`kustomize build config/operands/<key>/overlays/runtime`, filters the output to the kinds
-in Makefile `RUNTIME_KINDS` (Deployment, Service, ConfigMap, Validating- and
-MutatingWebhookConfiguration), and writes `internal/operands/manifests/<key>/objects.yaml`.
-It fails if any `image:` field in that output is not a WAO placeholder, so an upstream
-container WAO does not map can never deploy the upstream default. The file is embedded in
-the WAO binary with `go:embed`.
+1. It runs `kustomize build config/manifests`. That configuration includes all six `overlays/rbac` directories as resources.
+2. It sends the result to `operator-sdk generate bundle`.
+3. It passes the operand ServiceAccounts through `--extra-service-accounts`. The Makefile variable `OPERAND_SERVICE_ACCOUNTS` lists these accounts.
 
-At reconcile, when a component is `Enabled`, `internal/operands/render.go` loads the
-embedded objects, substitutes the namespace and image placeholders, adds the managed-by
-and component labels, orders Services before Deployments and webhooks last, and the
-controller applies them with server-side apply. When the component is `Disabled` again,
-the same set is removed. Nothing in this slice exists on the cluster until a component is
-enabled.
+The operator-sdk tool includes the roles bound to those ServiceAccounts in the CSV's permissions.
+OLM creates these resources when it installs WAO, even if no component becomes `Enabled`.
 
-## Where a change belongs
+The `make verify-operand-manifests` command checks that each `rbac` overlay produces only RBAC resource kinds.
+It also checks that the Makefile lists every operand ServiceAccount.
 
-| You want to | Edit |
+### Resources for enabled components: `overlays/runtime`
+
+The `runtime` overlay applies these changes to the copied base configuration:
+
+- It sets `namespace: __WAO_NAMESPACE__`. The operator replaces this placeholder when it reconciles the component.
+- It uses `images:` entries to replace each upstream image with `__WAO_<ENV>__:placeholder`. The operator replaces each token with the corresponding `RELATED_IMAGE_<...>` value from its environment.
+- It patches the manager environment variables for SNR's self-image and SBR's agent image. These patches use the same image tokens.
+- It adds the `workloadavailability.medik8s.io/component` label to each Deployment pod template and Service selector.
+- It connects OpenShift service-ca to the webhook Service and the manager's certificate volume. It also configures CA injection for the webhook configuration.
+
+Reconciliation is the process in which the operator compares the requested configuration with the cluster resources and applies the required changes.
+
+The `make operand-manifests` command generates the runtime manifests as follows:
+
+1. It runs `kustomize build config/operands/<key>/overlays/runtime`.
+2. It keeps only the resource kinds in the Makefile variable `RUNTIME_KINDS`.
+3. It writes the result to `internal/operands/manifests/<key>/objects.yaml`.
+
+The permitted kinds are Deployment, Service, ConfigMap, ValidatingWebhookConfiguration, and MutatingWebhookConfiguration.
+
+The command fails if any `image:` field contains a value other than a WAO placeholder.
+This check prevents WAO from deploying an upstream default image that has no WAO mapping.
+The WAO binary includes the generated file through `go:embed`.
+
+When a component is `Enabled`, `internal/operands/render.go` prepares the embedded objects:
+
+1. It loads the objects.
+2. It replaces the namespace and image placeholders.
+3. It adds the managed-by and component labels.
+4. It orders Services before Deployments and places webhooks last.
+
+The controller applies the objects with server-side apply.
+When the component returns to `Disabled`, the controller removes the same set of objects.
+WAO creates none of these runtime resources until the component becomes `Enabled`.
+
+## Where to make a change
+
+| Required change | Action |
 | --- | --- |
-| Pick up upstream changes to an operand | Nothing by hand: `make update-<key>-manifests` replaces `config/operands/<key>/config/` |
-| Change which image an operand runs | `operands.yaml`, then `make operand-manifests` |
-| Fix how an operand is packaged into the CSV | `config/operands/<key>/overlays/rbac/` |
-| Fix how an operand runs inside WAO's namespace | `config/operands/<key>/overlays/runtime/` |
-| Edit a copied file | Never. The next refresh overwrites it. Patch it from an overlay instead |
+| Copy updated upstream configuration | Run `make update-<key>-manifests`. The command replaces `config/operands/<key>/config/`. |
+| Select a different operand image | Edit `operands.yaml`. Run `make operand-manifests`. |
+| Change the operand permissions in WAO's CSV | Edit `config/operands/<key>/overlays/rbac/`. |
+| Change how an operand runs in WAO's namespace | Edit `config/operands/<key>/overlays/runtime/`. |
+| Change a copied file | Apply the change through an overlay. Do not edit the copy. The next update replaces it. |
 
-If an upstream rename breaks a patch target, `kustomize build` fails during
-`make operand-manifests` or `make bundle`. That failure is the intended signal to update
-the overlay.
+If an upstream resource name changes, its overlay patch can fail.
+In that case, `kustomize build` fails during `make operand-manifests` or `make bundle`.
+Use this failure to identify the overlay that needs a change.
