@@ -16,6 +16,24 @@ as operands in one namespace.
 - WAO never adopts an existing object it did not create. It reports the conflict instead.
 - No public API field may override a component image.
 
+## Operand configuration edits
+
+Read [the overlay guide](docs/operand-config-overlays.md) before changing operand packaging.
+Use [the update guide](docs/updating-operand-manifests.md) for refresh and generation commands.
+
+- Treat `config/operands/<key>/config/` as a copy of upstream configuration.
+  Never edit these copied files directly. Refresh an affected copy with
+  `make update-<key>-manifests`. Each refresh replaces the copied directory.
+- Make WAO packaging adjustments in `config/operands/<key>/overlays/rbac/`.
+- Make WAO runtime adjustments in `config/operands/<key>/overlays/runtime/`.
+  Both overlay directories survive a refresh.
+- Select operand images in `operands.yaml`. Run `make operand-manifests` to
+  synchronize `RELATED_IMAGE_*` values in `config/manager/manager.yaml`.
+- Regenerate `internal/operands/manifests/<key>/objects.yaml` with
+  `make operand-manifests`. Never edit these generated runtime objects directly.
+- Regenerate `bundle/` with `make bundle-reset` after changing its source configuration.
+  Never edit generated bundle files directly.
+
 ## Cluster work
 
 Live-cluster tests need a **disposable** OpenShift cluster with
