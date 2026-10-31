@@ -14,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -27,8 +28,11 @@ import (
 
 var (
 	k8sClient client.Client
-	testEnv   *envtest.Environment
-	cancel    context.CancelFunc
+	// operandClient acts as a service account in the install namespace, as an operand manager
+	// does, so it is exempt from the admission gate of Disabled components.
+	operandClient client.Client
+	testEnv       *envtest.Environment
+	cancel        context.CancelFunc
 )
 
 func testImages() images.Set {
@@ -63,6 +67,10 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(v1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+	Expect(err).NotTo(HaveOccurred())
+	operandCfg := rest.CopyConfig(cfg)
+	operandCfg.Impersonate = rest.ImpersonationConfig{UserName: "system:serviceaccount:" + ns + ":operand-manager", Groups: []string{"system:masters"}}
+	operandClient, err = client.New(operandCfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})).To(Succeed())
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{Scheme: scheme.Scheme, Metrics: metricsserver.Options{BindAddress: "0"}})
