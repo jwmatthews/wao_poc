@@ -1,8 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# The console details page flattens nested descriptors into their first object.
-# Identify each component in every editable label and keep its controls together.
+# Post-process the generated base CSV so the OpenShift console labels each
+# component's controls. Runs in `make bundle` after
+# `operator-sdk generate kustomize manifests`. It edits only specDescriptors
+# (console labels and widgets). It never changes the CRD schema or validation.
+#
+# Why markers cannot do this:
+# - All six components share the ComponentSpec and CPUMemory Go types, so a
+#   marker produces the same label for each one: six switches named "Enabled",
+#   six groups named "Manager Resources".
+# - operator-sdk does not generate descriptors below manager.resources, so the
+#   CPU and memory fields get no text control or help text without this script.
+#
+# What it does for each component found under components.<key>:
+# - Prefixes the Enabled, Manager and Manager Resources labels with the
+#   component name, for example "Node Health Check Enabled".
+# - Adds CPU/Memory Request/Limit text descriptors with examples and a note
+#   that an empty field keeps the packaged default.
+# - Sorts descriptors by path so each component's controls stay together.
+#
+# The console details page flattens nested descriptors, so a label without the
+# component name does not say which component it controls.
+#
+# TestResourceConfigurationSchemaAndConsole (test/offline) pins the output.
+# Update that test if you change labels or controls here.
 csv="${1:?pass the generated base CSV path}"
 : "${YQ:?YQ must name the pinned yq binary}"
 
