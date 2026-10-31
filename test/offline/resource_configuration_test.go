@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -135,27 +134,9 @@ func TestResourceConfigurationSchemaAndConsole(t *testing.T) {
 	}
 }
 
-// Generated quantity patterns must reject exponents that ParseQuantity cannot read.
-func TestResourceConfigurationQuantityPatterns(t *testing.T) {
-	cases := []struct {
-		quantity string
-		valid    bool
-	}{
-		{"1e1.5", false},
-		{"1e.5", false},
-		{"1e9223372036854775808", false},
-		{"1e-9223372036854775809", false},
-		{"100m", true},
-		{"128Mi", true},
-		{"0", true},
-		{"-1", true},
-		{"1e-3", true},
-		{"1E", true},
-		{"1E+2", true},
-		{"1e9223372036854775807", true},
-		{"1e-9223372036854775808", true},
-		{"1e000000000000000000003", true},
-	}
+// Admission validates each quantity with CEL. The guard must precede isQuantity so the
+// API server never parses an exponent that makes ParseQuantity stall.
+func TestResourceConfigurationQuantityValidation(t *testing.T) {
 	for _, artifact := range []struct{ name, crd string }{
 		{"base", "config/crd/bases/" + waoCRDFile},
 		{"bundle", "bundle/manifests/" + waoCRDFile},
@@ -164,25 +145,27 @@ func TestResourceConfigurationQuantityPatterns(t *testing.T) {
 			schema := readResourceCRDSchema(t, artifact.crd)
 			for _, key := range v1alpha1.AllComponentKeys {
 				for _, field := range []string{"requests", "limits"} {
-					t.Run(key+"/"+field, func(t *testing.T) {
-						path := "spec.components." + key + ".manager.resources." + field
-						for _, name := range []string{"cpu", "memory"} {
-							quantitySchema := resourceSchemaAt(t, schema, path+"."+name)
-							pattern, found, err := unstructured.NestedString(quantitySchema, "pattern")
-							if err != nil || !found {
-								t.Fatalf("%s quantity pattern is missing: %v", path, err)
-							}
-							quantityPattern, err := regexp.Compile(pattern)
-							if err != nil {
-								t.Fatalf("%s quantity pattern does not compile: %v", path, err)
-							}
-							for _, tc := range cases {
-								if got := quantityPattern.MatchString(tc.quantity); got != tc.valid {
-									t.Errorf("%s pattern accepts %q = %t, want %t", path, tc.quantity, got, tc.valid)
-								}
-							}
+					for _, name := range []string{"cpu", "memory"} {
+						path := "spec.components." + key + ".manager.resources." + field + "." + name
+						quantity := resourceSchemaAt(t, schema, path)
+						if _, found := quantity["pattern"]; found {
+							t.Errorf("%s keeps a regex pattern; CEL validates quantities", path)
 						}
-					})
+						// sigs.k8s.io/yaml decodes JSON numbers as float64.
+						if maxLength, _ := quantity["maxLength"].(float64); maxLength != 32 {
+							t.Errorf("%s maxLength = %v, want 32", path, quantity["maxLength"])
+						}
+						rules, _, err := unstructured.NestedSlice(quantity, "x-kubernetes-validations")
+						if err != nil || len(rules) != 1 {
+							t.Fatalf("%s must have one validation rule: %v (%v)", path, rules, err)
+						}
+						rule, _ := rules[0].(map[string]any)["rule"].(string)
+						guard := strings.Index(rule, `!string(self).matches('[eE][-+]?[0-9]{4,}')`)
+						parse := strings.Index(rule, "isQuantity(string(self))")
+						if guard != 0 || parse < 0 || !strings.Contains(rule[guard:parse], "&&") {
+							t.Errorf("%s rule must reject long exponents before isQuantity: %q", path, rule)
+						}
+					}
 				}
 			}
 		})

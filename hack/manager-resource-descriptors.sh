@@ -24,8 +24,7 @@ while IFS=$'\t' read -r WAO_COMPONENT_PATH WAO_COMPONENT_NAME; do
     (.spec.customresourcedefinitions.owned[] |
       select(.name == "workloadavailabilityconfigs.workloadavailability.medik8s.io") |
       .specDescriptors) |= (
-        map(select(.path != strenv(WAO_COMPONENT_PATH) + ".manager.resources.claims" and
-          (.path | test("^" + strenv(WAO_COMPONENT_PATH) + "\\.manager\\.resources\\.(requests|limits)\\.(cpu|memory)$") | not))) +
+        map(select(.path | test("^" + strenv(WAO_COMPONENT_PATH) + "\\.manager\\.resources\\.(requests|limits)\\.(cpu|memory)$") | not)) +
         [
           {"path": strenv(WAO_COMPONENT_PATH) + ".manager.resources.requests.cpu",
            "displayName": strenv(WAO_COMPONENT_NAME) + " CPU Request",
@@ -42,10 +41,7 @@ while IFS=$'\t' read -r WAO_COMPONENT_PATH WAO_COMPONENT_NAME; do
           {"path": strenv(WAO_COMPONENT_PATH) + ".manager.resources.limits.memory",
            "displayName": strenv(WAO_COMPONENT_NAME) + " Memory Limit",
            "description": "Set the manager memory limit, for example 256Mi or 1Gi. Leave empty to use the packaged default.",
-           "x-descriptors": ["urn:alm:descriptor:com.tectonic.ui:text"]},
-          {"path": strenv(WAO_COMPONENT_PATH) + ".manager.resources.claims",
-           "displayName": "Resource Claims",
-           "x-descriptors": ["urn:alm:descriptor:com.tectonic.ui:hidden"]}
+           "x-descriptors": ["urn:alm:descriptor:com.tectonic.ui:text"]}
         ]
       )
   ' "$csv"

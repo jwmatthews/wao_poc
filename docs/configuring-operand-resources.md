@@ -7,8 +7,9 @@ An omitted component or enable field remains disabled.
 Use `true` and `false` without quotes.
 
 Set `spec.components.<key>.manager.resources` to configure the selected manager container.
-The field uses Kubernetes `ResourceRequirements`, with `requests` and `limits` maps.
+The field has `requests` and `limits` objects, each with optional `cpu` and `memory` fields.
 WAO supports CPU and memory only.
+Each value is a Kubernetes quantity written as a string, such as `"500m"`, or an integer, such as `1`.
 Resource settings alone do not enable a component.
 
 This example enables Node Health Check (NHC) and configures its manager:
@@ -148,7 +149,9 @@ Also reduce the request if you require that limit.
 
 ## Validation and status
 
-The Kubernetes API checks the quantity structure.
+The Kubernetes API checks each value with a CEL `isQuantity` rule.
+The rule rejects exponents longer than three digits, such as `1e1000`, before it parses the value.
+This requires Kubernetes 1.29 or later.
 Use CPU quantities such as `100m` or `1`.
 Use memory quantities such as `128Mi` or `1Gi`.
 String values for `enabled`, including `"true"`, are invalid.
@@ -160,8 +163,6 @@ WAO checks resource values when it reconciles an enabled component.
 WAO rejects these settings:
 
 - Negative quantities.
-- Resource names other than `cpu` and `memory`.
-- Nonempty resource `claims`.
 - An effective request greater than its effective limit.
 
 The effective values combine your overrides with the packaged defaults.

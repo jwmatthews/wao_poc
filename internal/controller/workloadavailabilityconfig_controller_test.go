@@ -56,10 +56,28 @@ func setResources(ctx context.Context, key string, resources *corev1.ResourceReq
 		if resources == nil {
 			componentSpec(w, key).Manager = nil
 		} else {
-			componentSpec(w, key).Manager = &v1alpha1.ManagerSpec{Resources: resources.DeepCopy()}
+			componentSpec(w, key).Manager = &v1alpha1.ManagerSpec{Resources: toManagerResources(resources)}
 		}
 		return k8sClient.Update(ctx, w)
 	}).Should(Succeed())
+}
+
+// toManagerResources writes only CPU and memory, the fields the API exposes.
+func toManagerResources(in *corev1.ResourceRequirements) *v1alpha1.ManagerResources {
+	convert := func(list corev1.ResourceList) *v1alpha1.CPUMemory {
+		if list == nil {
+			return nil
+		}
+		out := &v1alpha1.CPUMemory{}
+		if q, ok := list[corev1.ResourceCPU]; ok {
+			out.CPU = ptr.To(v1alpha1.Quantity(q.String()))
+		}
+		if q, ok := list[corev1.ResourceMemory]; ok {
+			out.Memory = ptr.To(v1alpha1.Quantity(q.String()))
+		}
+		return out
+	}
+	return &v1alpha1.ManagerResources{Requests: convert(in.Requests), Limits: convert(in.Limits)}
 }
 
 func getDeployment(ctx context.Context, name string) *appsv1.Deployment {
@@ -163,7 +181,7 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 
 	It("rejects malformed quantity exponents while the component is disabled", func() {
 		for _, field := range []string{"requests", "limits"} {
-			for _, value := range []string{"1e1.5", "1e.5", "1e9223372036854775808", "1e-9223372036854775809"} {
+			for _, value := range []string{"1e1.5", "1e.5", "1e9223372036854775808", "1e-9223372036854775809", "1e9223372036854775807", "1e2147483648", "1e100000000", "1e1000", "bogus"} {
 				for _, name := range []string{"cpu", "memory"} {
 					patch := []byte(fmt.Sprintf(`{"spec":{"components":{"nodeHealthCheck":{"enabled":false,"manager":{"resources":{%q:{%q:%q}}}}}}}`, field, name, value))
 					target := &unstructured.Unstructured{Object: map[string]interface{}{
@@ -180,7 +198,7 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 	It("accepts integer and string resource quantities through the console schema", func() {
 		for _, field := range []string{"requests", "limits"} {
 			for _, name := range []string{"cpu", "memory"} {
-				for _, value := range []string{`1`, `0`, `"100m"`, `"128Mi"`} {
+				for _, value := range []string{`1`, `0`, `"100m"`, `"128Mi"`, `"1e3"`, `"1e-999"`} {
 					for _, patchType := range []types.PatchType{types.MergePatchType, types.ApplyPatchType} {
 						patch := []byte(fmt.Sprintf(`{"apiVersion":"workloadavailability.medik8s.io/v1alpha1","kind":"WorkloadAvailabilityConfig","metadata":{"name":"cluster"},"spec":{"components":{"nodeHealthCheck":{"enabled":false,"manager":{"resources":{%q:{%q:%s}}}}}}}`, field, name, value))
 						target := &unstructured.Unstructured{Object: map[string]interface{}{

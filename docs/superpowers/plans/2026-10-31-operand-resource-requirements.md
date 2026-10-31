@@ -27,7 +27,7 @@
 - Replace `spec.components.<key>.state` with `spec.components.<key>.enabled` for all six components.
 - Use boolean values, not strings. Omitted `enabled` fields mean false.
 - Generate CSV boolean switches and resource controls for the console creation form.
-- Keep the declared minimum Kubernetes version at `1.25.0` for this change.
+- Declare minimum Kubernetes version `1.29.0`, the first version whose CRD rules can use CEL quantity functions.
 - Keep implementation plans in `docs/superpowers/plans/`.
 - Use `gh` for GitHub access. Obtain specific approval before any GitHub write.
 - Run `make check` before each implementation commit.
@@ -128,24 +128,27 @@ The current manager defaults are reference data for tests and review:
 
 ### Validation and failure behavior
 
-Use the generated CRD quantity schema for structural checks. Add envtest cases that submit malformed quantities through an unstructured client. A typed client cannot submit malformed `resource.Quantity` values.
+**Revision:** A review replaced the original design, which used `corev1.ResourceRequirements` plus a yq script (`hack/manager-resource-schema.sh`) that rewrote the generated CRD. The script's int64 exponent regex admitted values such as `1e2147483648`, which make `ParseQuantity` stall. The task code samples below show the original design.
 
-The implementation adds `hack/manager-resource-schema.sh` to `make manifests` after controller-gen.
-The generated standard quantity pattern accepts fractional exponents and exponents outside the signed int64 range.
-The helper restricts these exponents in all six components, for both requests and limits.
-It preserves the standard `ResourceRequirements` type and the Kubernetes 1.25 minimum.
-It declares CPU and memory properties so the console can render separate text fields.
-Each property uses `type: string` without `anyOf`, which this console cannot render.
-The `x-kubernetes-int-or-string` extension preserves integer and string admission.
-The `int-or-string` format also preserves both types during server-side apply.
+The API uses WAO types: `ManagerResources{Requests, Limits *CPUMemory}` and `CPUMemory{CPU, Memory *Quantity}`.
+`Quantity` is a string type with markers on the type, so controller-gen emits `type: string`, `format: int-or-string`, `x-kubernetes-int-or-string` and no `anyOf`.
+The console renders that schema as a text field. Integer and string values both pass admission, including through server-side apply.
+`Quantity.UnmarshalJSON` accepts a JSON integer or string, so a typed client always decodes the stored object.
+Each quantity has `maxLength: 32` and one CEL rule:
+`!string(self).matches('[eE][-+]?[0-9]{4,}') && isQuantity(string(self))`.
+The guard comes first in the same rule. A failed `pattern` does not stop CEL evaluation, so a separate pattern cannot protect `isQuantity` from a stalling exponent.
+`Quantity.Parse` repeats the guard before `ParseQuantity` for objects stored before the rule existed.
+The fixed `cpu` and `memory` properties remove arbitrary resource names and `claims` from the schema.
 Admission tests check merge patches, apply patches, and strict rejection of unsupported resource names.
 Offline tests check both generated CRDs.
 Admission tests use an unstructured target and server dry-run.
 This prevents response decoding errors from concealing server acceptance of malformed quantities.
 
-Perform semantic checks in Go after the merge. Check negative quantities, unsupported resource names, unsupported claims, and requests that exceed effective limits. Compare quantities with `resource.Quantity.Cmp`. Do not compare strings or convert quantities to floating point.
+Perform semantic checks in Go after the merge. Check negative quantities and requests that exceed effective limits. Compare quantities with `resource.Quantity.Cmp`. Do not compare strings or convert quantities to floating point.
+Admission cannot check requests against limits, because the effective values include packaged defaults.
 
-This choice uses the status option allowed by issue #38. A new admission webhook would add installation and certificate requirements. Quantity-aware CEL functions require Kubernetes 1.28, which exceeds the CSV's declared minimum of 1.25.
+This choice uses the status option allowed by issue #38. A new admission webhook would add installation and certificate requirements.
+The CEL quantity library entered the CEL base environment in Kubernetes 1.28. New CRD rules compile at the API server's compatibility version, one minor below its own, so `isQuantity` first works on Kubernetes 1.29. The CSV declares `minKubeVersion: 1.29.0`.
 
 For an invalid enabled component:
 

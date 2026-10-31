@@ -248,10 +248,6 @@ spec:
               WAO checks effective values when the component is enabled.
             displayName: Fence Agents Remediation Manager Resources
             path: components.fenceAgentsRemediation.manager.resources
-          - displayName: Resource Claims
-            path: components.fenceAgentsRemediation.manager.resources.claims
-            x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:hidden
           - description: Set the manager CPU limit, for example 500m or 1. Leave empty to use the packaged default.
             displayName: Fence Agents Remediation CPU Limit
             path: components.fenceAgentsRemediation.manager.resources.limits.cpu
@@ -295,10 +291,6 @@ spec:
               WAO checks effective values when the component is enabled.
             displayName: Machine Deletion Remediation Manager Resources
             path: components.machineDeletionRemediation.manager.resources
-          - displayName: Resource Claims
-            path: components.machineDeletionRemediation.manager.resources.claims
-            x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:hidden
           - description: Set the manager CPU limit, for example 500m or 1. Leave empty to use the packaged default.
             displayName: Machine Deletion Remediation CPU Limit
             path: components.machineDeletionRemediation.manager.resources.limits.cpu
@@ -342,10 +334,6 @@ spec:
               WAO checks effective values when the component is enabled.
             displayName: Node Health Check Manager Resources
             path: components.nodeHealthCheck.manager.resources
-          - displayName: Resource Claims
-            path: components.nodeHealthCheck.manager.resources.claims
-            x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:hidden
           - description: Set the manager CPU limit, for example 500m or 1. Leave empty to use the packaged default.
             displayName: Node Health Check CPU Limit
             path: components.nodeHealthCheck.manager.resources.limits.cpu
@@ -390,10 +378,6 @@ spec:
               WAO checks effective values when the component is enabled.
             displayName: Node Maintenance Manager Resources
             path: components.nodeMaintenance.manager.resources
-          - displayName: Resource Claims
-            path: components.nodeMaintenance.manager.resources.claims
-            x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:hidden
           - description: Set the manager CPU limit, for example 500m or 1. Leave empty to use the packaged default.
             displayName: Node Maintenance CPU Limit
             path: components.nodeMaintenance.manager.resources.limits.cpu
@@ -438,10 +422,6 @@ spec:
               WAO checks effective values when the component is enabled.
             displayName: Self Node Remediation Manager Resources
             path: components.selfNodeRemediation.manager.resources
-          - displayName: Resource Claims
-            path: components.selfNodeRemediation.manager.resources.claims
-            x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:hidden
           - description: Set the manager CPU limit, for example 500m or 1. Leave empty to use the packaged default.
             displayName: Self Node Remediation CPU Limit
             path: components.selfNodeRemediation.manager.resources.limits.cpu
@@ -487,10 +467,6 @@ spec:
               WAO checks effective values when the component is enabled.
             displayName: Storage Based Remediation Manager Resources
             path: components.storageBasedRemediation.manager.resources
-          - displayName: Resource Claims
-            path: components.storageBasedRemediation.manager.resources.claims
-            x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:hidden
           - description: Set the manager CPU limit, for example 500m or 1. Leave empty to use the packaged default.
             displayName: Storage Based Remediation CPU Limit
             path: components.storageBasedRemediation.manager.resources.limits.cpu
