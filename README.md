@@ -22,7 +22,7 @@ ownership and its own upgrade lifecycle. WAO replaces that with **one OLM packag
 that owns all the component APIs** plus a cluster-scoped `WorkloadAvailabilityConfig`
 named `cluster`. A lifecycle controller installs each component's unchanged
 controller-manager as a separate operand when an administrator enables it. Every
-component starts **Disabled**. 
+component starts with **`enabled: false`**.
 
 ```sh
 ❯ oc get workloadavailabilityconfig -o yaml
@@ -36,17 +36,17 @@ items:
   spec:
     components:
       fenceAgentsRemediation:
-        state: Disabled
+        enabled: false
       machineDeletionRemediation:
-        state: Disabled
+        enabled: false
       nodeHealthCheck:
-        state: Disabled
+        enabled: false
       nodeMaintenance:
-        state: Disabled
+        enabled: false
       selfNodeRemediation:
-        state: Disabled
+        enabled: false
       storageBasedRemediation:
-        state: Disabled
+        enabled: false
     ...
 ```
 This operator does NOT intend to change the behavior or functionality of the underlying components.  Success for this operator is to simplify the publishing of the operands as a single entity.  Allow development to continue to happen in their respective repositories, sync the updated RBAC and CRD to include WAO's bundle, and publish a single operator from this repository.
@@ -157,7 +157,7 @@ KUBECONFIG=/path/to/disposable.kubeconfig make dev-olm-undeploy DEV_CLUSTER_TYPE
 The build includes your uncommitted WAO changes. External-cluster images use ttl.sh
 with a short TTL (default two hours); redeploy if they expire. Development packaging
 rewrites the bundle and manager image setting; run `make bundle-reset` before tests
-or a commit. Every component stays Disabled after installation.
+or a commit. Every component keeps `enabled: false` after installation.
 
 ### Running tests
 The current tests are simple Go unit and envtest suites, we do not have any e2e tests implemented.
@@ -170,9 +170,24 @@ make test-offline             # verify-operand-manifests plus the operand pipeli
 
 GitHub Actions runs the Go suites, lint, `make verify-operand-manifests` and the offline tests.
 
+## Configure component resources
+
+Set `spec.components.<key>.enabled` to `true` to enable a component.
+The default is `false` for all six components.
+Set `spec.components.<key>.manager.resources` to configure its manager CPU and memory.
+Omitted resource values retain the packaged defaults.
+
+Use the OpenShift console form to edit `WorkloadAvailabilityConfig/cluster`.
+Each component has an Enabled switch and Manager Resources controls.
+WAO normally creates this singleton automatically.
+
+See [Configure operand manager resources](docs/configuring-operand-resources.md)
+for examples, console instructions, validation, and migration requirements.
+The boolean API replaces `state` in `v1alpha1` and requires a controlled upgrade for existing installations.
+
 ## What Enabled and Disabled mean
 
-**Enabled** applies the component's operand objects with server-side apply: the
+**Enabled** (`enabled: true`) applies the component's operand objects with server-side apply: the
 manager Deployment, Services, ConfigMaps and webhook configurations, rendered from the
 copied upstream configuration (the `objects.yaml` embedded in the binary) with the selected
 image references substituted. The operand ServiceAccounts, Roles and bindings are not part of
@@ -181,7 +196,7 @@ component is Enabled. The phase becomes
 `Available` once the managers are ready and, for NHC, SNR, FAR and NMO, the
 service-ca CA bundles are injected into the webhooks.
 
-**Disabled** (the default for every component) means WAO has not created, or has
+**Disabled** (`enabled: false`, the default for every component) means WAO has not created, or has
 removed, the operand objects it renders (not the OLM-owned RBAC). Specifically:
 
 - Installing WAO creates no remediation policy, remediation request, native config,
@@ -202,8 +217,8 @@ removed, the operand objects it renders (not the OLM-owned RBAC). Specifically:
 
 ## Uninstall
 
-1. Set every component to `Disabled` and wait for each phase to be `Disabled` or
-   `DisableIncomplete`.
+1. Set every component's `enabled` field to `false`.
+   Wait for each phase to be `Disabled` or `DisableIncomplete`.
 2. Delete the config: `oc delete workloadavailabilityconfig cluster`. Its finalizer
    removes any remaining operand objects. WAO creates a new all-Disabled config the
    next time it starts (D4), which is harmless.

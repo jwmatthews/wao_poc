@@ -1,0 +1,16 @@
+apiVersion: workloadavailability.medik8s.io/v1alpha1
+kind: WorkloadAvailabilityConfig
+metadata:
+  name: cluster
+spec:
+  components:
+    nodeHealthCheck:
+      enabled: false
+      manager:
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi

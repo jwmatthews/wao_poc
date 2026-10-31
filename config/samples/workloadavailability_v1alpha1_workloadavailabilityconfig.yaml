@@ -5,14 +5,14 @@ metadata:
 spec:
   components:
     nodeHealthCheck:
-      state: Disabled
+      enabled: false
     selfNodeRemediation:
-      state: Disabled
+      enabled: false
     storageBasedRemediation:
-      state: Disabled
+      enabled: false
     nodeMaintenance:
-      state: Disabled
+      enabled: false
     fenceAgentsRemediation:
-      state: Disabled
+      enabled: false
     machineDeletionRemediation:
-      state: Disabled
+      enabled: false
