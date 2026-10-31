@@ -8,9 +8,11 @@ import (
 func NMO() Definition {
 	return Definition{
 		Key: v1alpha1.ComponentKeyNodeMaintenance, ShortName: "nmo", ManifestDir: "nmo",
-		Deployments:  []string{"node-maintenance-operator-controller-manager"},
-		Images:       []string{images.NMOManager},
-		Webhooks:     []WebhookConfiguration{{Kind: "ValidatingWebhookConfiguration", Name: "node-maintenance-operator-validating-webhook-configuration"}},
-		ManagedKinds: []ResourceKind{{Group: "nodemaintenance.medik8s.io", Version: "v1beta1", Kind: "NodeMaintenance"}},
+		ManagerDeployment: "node-maintenance-operator-controller-manager",
+		ManagerContainer:  "manager",
+		Deployments:       []string{"node-maintenance-operator-controller-manager"},
+		Images:            []string{images.NMOManager},
+		Webhooks:          []WebhookConfiguration{{Kind: "ValidatingWebhookConfiguration", Name: "node-maintenance-operator-validating-webhook-configuration"}},
+		ManagedKinds:      []ResourceKind{{Group: "nodemaintenance.medik8s.io", Version: "v1beta1", Kind: "NodeMaintenance"}},
 	}
 }

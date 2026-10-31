@@ -203,8 +203,9 @@ test-offline: verify-operand-manifests ## Offline checks: operand manifests, bun
 ##@ Development
 
 .PHONY: manifests
-manifests: controller-gen ## Generate manifests e.g. CRD, RBAC etc.
+manifests: controller-gen yq ## Generate manifests e.g. CRD, RBAC etc.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	YQ=$(YQ) bash hack/manager-resource-schema.sh config/crd/bases/workloadavailability.medik8s.io_workloadavailabilityconfigs.yaml
 
 .PHONY: generate
 generate: controller-gen ## Generate code

@@ -8,8 +8,10 @@ import (
 func SNR() Definition {
 	return Definition{
 		Key: v1alpha1.ComponentKeySelfNodeRemediation, ShortName: "snr", ManifestDir: "snr",
-		Deployments: []string{"self-node-remediation-controller-manager"},
-		Images:      []string{images.SNRManager},
+		ManagerDeployment: "self-node-remediation-controller-manager",
+		ManagerContainer:  "manager",
+		Deployments:       []string{"self-node-remediation-controller-manager"},
+		Images:            []string{images.SNRManager},
 		Webhooks: []WebhookConfiguration{
 			{Kind: "ValidatingWebhookConfiguration", Name: "self-node-remediation-validating-webhook-configuration"},
 			{Kind: "MutatingWebhookConfiguration", Name: "self-node-remediation-mutating-webhook-configuration"},

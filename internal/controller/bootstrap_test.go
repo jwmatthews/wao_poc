@@ -34,7 +34,7 @@ func TestEnsureDefaultConfigLeavesExistingUntouched(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = v1alpha1.AddToScheme(scheme)
 	existing := &v1alpha1.WorkloadAvailabilityConfig{ObjectMeta: metav1.ObjectMeta{Name: v1alpha1.SingletonName}}
-	existing.Spec.Components.NodeHealthCheck.State = v1alpha1.ComponentStateEnabled
+	existing.Spec.Components.NodeHealthCheck.Enabled = true
 	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(existing).Build()
 	if err := EnsureDefaultConfig(context.Background(), c); err != nil {
 		t.Fatal(err)

@@ -138,6 +138,9 @@ func (r *WorkloadAvailabilityConfigReconciler) ensureEnabled(ctx context.Context
 	if err != nil {
 		return st, err
 	}
+	if err := operands.ApplyManagerResources(def, objs, wac.Spec.ManagerResourcesOf(def.Key)); err != nil {
+		return st, err
+	}
 	for _, o := range objs {
 		if err := r.guardForeign(ctx, o); err != nil {
 			return st, err
