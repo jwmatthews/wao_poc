@@ -497,7 +497,7 @@ bundle-validate: operator-sdk ## Validate the bundle directory with additional v
 .PHONY: bundle-build
 bundle-build: bundle ## Build the bundle image.
 	$(MAKE) bundle-update
-	$(CONTAINER_TOOL) build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	$(CONTAINER_TOOL) build --platform $(PLATFORM) -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
@@ -541,7 +541,7 @@ catalog-fbc: opm yq verify-previous-version verify-skip-range ## Render ./bundle
 
 .PHONY: catalog-build
 catalog-build: catalog-fbc ## Build the FBC image CATALOG_IMG from catalog/ (needs CONTAINER_TOOL).
-	$(CONTAINER_TOOL) build . -f ${CATALOG_DOCKERFILE} -t ${CATALOG_IMG}
+	$(CONTAINER_TOOL) build --platform $(PLATFORM) . -f ${CATALOG_DOCKERFILE} -t ${CATALOG_IMG}
 
 .PHONY: catalog-push
 catalog-push: ## Push the catalog image.
