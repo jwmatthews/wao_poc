@@ -242,6 +242,12 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 			setResources(ctx, def.Key, nil)
 		}
 		Eventually(func(g Gomega) {
+			w := getWAC(ctx)
+			g.Expect(w.Status.ObservedGeneration).To(Equal(w.Generation))
+			g.Expect(w.Status.Components).To(HaveLen(6))
+			for _, c := range w.Status.Components {
+				g.Expect(c.Phase).To(Equal(v1alpha1.ComponentPhaseDisabled), c.Name)
+			}
 			deps := &appsv1.DeploymentList{}
 			g.Expect(k8sClient.List(ctx, deps, client.InNamespace(ns))).To(Succeed())
 			g.Expect(deps.Items).To(BeEmpty())
@@ -250,23 +256,29 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 
 	It("installs the NHC operand when enabled", func() {
 		setEnabled(ctx, v1alpha1.ComponentKeyNodeHealthCheck, true)
-		// Status is written after every operand object has been applied, so wait for it first.
+		// Wait for status from this enable generation, not a previous installation.
 		Eventually(func(g Gomega) {
-			c := component(getWAC(ctx), v1alpha1.ComponentKeyNodeHealthCheck)
+			w := getWAC(ctx)
+			g.Expect(w.Status.ObservedGeneration).To(Equal(w.Generation))
+			c := component(w, v1alpha1.ComponentKeyNodeHealthCheck)
 			g.Expect(c).NotTo(BeNil())
 			g.Expect(c.Phase).To(Equal(v1alpha1.ComponentPhaseProgressing)) // envtest has no kubelet or service-ca
 			g.Expect(c.Deployments).To(HaveLen(2))                          // the manager and the console plugin backend of NHC's OCP packaging
 			g.Expect(c.AdmissionReady).To(Equal(ptr.To(false)))
 		}).Should(Succeed())
 		dep := &appsv1.Deployment{}
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-controller-manager"}, dep)).To(Succeed())
+		Eventually(func() error {
+			return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-controller-manager"}, dep)
+		}).Should(Succeed())
 		Expect(dep.Spec.Template.Spec.Containers[0].Image).To(Equal(testImages().Get(images.NHCManager)))
 		Expect(dep.Labels[operands.LabelManagedBy]).To(Equal(operands.ManagedByValue))
 		Expect(dep.OwnerReferences).To(HaveLen(1))
 		Expect(dep.OwnerReferences[0].Kind).To(Equal("WorkloadAvailabilityConfig"))
 		Expect(*dep.OwnerReferences[0].Controller).To(BeTrue())
 		console := &appsv1.Deployment{}
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-node-remediation-console-plugin"}, console)).To(Succeed())
+		Eventually(func() error {
+			return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-node-remediation-console-plugin"}, console)
+		}).Should(Succeed())
 		Expect(console.Spec.Template.Spec.Containers[0].Image).To(Equal(testImages().Get(images.NHCConsole)))
 		Expect(console.OwnerReferences).To(HaveLen(1))
 
