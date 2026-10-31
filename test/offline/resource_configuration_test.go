@@ -172,6 +172,17 @@ func TestResourceConfigurationQuantityValidation(t *testing.T) {
 	}
 }
 
+// CRD rules can call isQuantity from Kubernetes 1.29. New rules compile one minor
+// version below the API server, and the quantity library entered CEL in 1.28.
+func TestResourceConfigurationMinKubeVersion(t *testing.T) {
+	for _, path := range []string{"config/manifests/bases/" + waoCSVFile, "bundle/manifests/" + waoCSVFile} {
+		csv := readResourceYAML(t, path)
+		if got, _, _ := unstructured.NestedString(csv, "spec", "minKubeVersion"); got != "1.29.0" {
+			t.Errorf("%s minKubeVersion = %q, want 1.29.0", path, got)
+		}
+	}
+}
+
 func TestResourceConfigurationDefaultSample(t *testing.T) {
 	sample := readResourceYAML(t, "config/samples/workloadavailability_v1alpha1_workloadavailabilityconfig.yaml")
 	assertResourceDefaultExample(t, sample)
