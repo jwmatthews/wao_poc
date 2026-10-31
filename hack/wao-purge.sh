@@ -14,7 +14,7 @@
 # Every step is idempotent: re-running after a partial failure is safe.
 #
 # Usage, from the repo root:
-#   ./hack/wac-cluster-uninstall.sh
+#   ./hack/wao-purge.sh
 
 set -euo pipefail
 
@@ -165,6 +165,16 @@ step "5a. Deleting cluster RBAC owned by this install"
 # Created by OLM from the bundle.
 oc delete clusterrole,clusterrolebinding -l "olm.owner.namespace=${NS}" --ignore-not-found
 oc delete clusterrole,clusterrolebinding -l "$OLM_PKG_LABEL" --ignore-not-found
+# Bundle RBAC that OLM labels only with olm.owner=<csv name> (no olm.owner.namespace). These are
+# orphaned when the CSV goes away without OLM cleaning up, e.g. after `operator-sdk cleanup`.
+for obj in $(oc get clusterrole,clusterrolebinding -l olm.owner \
+  -o jsonpath='{range .items[*]}{.kind}{"/"}{.metadata.name}{" "}{.metadata.labels.olm\.owner}{"\n"}{end}' |
+  awk -v pkg="$PKG" 'index($2, pkg ".") == 1 {print tolower($1)}'); do
+  oc delete "$obj" --ignore-not-found
+done
+# Created at runtime by NHC; its owner reference points at a namespaced Deployment, so garbage
+# collection never removes it.
+oc delete clusterrole,clusterrolebinding node-healthcheck-operator-aggregation --ignore-not-found
 # Created at runtime (for example by the SBR manager): any binding whose subject lives in $NS.
 for crb in $(oc get clusterrolebinding \
   -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.subjects[*].namespace}{"\n"}{end}' |
