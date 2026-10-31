@@ -134,6 +134,11 @@ The implementation adds `hack/manager-resource-schema.sh` to `make manifests` af
 The generated standard quantity pattern accepts fractional exponents and exponents outside the signed int64 range.
 The helper restricts these exponents in all six components, for both requests and limits.
 It preserves the standard `ResourceRequirements` type and the Kubernetes 1.25 minimum.
+It declares CPU and memory properties so the console can render separate text fields.
+Each property uses `type: string` without `anyOf`, which this console cannot render.
+The `x-kubernetes-int-or-string` extension preserves integer and string admission.
+The `int-or-string` format also preserves both types during server-side apply.
+Admission tests check merge patches, apply patches, and strict rejection of unsupported resource names.
 Offline tests check both generated CRDs.
 Admission tests use an unstructured target and server dry-run.
 This prevents response decoding errors from concealing server acceptance of malformed quantities.
@@ -190,13 +195,16 @@ Add these CSV `specDescriptors` for each of the six components:
   path: components.nodeHealthCheck.enabled
   x-descriptors:
     - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
-- displayName: Node Health Check Manager Resources
-  description: Set CPU and memory for the manager container only.
-  path: components.nodeHealthCheck.manager.resources
+- displayName: Node Health Check CPU Request
+  description: Set the manager CPU request, for example 100m or 1. Leave empty to use the packaged default.
+  path: components.nodeHealthCheck.manager.resources.requests.cpu
   x-descriptors:
-    - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+    - urn:alm:descriptor:com.tectonic.ui:text
 ```
 
+Add equivalent text descriptors for Memory Request, CPU Limit, and Memory Limit.
+Do not use the generic `resourceRequirements` control because it exposes unsupported Storage fields.
+Hide the unsupported claims field from the creation form.
 Replace the old State selectors with boolean switches. Remove their `.state` descriptor paths and `select:Enabled` / `select:Disabled` values. Preserve each component's explanatory text, including the effects of enabling SNR.
 
 Use nested schema objects to group controls in the creation form.
@@ -211,12 +219,13 @@ Do not hide these controls under advanced settings.
 
 Update the CSV's `metadata.annotations.alm-examples` to use `enabled: false` for all six components. Keep the name `cluster` and omit resource overrides from this default example. Put the form controls under `spec.customresourcedefinitions.owned[].specDescriptors`. These descriptors and the example annotation serve different purposes.
 
-Support creation through the console form and editing through the CSV details controls.
-A user must be able to enable a component and enter resources without editing YAML.
+Support creation through the console form with separate CPU and memory text fields.
+A user must be able to enable a component and enter resources during creation without editing YAML.
 The creation form must show all components disabled initially.
 Cluster-scoped resource links can open the generic details page, where Edit opens YAML.
-Document the CSV details address, the switch confirmation, and the resource dialogs.
-Leave the standard control's Storage fields empty because WAO supports CPU and memory only.
+The CSV details page displays saved text values and supports enable switches.
+OpenShift 5.0 text descriptors do not provide inline editors.
+Document the CSV details address, switch confirmation, and YAML editing for existing resource settings.
 
 WAO already creates the singleton automatically. Document that users normally edit this existing object. Manual creation uses the same form and the required name `cluster` when the singleton is absent. Do not remove automatic creation or permit additional singleton names.
 
@@ -290,7 +299,7 @@ type ManagerSpec struct {
     // Resources overrides CPU and memory requests and limits.
     // Omitted values use the packaged manager defaults.
     // These settings do not configure agents or the console plugin.
-    // +operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Manager Resources",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:resourceRequirements"}
+    // +operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Manager Resources"
     // +optional
     Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
@@ -536,7 +545,8 @@ Server-side apply removal needs an API-server test. If a field persists, inspect
 
 - [x] Add an offline test that parses the generated base and bundle CSVs.
 - [x] Require one resource descriptor at `components.<key>.manager.resources` for every component key.
-- [x] Require the `resourceRequirements` descriptor value at each path.
+- [x] Require four `text` descriptors for CPU and memory requests and limits per component.
+- [x] Reject the generic `resourceRequirements` descriptor in both CSV copies.
 - [x] Require one `booleanSwitch` descriptor at `components.<key>.enabled` for every component.
 - [x] Require boolean CRD fields with false defaults for all six components.
 - [x] Reject old `.state` descriptor paths and the old string-selection descriptors.
@@ -612,10 +622,12 @@ The following checks need a disposable cluster with classic OLM and explicit ses
 - [x] Open the existing `WorkloadAvailabilityConfig/cluster` on the CSV details page.
 - [x] Check all six component sections for the Enabled switch and resource controls.
 - [x] Check that saved enable values are booleans and that the CR contains no component `state` input.
-- [x] Check CPU units, memory units, partial values, save behavior, and removal of an override.
+- [x] Check CPU units, memory units, partial values, and save behavior in the separate text fields.
+- [x] Create a disabled singleton with all four NHC resource values through the replacement form.
+- [x] Create a disabled singleton with only one CPU request and check that empty fields remain omitted.
+- [x] Check that neither the creation form nor the details page exposes the generic Storage field.
 - [x] Check that console editing does not insert resource defaults into untouched components.
 - [x] Enable NHC with a valid resource override.
-- [x] Change one NHC resource value through a CSV details dialog.
 - [x] Check the resulting Deployment rollout and effective manager resources.
 - [x] Check that the console plugin and other component templates remain unchanged.
 - [x] Submit an invalid effective request/limit pair on NHC and check the status message.
@@ -627,7 +639,10 @@ NHC provides a rollout check without requiring a real health policy. Do not crea
 
 Use server-side dry-run for admission-only checks. Never capture Secret values or cluster-identifying details in repository documents. Review any sanitized test report before committing it.
 
-If the target console version cannot edit nested resources through the CSV details controls, the console requirement remains incomplete.
+The replacement text descriptors support creation and display in OpenShift 5.0.
+This console version requires YAML to edit these text values after creation.
+The replacement removes the unsupported Storage field from the generic control.
+The user guide states this editing limit explicitly.
 
 ## Acceptance coverage
 
@@ -652,7 +667,7 @@ If the target console version cannot edit nested resources through the CSV detai
 - [Issue #38](https://github.com/jwmatthews/wao_poc/issues/38).
 - [Console requirement in issue #38](https://github.com/jwmatthews/wao_poc/issues/38#issuecomment-6421699404).
 - [Manager resources proposal in issue #43](https://github.com/jwmatthews/wao_poc/issues/43#issuecomment-6529892013).
-- [OpenShift Console 4.20 descriptor reference](https://github.com/openshift/console/blob/release-4.20/frontend/packages/operator-lifecycle-manager/src/components/descriptors/reference/reference.md).
+- [OpenShift Console 5.0 descriptor reference](https://github.com/openshift/console/blob/release-5.0/frontend/packages/operator-lifecycle-manager/src/components/descriptors/reference/reference.md).
 - [Kubernetes v0.33.0 resource types](https://github.com/kubernetes/api/blob/v0.33.0/core/v1/types.go).
 - [Quantity CEL library version registration](https://github.com/kubernetes/apiserver/blob/v0.33.0/pkg/cel/environment/base.go).
 - [Project overlay guide](../../operand-config-overlays.md).
@@ -663,3 +678,9 @@ The CSV details page needs component names in its flattened labels.
 Cluster-scoped resource links can open the generic YAML editor instead of that page.
 The user guide provides a command for the CSV details address.
 The generation helper and offline tests preserve the corrected labels.
+
+The final console controls use four text fields for each component's CPU and memory requests and limits.
+The CRD declares those properties explicitly for the creation form.
+The generic resource control is absent because it exposed an unsupported Storage field.
+The console displays stored resource values on the CSV details page.
+Its text descriptor requires YAML for subsequent edits.

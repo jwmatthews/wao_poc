@@ -69,7 +69,7 @@ type ManagerSpec struct {
 	// Resources sets CPU and memory for the manager container only.
 	// Omitted values retain the packaged defaults. Settings do not enable the component.
 	// WAO checks effective values when the component is enabled.
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Manager Resources",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:resourceRequirements"},order=2
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Manager Resources",order=2
 	// +optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }

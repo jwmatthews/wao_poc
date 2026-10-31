@@ -164,7 +164,7 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 	It("rejects malformed quantity exponents while the component is disabled", func() {
 		for _, field := range []string{"requests", "limits"} {
 			for _, value := range []string{"1e1.5", "1e.5", "1e9223372036854775808", "1e-9223372036854775809"} {
-				for _, name := range []string{"cpu", "memory", "unsupported"} {
+				for _, name := range []string{"cpu", "memory"} {
 					patch := []byte(fmt.Sprintf(`{"spec":{"components":{"nodeHealthCheck":{"enabled":false,"manager":{"resources":{%q:{%q:%q}}}}}}}`, field, name, value))
 					target := &unstructured.Unstructured{Object: map[string]interface{}{
 						"apiVersion": v1alpha1.GroupVersion.String(), "kind": "WorkloadAvailabilityConfig",
@@ -173,6 +173,38 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 					err := k8sClient.Patch(ctx, target, client.RawPatch(types.MergePatchType, patch), client.DryRunAll)
 					Expect(apierrors.IsInvalid(err)).To(BeTrue(), "%s.%s=%s should fail admission: %v", field, name, value, err)
 				}
+			}
+		}
+	})
+
+	It("accepts integer and string resource quantities through the console schema", func() {
+		for _, field := range []string{"requests", "limits"} {
+			for _, name := range []string{"cpu", "memory"} {
+				for _, value := range []string{`1`, `0`, `"100m"`, `"128Mi"`} {
+					for _, patchType := range []types.PatchType{types.MergePatchType, types.ApplyPatchType} {
+						patch := []byte(fmt.Sprintf(`{"apiVersion":"workloadavailability.medik8s.io/v1alpha1","kind":"WorkloadAvailabilityConfig","metadata":{"name":"cluster"},"spec":{"components":{"nodeHealthCheck":{"enabled":false,"manager":{"resources":{%q:{%q:%s}}}}}}}`, field, name, value))
+						target := &unstructured.Unstructured{Object: map[string]interface{}{
+							"apiVersion": v1alpha1.GroupVersion.String(), "kind": "WorkloadAvailabilityConfig",
+							"metadata": map[string]interface{}{"name": v1alpha1.SingletonName},
+						}}
+						Expect(k8sClient.Patch(ctx, target, client.RawPatch(patchType, patch), client.DryRunAll, client.FieldOwner("wao-resource-admission-test"))).To(Succeed(), "%s %s.%s=%s", patchType, field, name, value)
+						stored, found, err := unstructured.NestedFieldNoCopy(target.Object, "spec", "components", "nodeHealthCheck", "manager", "resources", field, name)
+						Expect(err).NotTo(HaveOccurred())
+						Expect(found).To(BeTrue())
+						Expect(fmt.Sprint(stored)).To(Equal(strings.Trim(value, `"`)))
+					}
+				}
+			}
+		}
+	})
+
+	It("rejects unsupported resource names with strict field validation", func() {
+		for _, field := range []string{"requests", "limits"} {
+			for _, name := range []string{"storage", "ephemeral-storage", "unsupported"} {
+				patch := []byte(fmt.Sprintf(`{"spec":{"components":{"nodeHealthCheck":{"manager":{"resources":{%q:{%q:"1Gi"}}}}}}}`, field, name))
+				err := k8sClient.Patch(ctx, getWAC(ctx), client.RawPatch(types.MergePatchType, patch), client.DryRunAll, client.FieldValidation(metav1.FieldValidationStrict))
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(name))
 			}
 		}
 	})

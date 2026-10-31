@@ -231,8 +231,30 @@ spec:
               WAO checks effective values when the component is enabled.
             displayName: Fence Agents Remediation Manager Resources
             path: components.fenceAgentsRemediation.manager.resources
+          - path: components.fenceAgentsRemediation.manager.resources.claims
+            displayName: Resource Claims
             x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - path: components.fenceAgentsRemediation.manager.resources.limits.cpu
+            displayName: Fence Agents Remediation CPU Limit
+            description: Set the manager CPU limit, for example 500m or 1. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - path: components.fenceAgentsRemediation.manager.resources.limits.memory
+            displayName: Fence Agents Remediation Memory Limit
+            description: Set the manager memory limit, for example 256Mi or 1Gi. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - path: components.fenceAgentsRemediation.manager.resources.requests.cpu
+            displayName: Fence Agents Remediation CPU Request
+            description: Set the manager CPU request, for example 100m or 1. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - path: components.fenceAgentsRemediation.manager.resources.requests.memory
+            displayName: Fence Agents Remediation Memory Request
+            description: Set the manager memory request, for example 128Mi or 1Gi. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
           - description: |-
               Runs the Machine Deletion Remediation operator. Machine deletion requires
               a separate remediation request.
@@ -256,8 +278,30 @@ spec:
               WAO checks effective values when the component is enabled.
             displayName: Machine Deletion Remediation Manager Resources
             path: components.machineDeletionRemediation.manager.resources
+          - path: components.machineDeletionRemediation.manager.resources.claims
+            displayName: Resource Claims
             x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - path: components.machineDeletionRemediation.manager.resources.limits.cpu
+            displayName: Machine Deletion Remediation CPU Limit
+            description: Set the manager CPU limit, for example 500m or 1. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - path: components.machineDeletionRemediation.manager.resources.limits.memory
+            displayName: Machine Deletion Remediation Memory Limit
+            description: Set the manager memory limit, for example 256Mi or 1Gi. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - path: components.machineDeletionRemediation.manager.resources.requests.cpu
+            displayName: Machine Deletion Remediation CPU Request
+            description: Set the manager CPU request, for example 100m or 1. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - path: components.machineDeletionRemediation.manager.resources.requests.memory
+            displayName: Machine Deletion Remediation Memory Request
+            description: Set the manager memory request, for example 128Mi or 1Gi. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
           - description: |-
               Runs the Node Health Check operator. Configure a NodeHealthCheck policy
               separately to enable automated health monitoring and remediation.
@@ -281,8 +325,30 @@ spec:
               WAO checks effective values when the component is enabled.
             displayName: Node Health Check Manager Resources
             path: components.nodeHealthCheck.manager.resources
+          - path: components.nodeHealthCheck.manager.resources.claims
+            displayName: Resource Claims
             x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - path: components.nodeHealthCheck.manager.resources.limits.cpu
+            displayName: Node Health Check CPU Limit
+            description: Set the manager CPU limit, for example 500m or 1. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - path: components.nodeHealthCheck.manager.resources.limits.memory
+            displayName: Node Health Check Memory Limit
+            description: Set the manager memory limit, for example 256Mi or 1Gi. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - path: components.nodeHealthCheck.manager.resources.requests.cpu
+            displayName: Node Health Check CPU Request
+            description: Set the manager CPU request, for example 100m or 1. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - path: components.nodeHealthCheck.manager.resources.requests.memory
+            displayName: Node Health Check Memory Request
+            description: Set the manager memory request, for example 128Mi or 1Gi. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
           - description: |-
               Runs the Node Maintenance operator. Creating a NodeMaintenance resource
               separately requests node cordoning and draining. Complete active maintenance
@@ -307,8 +373,30 @@ spec:
               WAO checks effective values when the component is enabled.
             displayName: Node Maintenance Manager Resources
             path: components.nodeMaintenance.manager.resources
+          - path: components.nodeMaintenance.manager.resources.claims
+            displayName: Resource Claims
             x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - path: components.nodeMaintenance.manager.resources.limits.cpu
+            displayName: Node Maintenance CPU Limit
+            description: Set the manager CPU limit, for example 500m or 1. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - path: components.nodeMaintenance.manager.resources.limits.memory
+            displayName: Node Maintenance Memory Limit
+            description: Set the manager memory limit, for example 256Mi or 1Gi. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - path: components.nodeMaintenance.manager.resources.requests.cpu
+            displayName: Node Maintenance CPU Request
+            description: Set the manager CPU request, for example 100m or 1. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - path: components.nodeMaintenance.manager.resources.requests.memory
+            displayName: Node Maintenance Memory Request
+            description: Set the manager memory request, for example 128Mi or 1Gi. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
           - description: |-
               Runs the Self Node Remediation operator. Enabling this component creates
               its default configuration and starts privileged node agents on eligible
@@ -333,8 +421,30 @@ spec:
               WAO checks effective values when the component is enabled.
             displayName: Self Node Remediation Manager Resources
             path: components.selfNodeRemediation.manager.resources
+          - path: components.selfNodeRemediation.manager.resources.claims
+            displayName: Resource Claims
             x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - path: components.selfNodeRemediation.manager.resources.limits.cpu
+            displayName: Self Node Remediation CPU Limit
+            description: Set the manager CPU limit, for example 500m or 1. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - path: components.selfNodeRemediation.manager.resources.limits.memory
+            displayName: Self Node Remediation Memory Limit
+            description: Set the manager memory limit, for example 256Mi or 1Gi. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - path: components.selfNodeRemediation.manager.resources.requests.cpu
+            displayName: Self Node Remediation CPU Request
+            description: Set the manager CPU request, for example 100m or 1. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - path: components.selfNodeRemediation.manager.resources.requests.memory
+            displayName: Self Node Remediation Memory Request
+            description: Set the manager memory request, for example 128Mi or 1Gi. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
           - description: |-
               Runs the Storage Based Remediation operator. Configure a
               StorageBasedRemediationConfig separately to deploy its agents and configure
@@ -360,8 +470,30 @@ spec:
               WAO checks effective values when the component is enabled.
             displayName: Storage Based Remediation Manager Resources
             path: components.storageBasedRemediation.manager.resources
+          - path: components.storageBasedRemediation.manager.resources.claims
+            displayName: Resource Claims
             x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - path: components.storageBasedRemediation.manager.resources.limits.cpu
+            displayName: Storage Based Remediation CPU Limit
+            description: Set the manager CPU limit, for example 500m or 1. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - path: components.storageBasedRemediation.manager.resources.limits.memory
+            displayName: Storage Based Remediation Memory Limit
+            description: Set the manager memory limit, for example 256Mi or 1Gi. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - path: components.storageBasedRemediation.manager.resources.requests.cpu
+            displayName: Storage Based Remediation CPU Request
+            description: Set the manager CPU request, for example 100m or 1. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - path: components.storageBasedRemediation.manager.resources.requests.memory
+            displayName: Storage Based Remediation Memory Request
+            description: Set the manager memory request, for example 128Mi or 1Gi. Leave empty to use the packaged default.
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
         statusDescriptors:
           - description: |-
               Available, Progressing, and Degraded describe WAO reconciliation.

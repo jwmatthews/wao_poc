@@ -53,7 +53,7 @@ The six component keys are:
 
 WAO normally creates the singleton named `cluster` when it starts.
 Edit this existing object when it is present.
-The creation form provides component sections with Enabled switches and Manager Resources controls.
+The creation form provides component sections with Enabled switches and four manager resource fields.
 These controls use boolean values and Kubernetes resource quantities.
 
 If the singleton is absent, use the console's Create form.
@@ -63,9 +63,24 @@ Keep the required name `cluster`.
 The initial example sets all six components to `enabled: false`.
 WAO does not accept other configuration names.
 
+Expand the component's Manager Resources section.
+The Requests group contains CPU Request and Memory Request fields.
+The Limits group contains CPU Limit and Memory Limit fields.
+Each label includes the component name.
+Use CPU values such as `100m` or `1`.
+Use memory values such as `128Mi` or `1Gi`.
+Leave a field empty to retain its packaged default.
+Untouched fields remain omitted.
+The form does not display a Storage field.
+
 The console's standard Edit action can open YAML for this cluster-scoped resource.
-The CSV details page provides switches and resource dialogs for editing without YAML.
-Each editable label includes its component name.
+The CSV details page provides enable switches and displays the four saved resource values.
+The OpenShift 5.0 console does not provide inline editors for these text fields.
+Use the YAML tab or Edit action to change resources on an existing configuration.
+Preserve the component's `enabled` value when changing its resources.
+Remove a resource entry to restore its packaged default.
+
+Each field label includes its component name.
 Use the following commands to obtain that page's address.
 Set `KUBECONFIG` to your cluster's kubeconfig path first.
 These commands require `jq`.
@@ -86,17 +101,13 @@ printf 'https://%s/k8s/ns/%s/clusterserviceversions/%s/workloadavailability.medi
 1. Open the printed address.
 2. Change the required component's Enabled switch.
 3. Select Confirm change beside the switch.
-4. Select its resource requests or resource limits to open the resource dialog.
-5. Enter CPU or memory quantities.
-6. Save the dialog.
+4. Open the YAML tab to change resource quantities on the existing configuration.
+5. Change only the required entries under `manager.resources.requests` or `manager.resources.limits`.
+6. Save the configuration.
 7. Check the component status and its manager Deployment.
 
-Leave the Storage fields empty.
-The standard console control displays these fields, but WAO supports CPU and memory only.
-Untouched fields remain omitted.
-If the console reports that the object changed, close the dialog.
-Wait for the current rollout to finish.
-Open the dialog again before saving your change.
+The details page shows stored overrides, not the effective Deployment values.
+An empty value means that WAO uses the packaged default, if present.
 
 Enabling Self Node Remediation starts privileged node agents on eligible nodes.
 Disabling a component removes its manager and managed installation resources.
@@ -141,6 +152,9 @@ The Kubernetes API checks the quantity structure.
 Use CPU quantities such as `100m` or `1`.
 Use memory quantities such as `128Mi` or `1Gi`.
 String values for `enabled`, including `"true"`, are invalid.
+The resource schema declares only `cpu` and `memory` entries.
+Strict field validation rejects other resource names.
+Kubernetes can remove unknown entries when the client does not request strict validation.
 
 WAO checks resource values when it reconciles an enabled component.
 WAO rejects these settings:

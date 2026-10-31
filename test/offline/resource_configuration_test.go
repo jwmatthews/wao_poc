@@ -81,19 +81,20 @@ func TestResourceConfigurationSchemaAndConsole(t *testing.T) {
 				}
 				for _, value := range xDescriptors {
 					if strings.Contains(value, ":select:Enabled") ||
-						strings.Contains(value, ":select:Disabled") || strings.Contains(value, ":fieldGroup") {
+						strings.Contains(value, ":select:Disabled") || strings.Contains(value, ":fieldGroup") ||
+						strings.HasSuffix(value, ":resourceRequirements") {
 						t.Errorf("unsupported descriptor %q at %s", value, path)
 					}
 				}
 			}
 			for _, key := range v1alpha1.AllComponentKeys {
 				prefix := "components." + key
-				if positions[prefix+".manager.resources"] != positions[prefix+".enabled"]+2 {
-					t.Errorf("%s enable and resource controls are not adjacent to its Manager descriptor", key)
-				}
 				for _, control := range []struct{ suffix, name, kind string }{
 					{"enabled", "Enabled", "booleanSwitch"},
-					{"manager.resources", "Manager Resources", "resourceRequirements"},
+					{"manager.resources.requests.cpu", "CPU Request", "text"},
+					{"manager.resources.requests.memory", "Memory Request", "text"},
+					{"manager.resources.limits.cpu", "CPU Limit", "text"},
+					{"manager.resources.limits.memory", "Memory Limit", "text"},
 				} {
 					path := "components." + key + "." + control.suffix
 					descriptor := byPath[path]
@@ -112,6 +113,9 @@ func TestResourceConfigurationSchemaAndConsole(t *testing.T) {
 					want := "urn:alm:descriptor:com.tectonic.ui:" + control.kind
 					if !slices.Contains(xDescriptors, want) {
 						t.Errorf("%s descriptors = %v, want %s", path, xDescriptors, want)
+					}
+					if positions[path] < positions[prefix+".enabled"] {
+						t.Errorf("%s must follow its component enable control", path)
 					}
 				}
 			}
@@ -162,18 +166,20 @@ func TestResourceConfigurationQuantityPatterns(t *testing.T) {
 				for _, field := range []string{"requests", "limits"} {
 					t.Run(key+"/"+field, func(t *testing.T) {
 						path := "spec.components." + key + ".manager.resources." + field
-						resourceMap := resourceSchemaAt(t, schema, path)
-						pattern, found, err := unstructured.NestedString(resourceMap, "additionalProperties", "pattern")
-						if err != nil || !found {
-							t.Fatalf("%s quantity pattern is missing: %v", path, err)
-						}
-						quantityPattern, err := regexp.Compile(pattern)
-						if err != nil {
-							t.Fatalf("%s quantity pattern does not compile: %v", path, err)
-						}
-						for _, tc := range cases {
-							if got := quantityPattern.MatchString(tc.quantity); got != tc.valid {
-								t.Errorf("%s pattern accepts %q = %t, want %t", path, tc.quantity, got, tc.valid)
+						for _, name := range []string{"cpu", "memory"} {
+							quantitySchema := resourceSchemaAt(t, schema, path+"."+name)
+							pattern, found, err := unstructured.NestedString(quantitySchema, "pattern")
+							if err != nil || !found {
+								t.Fatalf("%s quantity pattern is missing: %v", path, err)
+							}
+							quantityPattern, err := regexp.Compile(pattern)
+							if err != nil {
+								t.Fatalf("%s quantity pattern does not compile: %v", path, err)
+							}
+							for _, tc := range cases {
+								if got := quantityPattern.MatchString(tc.quantity); got != tc.valid {
+									t.Errorf("%s pattern accepts %q = %t, want %t", path, tc.quantity, got, tc.valid)
+								}
 							}
 						}
 					})
@@ -281,7 +287,29 @@ func assertComponentResourceSchema(t *testing.T, schema map[string]any, key stri
 	}
 	assertNoResourceDefaults(t, resources)
 	for _, field := range []string{"requests", "limits"} {
-		resourceSchemaAt(t, schema, path+".manager.resources."+field)
+		resourceMap := resourceSchemaAt(t, schema, path+".manager.resources."+field)
+		properties, _, err := unstructured.NestedMap(resourceMap, "properties")
+		if err != nil || len(properties) != 2 {
+			t.Errorf("%s must expose only CPU and memory: %v (%v)", field, properties, err)
+		}
+		if _, found := resourceMap["additionalProperties"]; found {
+			t.Errorf("%s must not expose arbitrary resource names", field)
+		}
+		for _, name := range []string{"cpu", "memory"} {
+			quantity := resourceSchemaAt(t, schema, path+".manager.resources."+field+"."+name)
+			if quantity["type"] != "string" || quantity["x-kubernetes-int-or-string"] != true {
+				t.Errorf("%s.%s must render as text and accept Kubernetes integer or string quantities: %v", field, name, quantity)
+			}
+			if quantity["format"] != "int-or-string" {
+				t.Errorf("%s.%s must preserve integer quantities during server-side apply", field, name)
+			}
+			for _, unsupported := range []string{"anyOf", "oneOf", "allOf"} {
+				if _, found := quantity[unsupported]; found {
+					t.Errorf("%s.%s uses %s, which the console cannot render", field, name, unsupported)
+				}
+			}
+			assertResourceOptional(t, resourceMap, name)
+		}
 	}
 }
 
