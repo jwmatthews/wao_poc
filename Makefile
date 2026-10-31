@@ -555,6 +555,14 @@ catalog-source: yq ## Write dist/catalogsource.yaml pointing at CATALOG_IMG.
 	$(YQ) '.spec.image = "$(CATALOG_IMG)"' config/catalog/catalogsource.yaml > dist/catalogsource.yaml
 	@grep -q CATALOG_IMG_PLACEHOLDER dist/catalogsource.yaml && { echo "catalog-source: placeholder left"; exit 1; } || true
 
+.PHONY: cluster-catalog
+cluster-catalog: yq ## Write dist/clustercatalog.yaml (OLM v1) pointing at CATALOG_IMG (tag or digest).
+	@test -n "$(CATALOG_IMG)" || { echo "cluster-catalog: set CATALOG_IMG"; exit 1; }
+	mkdir -p dist
+	$(YQ) '.spec.source.image.ref = "$(CATALOG_IMG)" | with(select(.spec.source.image.ref | test("@sha256:")); del(.spec.source.image.pollIntervalMinutes))' \
+		config/catalog/olmv1/clustercatalog.yaml > dist/clustercatalog.yaml
+	@grep -q CATALOG_IMG_PLACEHOLDER dist/clustercatalog.yaml && { echo "cluster-catalog: placeholder left"; exit 1; } || true
+
 ##@ Targets used by CI
 
 .PHONY: container-build

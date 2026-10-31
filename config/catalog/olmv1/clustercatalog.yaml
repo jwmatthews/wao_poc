@@ -1,0 +1,17 @@
+# OLM v1 catalog for the disposable-cluster install. `make cluster-catalog CATALOG_IMG=<ref>` fills
+# spec.source.image.ref and writes dist/clustercatalog.yaml. When the ref is a digest
+# (image@sha256:...), pollIntervalMinutes is dropped because OLM v1 rejects it for digests.
+#
+# ClusterCatalog is cluster-scoped: catalogd unpacks the image itself, so there is no catalog pod
+# in openshift-marketplace. hack/wao-olmv1-make_and_deploy.sh pins the ref to the digest it just
+# pushed, so each rebuild of a reused tag is picked up immediately.
+apiVersion: olm.operatorframework.io/v1
+kind: ClusterCatalog
+metadata:
+  name: wao-poc-catalog
+spec:
+  source:
+    type: Image
+    image:
+      ref: CATALOG_IMG_PLACEHOLDER
+      pollIntervalMinutes: 10

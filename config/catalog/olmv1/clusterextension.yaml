@@ -1,0 +1,35 @@
+# Namespace and ClusterExtension for the OLM v1 POC install. Every component starts Disabled.
+#
+# OLM v1 replaces the Subscription and OperatorGroup with one cluster-scoped ClusterExtension.
+# It does not create the namespace (the CSV's suggested-namespace annotations are ignored), so
+# it is created here.
+#
+# spec.serviceAccount is omitted: on OCP 5.0 it is deprecated and ignored, and the
+# operator-controller installs with its own cluster-admin identity. OCP 4.x requires it and the
+# named ServiceAccount must hold every permission in the bundle (see docs/olm-rbac-requirements.md).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-workload-availability
+  annotations:
+    openshift.io/node-selector: ""
+---
+apiVersion: olm.operatorframework.io/v1
+kind: ClusterExtension
+metadata:
+  name: workload-availability-operator
+spec:
+  namespace: openshift-workload-availability
+  source:
+    sourceType: Catalog
+    catalog:
+      packageName: workload-availability-operator
+      channels:
+        - stable
+      # Resolve only from our catalog, never from the default openshift-* ClusterCatalogs.
+      selector:
+        matchLabels:
+          olm.operatorframework.io/metadata.name: wao-poc-catalog
+      # POC builds are stamped by date and each catalog holds a single bundle, so allow moving to
+      # whatever version the catalog serves instead of enforcing replaces/skipRange upgrade edges.
+      upgradeConstraintPolicy: SelfCertified
