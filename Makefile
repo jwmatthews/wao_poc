@@ -203,8 +203,9 @@ test-offline: verify-operand-manifests ## Offline checks: operand manifests, bun
 ##@ Development
 
 .PHONY: manifests
-manifests: controller-gen ## Generate manifests e.g. CRD, RBAC etc.
+manifests: controller-gen yq ## Generate manifests e.g. CRD, RBAC etc.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	YQ=$(YQ) bash hack/manager-resource-schema.sh config/crd/bases/workloadavailability.medik8s.io_workloadavailabilityconfigs.yaml
 
 .PHONY: generate
 generate: controller-gen ## Generate code
@@ -416,6 +417,7 @@ bundle: verify-previous-version verify-skip-range ## Generate bundle manifests a
 	# Validate before starting generation, including under parallel Make.
 	$(MAKE) manifests kustomize operator-sdk
 	$(OPERATOR_SDK) generate kustomize manifests -q
+	YQ=$(YQ) bash hack/manager-resource-descriptors.sh $(MANIFESTS_DIR)/bases/$(OPERATOR_NAME).clusterserviceversion.yaml
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	# LoadRestrictionsNone: config/operands/sbr/overlays/rbac lists a copied file that SBR's own kustomization omits.
 	$(KUSTOMIZE) build --load-restrictor LoadRestrictionsNone $(MANIFESTS_DIR) | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) --extra-service-accounts $(OPERAND_SERVICE_ACCOUNTS) $(BUNDLE_METADATA_OPTS)

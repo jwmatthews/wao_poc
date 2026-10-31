@@ -17,8 +17,11 @@ type Definition struct {
 	ShortName   string // nhc
 	ManifestDir string // directory under internal/operands/manifests
 	Deployments []string
-	Images      []string // RELATED_IMAGE_* names; see images.Placeholder
-	Webhooks    []WebhookConfiguration
+	// ManagerDeployment and ManagerContainer select the target for manager resources.
+	ManagerDeployment string
+	ManagerContainer  string
+	Images            []string // RELATED_IMAGE_* names; see images.Placeholder
+	Webhooks          []WebhookConfiguration
 	// AgentOwners are config kinds, in the install namespace, whose DaemonSets are node agents
 	// that keep running after the manager is removed.
 	AgentOwners []ResourceKind

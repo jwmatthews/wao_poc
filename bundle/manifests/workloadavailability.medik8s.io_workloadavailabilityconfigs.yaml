@@ -69,51 +69,273 @@ spec:
                       Runs the Fence Agents Remediation operator. Fencing requires separately
                       configured remediation resources and fence-agent credentials.
                     properties:
-                      state:
-                        default: Disabled
+                      enabled:
+                        default: false
                         description: |-
-                          Enabled runs the operator. Disabled removes its manager and managed
-                          installation resources; existing agents, configuration, and native resources
-                          can remain. Complete active maintenance or remediation before disabling.
-                          Default: Disabled.
-                        enum:
-                        - Enabled
-                        - Disabled
-                        type: string
+                          Enabled runs the operator when true. The default is false.
+                          Disabling removes its manager and managed installation resources.
+                          Existing agents, configuration, and native resources can remain.
+                          Complete active maintenance or remediation before disabling.
+                        type: boolean
+                      manager:
+                        description: Manager configures the component's manager container.
+                        properties:
+                          resources:
+                            description: |-
+                              Resources sets CPU and memory for the manager container only.
+                              Omitted values retain the packaged defaults. Settings do not enable the component.
+                              WAO checks effective values when the component is enabled.
+                            properties:
+                              claims:
+                                description: |-
+                                  Claims lists the names of resources, defined in spec.resourceClaims,
+                                  that are used by this container.
+
+                                  This is an alpha field and requires enabling the
+                                  DynamicResourceAllocation feature gate.
+
+                                  This field is immutable. It can only be set for containers.
+                                items:
+                                  description: ResourceClaim references one entry
+                                    in PodSpec.ResourceClaims.
+                                  properties:
+                                    name:
+                                      description: |-
+                                        Name must match the name of one entry in pod.spec.resourceClaims of
+                                        the Pod where this field is used. It makes that resource available
+                                        inside a container.
+                                      type: string
+                                    request:
+                                      description: |-
+                                        Request is the name chosen for a request in the referenced claim.
+                                        If empty, everything from the claim is made available, otherwise
+                                        only the result of this request.
+                                      type: string
+                                  required:
+                                  - name
+                                  type: object
+                                type: array
+                                x-kubernetes-list-map-keys:
+                                - name
+                                x-kubernetes-list-type: map
+                              limits:
+                                description: |-
+                                  Limits describes the maximum amount of compute resources allowed.
+                                  More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                                properties:
+                                  cpu:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                  memory:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                type: object
+                              requests:
+                                description: |-
+                                  Requests describes the minimum amount of compute resources required.
+                                  If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                                  otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                                  More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                                properties:
+                                  cpu:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                  memory:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                type: object
+                            type: object
+                        type: object
                     type: object
                   machineDeletionRemediation:
                     description: |-
                       Runs the Machine Deletion Remediation operator. Machine deletion requires
                       a separate remediation request.
                     properties:
-                      state:
-                        default: Disabled
+                      enabled:
+                        default: false
                         description: |-
-                          Enabled runs the operator. Disabled removes its manager and managed
-                          installation resources; existing agents, configuration, and native resources
-                          can remain. Complete active maintenance or remediation before disabling.
-                          Default: Disabled.
-                        enum:
-                        - Enabled
-                        - Disabled
-                        type: string
+                          Enabled runs the operator when true. The default is false.
+                          Disabling removes its manager and managed installation resources.
+                          Existing agents, configuration, and native resources can remain.
+                          Complete active maintenance or remediation before disabling.
+                        type: boolean
+                      manager:
+                        description: Manager configures the component's manager container.
+                        properties:
+                          resources:
+                            description: |-
+                              Resources sets CPU and memory for the manager container only.
+                              Omitted values retain the packaged defaults. Settings do not enable the component.
+                              WAO checks effective values when the component is enabled.
+                            properties:
+                              claims:
+                                description: |-
+                                  Claims lists the names of resources, defined in spec.resourceClaims,
+                                  that are used by this container.
+
+                                  This is an alpha field and requires enabling the
+                                  DynamicResourceAllocation feature gate.
+
+                                  This field is immutable. It can only be set for containers.
+                                items:
+                                  description: ResourceClaim references one entry
+                                    in PodSpec.ResourceClaims.
+                                  properties:
+                                    name:
+                                      description: |-
+                                        Name must match the name of one entry in pod.spec.resourceClaims of
+                                        the Pod where this field is used. It makes that resource available
+                                        inside a container.
+                                      type: string
+                                    request:
+                                      description: |-
+                                        Request is the name chosen for a request in the referenced claim.
+                                        If empty, everything from the claim is made available, otherwise
+                                        only the result of this request.
+                                      type: string
+                                  required:
+                                  - name
+                                  type: object
+                                type: array
+                                x-kubernetes-list-map-keys:
+                                - name
+                                x-kubernetes-list-type: map
+                              limits:
+                                description: |-
+                                  Limits describes the maximum amount of compute resources allowed.
+                                  More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                                properties:
+                                  cpu:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                  memory:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                type: object
+                              requests:
+                                description: |-
+                                  Requests describes the minimum amount of compute resources required.
+                                  If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                                  otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                                  More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                                properties:
+                                  cpu:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                  memory:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                type: object
+                            type: object
+                        type: object
                     type: object
                   nodeHealthCheck:
                     description: |-
                       Runs the Node Health Check operator. Configure a NodeHealthCheck policy
                       separately to enable automated health monitoring and remediation.
                     properties:
-                      state:
-                        default: Disabled
+                      enabled:
+                        default: false
                         description: |-
-                          Enabled runs the operator. Disabled removes its manager and managed
-                          installation resources; existing agents, configuration, and native resources
-                          can remain. Complete active maintenance or remediation before disabling.
-                          Default: Disabled.
-                        enum:
-                        - Enabled
-                        - Disabled
-                        type: string
+                          Enabled runs the operator when true. The default is false.
+                          Disabling removes its manager and managed installation resources.
+                          Existing agents, configuration, and native resources can remain.
+                          Complete active maintenance or remediation before disabling.
+                        type: boolean
+                      manager:
+                        description: Manager configures the component's manager container.
+                        properties:
+                          resources:
+                            description: |-
+                              Resources sets CPU and memory for the manager container only.
+                              Omitted values retain the packaged defaults. Settings do not enable the component.
+                              WAO checks effective values when the component is enabled.
+                            properties:
+                              claims:
+                                description: |-
+                                  Claims lists the names of resources, defined in spec.resourceClaims,
+                                  that are used by this container.
+
+                                  This is an alpha field and requires enabling the
+                                  DynamicResourceAllocation feature gate.
+
+                                  This field is immutable. It can only be set for containers.
+                                items:
+                                  description: ResourceClaim references one entry
+                                    in PodSpec.ResourceClaims.
+                                  properties:
+                                    name:
+                                      description: |-
+                                        Name must match the name of one entry in pod.spec.resourceClaims of
+                                        the Pod where this field is used. It makes that resource available
+                                        inside a container.
+                                      type: string
+                                    request:
+                                      description: |-
+                                        Request is the name chosen for a request in the referenced claim.
+                                        If empty, everything from the claim is made available, otherwise
+                                        only the result of this request.
+                                      type: string
+                                  required:
+                                  - name
+                                  type: object
+                                type: array
+                                x-kubernetes-list-map-keys:
+                                - name
+                                x-kubernetes-list-type: map
+                              limits:
+                                description: |-
+                                  Limits describes the maximum amount of compute resources allowed.
+                                  More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                                properties:
+                                  cpu:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                  memory:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                type: object
+                              requests:
+                                description: |-
+                                  Requests describes the minimum amount of compute resources required.
+                                  If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                                  otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                                  More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                                properties:
+                                  cpu:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                  memory:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                type: object
+                            type: object
+                        type: object
                     type: object
                   nodeMaintenance:
                     description: |-
@@ -121,17 +343,91 @@ spec:
                       separately requests node cordoning and draining. Complete active maintenance
                       before disabling; stopping the manager does not uncordon a node.
                     properties:
-                      state:
-                        default: Disabled
+                      enabled:
+                        default: false
                         description: |-
-                          Enabled runs the operator. Disabled removes its manager and managed
-                          installation resources; existing agents, configuration, and native resources
-                          can remain. Complete active maintenance or remediation before disabling.
-                          Default: Disabled.
-                        enum:
-                        - Enabled
-                        - Disabled
-                        type: string
+                          Enabled runs the operator when true. The default is false.
+                          Disabling removes its manager and managed installation resources.
+                          Existing agents, configuration, and native resources can remain.
+                          Complete active maintenance or remediation before disabling.
+                        type: boolean
+                      manager:
+                        description: Manager configures the component's manager container.
+                        properties:
+                          resources:
+                            description: |-
+                              Resources sets CPU and memory for the manager container only.
+                              Omitted values retain the packaged defaults. Settings do not enable the component.
+                              WAO checks effective values when the component is enabled.
+                            properties:
+                              claims:
+                                description: |-
+                                  Claims lists the names of resources, defined in spec.resourceClaims,
+                                  that are used by this container.
+
+                                  This is an alpha field and requires enabling the
+                                  DynamicResourceAllocation feature gate.
+
+                                  This field is immutable. It can only be set for containers.
+                                items:
+                                  description: ResourceClaim references one entry
+                                    in PodSpec.ResourceClaims.
+                                  properties:
+                                    name:
+                                      description: |-
+                                        Name must match the name of one entry in pod.spec.resourceClaims of
+                                        the Pod where this field is used. It makes that resource available
+                                        inside a container.
+                                      type: string
+                                    request:
+                                      description: |-
+                                        Request is the name chosen for a request in the referenced claim.
+                                        If empty, everything from the claim is made available, otherwise
+                                        only the result of this request.
+                                      type: string
+                                  required:
+                                  - name
+                                  type: object
+                                type: array
+                                x-kubernetes-list-map-keys:
+                                - name
+                                x-kubernetes-list-type: map
+                              limits:
+                                description: |-
+                                  Limits describes the maximum amount of compute resources allowed.
+                                  More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                                properties:
+                                  cpu:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                  memory:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                type: object
+                              requests:
+                                description: |-
+                                  Requests describes the minimum amount of compute resources required.
+                                  If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                                  otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                                  More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                                properties:
+                                  cpu:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                  memory:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                type: object
+                            type: object
+                        type: object
                     type: object
                   selfNodeRemediation:
                     description: |-
@@ -139,17 +435,91 @@ spec:
                       its default configuration and starts privileged node agents on eligible
                       nodes. Disabling does not remove existing node agents or their configuration.
                     properties:
-                      state:
-                        default: Disabled
+                      enabled:
+                        default: false
                         description: |-
-                          Enabled runs the operator. Disabled removes its manager and managed
-                          installation resources; existing agents, configuration, and native resources
-                          can remain. Complete active maintenance or remediation before disabling.
-                          Default: Disabled.
-                        enum:
-                        - Enabled
-                        - Disabled
-                        type: string
+                          Enabled runs the operator when true. The default is false.
+                          Disabling removes its manager and managed installation resources.
+                          Existing agents, configuration, and native resources can remain.
+                          Complete active maintenance or remediation before disabling.
+                        type: boolean
+                      manager:
+                        description: Manager configures the component's manager container.
+                        properties:
+                          resources:
+                            description: |-
+                              Resources sets CPU and memory for the manager container only.
+                              Omitted values retain the packaged defaults. Settings do not enable the component.
+                              WAO checks effective values when the component is enabled.
+                            properties:
+                              claims:
+                                description: |-
+                                  Claims lists the names of resources, defined in spec.resourceClaims,
+                                  that are used by this container.
+
+                                  This is an alpha field and requires enabling the
+                                  DynamicResourceAllocation feature gate.
+
+                                  This field is immutable. It can only be set for containers.
+                                items:
+                                  description: ResourceClaim references one entry
+                                    in PodSpec.ResourceClaims.
+                                  properties:
+                                    name:
+                                      description: |-
+                                        Name must match the name of one entry in pod.spec.resourceClaims of
+                                        the Pod where this field is used. It makes that resource available
+                                        inside a container.
+                                      type: string
+                                    request:
+                                      description: |-
+                                        Request is the name chosen for a request in the referenced claim.
+                                        If empty, everything from the claim is made available, otherwise
+                                        only the result of this request.
+                                      type: string
+                                  required:
+                                  - name
+                                  type: object
+                                type: array
+                                x-kubernetes-list-map-keys:
+                                - name
+                                x-kubernetes-list-type: map
+                              limits:
+                                description: |-
+                                  Limits describes the maximum amount of compute resources allowed.
+                                  More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                                properties:
+                                  cpu:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                  memory:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                type: object
+                              requests:
+                                description: |-
+                                  Requests describes the minimum amount of compute resources required.
+                                  If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                                  otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                                  More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                                properties:
+                                  cpu:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                  memory:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                type: object
+                            type: object
+                        type: object
                     type: object
                   storageBasedRemediation:
                     description: |-
@@ -158,17 +528,91 @@ spec:
                       storage-based fencing. Existing agents and storage configuration can remain
                       after disabling.
                     properties:
-                      state:
-                        default: Disabled
+                      enabled:
+                        default: false
                         description: |-
-                          Enabled runs the operator. Disabled removes its manager and managed
-                          installation resources; existing agents, configuration, and native resources
-                          can remain. Complete active maintenance or remediation before disabling.
-                          Default: Disabled.
-                        enum:
-                        - Enabled
-                        - Disabled
-                        type: string
+                          Enabled runs the operator when true. The default is false.
+                          Disabling removes its manager and managed installation resources.
+                          Existing agents, configuration, and native resources can remain.
+                          Complete active maintenance or remediation before disabling.
+                        type: boolean
+                      manager:
+                        description: Manager configures the component's manager container.
+                        properties:
+                          resources:
+                            description: |-
+                              Resources sets CPU and memory for the manager container only.
+                              Omitted values retain the packaged defaults. Settings do not enable the component.
+                              WAO checks effective values when the component is enabled.
+                            properties:
+                              claims:
+                                description: |-
+                                  Claims lists the names of resources, defined in spec.resourceClaims,
+                                  that are used by this container.
+
+                                  This is an alpha field and requires enabling the
+                                  DynamicResourceAllocation feature gate.
+
+                                  This field is immutable. It can only be set for containers.
+                                items:
+                                  description: ResourceClaim references one entry
+                                    in PodSpec.ResourceClaims.
+                                  properties:
+                                    name:
+                                      description: |-
+                                        Name must match the name of one entry in pod.spec.resourceClaims of
+                                        the Pod where this field is used. It makes that resource available
+                                        inside a container.
+                                      type: string
+                                    request:
+                                      description: |-
+                                        Request is the name chosen for a request in the referenced claim.
+                                        If empty, everything from the claim is made available, otherwise
+                                        only the result of this request.
+                                      type: string
+                                  required:
+                                  - name
+                                  type: object
+                                type: array
+                                x-kubernetes-list-map-keys:
+                                - name
+                                x-kubernetes-list-type: map
+                              limits:
+                                description: |-
+                                  Limits describes the maximum amount of compute resources allowed.
+                                  More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                                properties:
+                                  cpu:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                  memory:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                type: object
+                              requests:
+                                description: |-
+                                  Requests describes the minimum amount of compute resources required.
+                                  If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                                  otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                                  More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                                properties:
+                                  cpu:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                  memory:
+                                    format: int-or-string
+                                    pattern: ^([+]|-)?(([0-9]+([.][0-9]*)?)|([.][0-9]+))(([KMGTPE]i)|[numkMGTPE]|[eE]([+]?0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6][0-9]{0}|9223372036854775807)|-0*([0-9]{1,18}|[0-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7][0-9]{0}|9223372036854775808)))?$
+                                    type: string
+                                    x-kubernetes-int-or-string: true
+                                type: object
+                            type: object
+                        type: object
                     type: object
                 type: object
             type: object
@@ -204,8 +648,8 @@ spec:
                         type: object
                       type: array
                     desiredState:
-                      description: ComponentState is the administrator's intent for
-                        one component.
+                      description: ComponentState represents the controller's desired
+                        state in component status.
                       enum:
                       - Enabled
                       - Disabled

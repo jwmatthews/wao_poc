@@ -1,14 +1,61 @@
 package components_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/medik8s/workload-availability-operator/api/v1alpha1"
 	"github.com/medik8s/workload-availability-operator/internal/components"
 	"github.com/medik8s/workload-availability-operator/internal/images"
 	"github.com/medik8s/workload-availability-operator/internal/operands"
 )
+
+func TestRegistrySelectsOneManagerContainer(t *testing.T) {
+	imgs := images.Set{}
+	for _, name := range images.Required {
+		imgs[name] = "example.test/operand:test"
+	}
+	for _, def := range components.All() {
+		t.Run(def.Key, func(t *testing.T) {
+			if def.ManagerDeployment == "" || def.ManagerContainer == "" {
+				t.Fatal("manager Deployment and container names must be declared")
+			}
+			if !slices.Contains(def.Deployments, def.ManagerDeployment) {
+				t.Fatal("manager Deployment is absent from readiness and removal targets")
+			}
+			objects, err := operands.Render(def, "wao-test", imgs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			deployments, containers := 0, 0
+			for _, obj := range objects {
+				if obj.GetKind() != "Deployment" || obj.GetName() != def.ManagerDeployment {
+					continue
+				}
+				deployments++
+				entries, _, err := unstructured.NestedSlice(obj.Object, "spec", "template", "spec", "containers")
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, entry := range entries {
+					name, _, err := unstructured.NestedString(entry.(map[string]any), "name")
+					if err != nil {
+						t.Fatal(err)
+					}
+					if name == def.ManagerContainer {
+						containers++
+					}
+				}
+			}
+			if deployments != 1 || containers != 1 {
+				t.Fatalf("selected %d Deployments and %d containers, want one of each", deployments, containers)
+			}
+		})
+	}
+}
 
 func TestRegistryKeysMatchAPI(t *testing.T) {
 	want := []string{v1alpha1.ComponentKeyNodeHealthCheck, v1alpha1.ComponentKeySelfNodeRemediation, v1alpha1.ComponentKeyStorageBasedRemediation,

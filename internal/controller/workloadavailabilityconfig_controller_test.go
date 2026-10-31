@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -28,6 +30,52 @@ import (
 )
 
 const ns = "wao-test"
+
+func componentSpec(w *v1alpha1.WorkloadAvailabilityConfig, key string) *v1alpha1.ComponentSpec {
+	switch key {
+	case v1alpha1.ComponentKeyNodeHealthCheck:
+		return &w.Spec.Components.NodeHealthCheck
+	case v1alpha1.ComponentKeySelfNodeRemediation:
+		return &w.Spec.Components.SelfNodeRemediation
+	case v1alpha1.ComponentKeyStorageBasedRemediation:
+		return &w.Spec.Components.StorageBasedRemediation
+	case v1alpha1.ComponentKeyFenceAgentsRemediation:
+		return &w.Spec.Components.FenceAgentsRemediation
+	case v1alpha1.ComponentKeyMachineDeletionRemediation:
+		return &w.Spec.Components.MachineDeletionRemediation
+	case v1alpha1.ComponentKeyNodeMaintenance:
+		return &w.Spec.Components.NodeMaintenance
+	default:
+		panic("unknown component: " + key)
+	}
+}
+
+func setResources(ctx context.Context, key string, resources *corev1.ResourceRequirements) {
+	Eventually(func() error {
+		w := getWAC(ctx)
+		if resources == nil {
+			componentSpec(w, key).Manager = nil
+		} else {
+			componentSpec(w, key).Manager = &v1alpha1.ManagerSpec{Resources: resources.DeepCopy()}
+		}
+		return k8sClient.Update(ctx, w)
+	}).Should(Succeed())
+}
+
+func getDeployment(ctx context.Context, name string) *appsv1.Deployment {
+	d := &appsv1.Deployment{}
+	Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, d)).To(Succeed())
+	return d
+}
+
+func managerResources(d *appsv1.Deployment) corev1.ResourceRequirements {
+	for _, c := range d.Spec.Template.Spec.Containers {
+		if c.Name == "manager" {
+			return c.Resources
+		}
+	}
+	panic("manager container missing")
+}
 
 func getWAC(ctx context.Context) *v1alpha1.WorkloadAvailabilityConfig {
 	w := &v1alpha1.WorkloadAvailabilityConfig{}
@@ -44,22 +92,22 @@ func component(w *v1alpha1.WorkloadAvailabilityConfig, key string) *v1alpha1.Com
 	return nil
 }
 
-func setState(ctx context.Context, key string, state v1alpha1.ComponentState) {
+func setEnabled(ctx context.Context, key string, enabled bool) {
 	Eventually(func() error {
 		w := getWAC(ctx)
 		switch key {
 		case v1alpha1.ComponentKeyNodeHealthCheck:
-			w.Spec.Components.NodeHealthCheck.State = state
+			w.Spec.Components.NodeHealthCheck.Enabled = enabled
 		case v1alpha1.ComponentKeySelfNodeRemediation:
-			w.Spec.Components.SelfNodeRemediation.State = state
+			w.Spec.Components.SelfNodeRemediation.Enabled = enabled
 		case v1alpha1.ComponentKeyStorageBasedRemediation:
-			w.Spec.Components.StorageBasedRemediation.State = state
+			w.Spec.Components.StorageBasedRemediation.Enabled = enabled
 		case v1alpha1.ComponentKeyFenceAgentsRemediation:
-			w.Spec.Components.FenceAgentsRemediation.State = state
+			w.Spec.Components.FenceAgentsRemediation.Enabled = enabled
 		case v1alpha1.ComponentKeyMachineDeletionRemediation:
-			w.Spec.Components.MachineDeletionRemediation.State = state
+			w.Spec.Components.MachineDeletionRemediation.Enabled = enabled
 		case v1alpha1.ComponentKeyNodeMaintenance:
-			w.Spec.Components.NodeMaintenance.State = state
+			w.Spec.Components.NodeMaintenance.Enabled = enabled
 		}
 		return k8sClient.Update(ctx, w)
 	}).Should(Succeed())
@@ -98,25 +146,139 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		Consistently(func() string { return getWAC(ctx).ResourceVersion }, 5*time.Second, 250*time.Millisecond).Should(Equal(rv))
 	})
 
-	It("installs the NHC operand when enabled", func() {
-		setState(ctx, v1alpha1.ComponentKeyNodeHealthCheck, v1alpha1.ComponentStateEnabled)
-		// Status is written after every operand object has been applied, so wait for it first.
+	It("rejects strings for enabled and malformed resource quantities", func() {
+		for _, value := range []string{"true", "false", "Enabled"} {
+			patch := []byte(fmt.Sprintf(`{"spec":{"components":{"nodeHealthCheck":{"enabled":%q}}}}`, value))
+			err := k8sClient.Patch(ctx, getWAC(ctx), client.RawPatch(types.MergePatchType, patch))
+			Expect(apierrors.IsInvalid(err)).To(BeTrue(), "got %v", err)
+		}
+		bad := []byte(`{"spec":{"components":{"nodeHealthCheck":{"manager":{"resources":{"requests":{"cpu":"not-a-quantity"}}}}}}}`)
+		err := k8sClient.Patch(ctx, getWAC(ctx), client.RawPatch(types.MergePatchType, bad))
+		Expect(err).To(HaveOccurred())
+		legacy := []byte(`{"spec":{"components":{"nodeHealthCheck":{"state":"Enabled"}}}}`)
+		err = k8sClient.Patch(ctx, getWAC(ctx), client.RawPatch(types.MergePatchType, legacy), client.FieldValidation(metav1.FieldValidationStrict))
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("state"))
+	})
+
+	It("rejects malformed quantity exponents while the component is disabled", func() {
+		for _, field := range []string{"requests", "limits"} {
+			for _, value := range []string{"1e1.5", "1e.5", "1e9223372036854775808", "1e-9223372036854775809"} {
+				for _, name := range []string{"cpu", "memory"} {
+					patch := []byte(fmt.Sprintf(`{"spec":{"components":{"nodeHealthCheck":{"enabled":false,"manager":{"resources":{%q:{%q:%q}}}}}}}`, field, name, value))
+					target := &unstructured.Unstructured{Object: map[string]interface{}{
+						"apiVersion": v1alpha1.GroupVersion.String(), "kind": "WorkloadAvailabilityConfig",
+						"metadata": map[string]interface{}{"name": v1alpha1.SingletonName},
+					}}
+					err := k8sClient.Patch(ctx, target, client.RawPatch(types.MergePatchType, patch), client.DryRunAll)
+					Expect(apierrors.IsInvalid(err)).To(BeTrue(), "%s.%s=%s should fail admission: %v", field, name, value, err)
+				}
+			}
+		}
+	})
+
+	It("accepts integer and string resource quantities through the console schema", func() {
+		for _, field := range []string{"requests", "limits"} {
+			for _, name := range []string{"cpu", "memory"} {
+				for _, value := range []string{`1`, `0`, `"100m"`, `"128Mi"`} {
+					for _, patchType := range []types.PatchType{types.MergePatchType, types.ApplyPatchType} {
+						patch := []byte(fmt.Sprintf(`{"apiVersion":"workloadavailability.medik8s.io/v1alpha1","kind":"WorkloadAvailabilityConfig","metadata":{"name":"cluster"},"spec":{"components":{"nodeHealthCheck":{"enabled":false,"manager":{"resources":{%q:{%q:%s}}}}}}}`, field, name, value))
+						target := &unstructured.Unstructured{Object: map[string]interface{}{
+							"apiVersion": v1alpha1.GroupVersion.String(), "kind": "WorkloadAvailabilityConfig",
+							"metadata": map[string]interface{}{"name": v1alpha1.SingletonName},
+						}}
+						Expect(k8sClient.Patch(ctx, target, client.RawPatch(patchType, patch), client.DryRunAll, client.FieldOwner("wao-resource-admission-test"))).To(Succeed(), "%s %s.%s=%s", patchType, field, name, value)
+						stored, found, err := unstructured.NestedFieldNoCopy(target.Object, "spec", "components", "nodeHealthCheck", "manager", "resources", field, name)
+						Expect(err).NotTo(HaveOccurred())
+						Expect(found).To(BeTrue())
+						Expect(fmt.Sprint(stored)).To(Equal(strings.Trim(value, `"`)))
+					}
+				}
+			}
+		}
+	})
+
+	It("rejects unsupported resource names with strict field validation", func() {
+		for _, field := range []string{"requests", "limits"} {
+			for _, name := range []string{"storage", "ephemeral-storage", "unsupported"} {
+				patch := []byte(fmt.Sprintf(`{"spec":{"components":{"nodeHealthCheck":{"manager":{"resources":{%q:{%q:"1Gi"}}}}}}}`, field, name))
+				err := k8sClient.Patch(ctx, getWAC(ctx), client.RawPatch(types.MergePatchType, patch), client.DryRunAll, client.FieldValidation(metav1.FieldValidationStrict))
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(name))
+			}
+		}
+	})
+
+	It("stores resources while disabled and applies them to every named manager", func() {
+		resources := &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("5m"), corev1.ResourceMemory: resource.MustParse("16Mi")},
+			Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1"), corev1.ResourceMemory: resource.MustParse("256Mi")},
+		}
+		for _, def := range components.All() {
+			setResources(ctx, def.Key, resources)
+		}
 		Eventually(func(g Gomega) {
-			c := component(getWAC(ctx), v1alpha1.ComponentKeyNodeHealthCheck)
+			w := getWAC(ctx)
+			g.Expect(w.Status.ObservedGeneration).To(Equal(w.Generation))
+			deps := &appsv1.DeploymentList{}
+			g.Expect(k8sClient.List(ctx, deps, client.InNamespace(ns))).To(Succeed())
+			g.Expect(deps.Items).To(BeEmpty())
+		}).Should(Succeed())
+		for _, def := range components.All() {
+			setEnabled(ctx, def.Key, true)
+			Eventually(func(g Gomega) {
+				d := &appsv1.Deployment{}
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: def.ManagerDeployment}, d)).To(Succeed())
+				got := managerResources(d)
+				for _, name := range []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory} {
+					request, limit := got.Requests[name], got.Limits[name]
+					g.Expect(request.Cmp(resources.Requests[name])).To(BeZero())
+					g.Expect(limit.Cmp(resources.Limits[name])).To(BeZero())
+				}
+			}).Should(Succeed())
+		}
+		for _, def := range components.All() {
+			setEnabled(ctx, def.Key, false)
+			setResources(ctx, def.Key, nil)
+		}
+		Eventually(func(g Gomega) {
+			w := getWAC(ctx)
+			g.Expect(w.Status.ObservedGeneration).To(Equal(w.Generation))
+			g.Expect(w.Status.Components).To(HaveLen(6))
+			for _, c := range w.Status.Components {
+				g.Expect(c.Phase).To(Equal(v1alpha1.ComponentPhaseDisabled), c.Name)
+			}
+			deps := &appsv1.DeploymentList{}
+			g.Expect(k8sClient.List(ctx, deps, client.InNamespace(ns))).To(Succeed())
+			g.Expect(deps.Items).To(BeEmpty())
+		}).Should(Succeed())
+	})
+
+	It("installs the NHC operand when enabled", func() {
+		setEnabled(ctx, v1alpha1.ComponentKeyNodeHealthCheck, true)
+		// Wait for status from this enable generation, not a previous installation.
+		Eventually(func(g Gomega) {
+			w := getWAC(ctx)
+			g.Expect(w.Status.ObservedGeneration).To(Equal(w.Generation))
+			c := component(w, v1alpha1.ComponentKeyNodeHealthCheck)
 			g.Expect(c).NotTo(BeNil())
 			g.Expect(c.Phase).To(Equal(v1alpha1.ComponentPhaseProgressing)) // envtest has no kubelet or service-ca
 			g.Expect(c.Deployments).To(HaveLen(2))                          // the manager and the console plugin backend of NHC's OCP packaging
 			g.Expect(c.AdmissionReady).To(Equal(ptr.To(false)))
 		}).Should(Succeed())
 		dep := &appsv1.Deployment{}
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-controller-manager"}, dep)).To(Succeed())
+		Eventually(func() error {
+			return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-controller-manager"}, dep)
+		}).Should(Succeed())
 		Expect(dep.Spec.Template.Spec.Containers[0].Image).To(Equal(testImages().Get(images.NHCManager)))
 		Expect(dep.Labels[operands.LabelManagedBy]).To(Equal(operands.ManagedByValue))
 		Expect(dep.OwnerReferences).To(HaveLen(1))
 		Expect(dep.OwnerReferences[0].Kind).To(Equal("WorkloadAvailabilityConfig"))
 		Expect(*dep.OwnerReferences[0].Controller).To(BeTrue())
 		console := &appsv1.Deployment{}
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-node-remediation-console-plugin"}, console)).To(Succeed())
+		Eventually(func() error {
+			return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "node-healthcheck-node-remediation-console-plugin"}, console)
+		}).Should(Succeed())
 		Expect(console.Spec.Template.Spec.Containers[0].Image).To(Equal(testImages().Get(images.NHCConsole)))
 		Expect(console.OwnerReferences).To(HaveLen(1))
 
@@ -130,13 +292,113 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		Expect(vw.Annotations["service.beta.openshift.io/inject-cabundle"]).To(Equal("true"))
 	})
 
+	It("updates resources, repairs drift, restores defaults, and isolates other Deployments", func() {
+		const name = "node-healthcheck-controller-manager"
+		setEnabled(ctx, v1alpha1.ComponentKeyStorageBasedRemediation, true)
+		Eventually(func() error {
+			return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "sbr-operator-controller-manager"}, &appsv1.Deployment{})
+		}).Should(Succeed())
+		other := getDeployment(ctx, "sbr-operator-controller-manager").Spec.Template.DeepCopy()
+		plugin := getDeployment(ctx, "node-healthcheck-node-remediation-console-plugin").Spec.Template.DeepCopy()
+		defaults := managerResources(getDeployment(ctx, name))
+		resources := &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("64Mi")},
+			Limits:   corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("256Mi")},
+		}
+		setResources(ctx, v1alpha1.ComponentKeyNodeHealthCheck, resources)
+		Eventually(func(g Gomega) {
+			got := managerResources(getDeployment(ctx, name))
+			g.Expect(got.Requests.Memory().Cmp(resource.MustParse("64Mi"))).To(BeZero())
+			g.Expect(got.Limits.Memory().Cmp(resource.MustParse("256Mi"))).To(BeZero())
+			g.Expect(got.Requests.Cpu().Cmp(*defaults.Requests.Cpu())).To(BeZero())
+		}).Should(Succeed())
+		before := getDeployment(ctx, name).Generation
+		resources.Requests[corev1.ResourceMemory] = resource.MustParse("96Mi")
+		setResources(ctx, v1alpha1.ComponentKeyNodeHealthCheck, resources)
+		Eventually(func(g Gomega) {
+			d := getDeployment(ctx, name)
+			got := managerResources(d)
+			g.Expect(got.Requests.Memory().Cmp(resource.MustParse("96Mi"))).To(BeZero())
+			g.Expect(d.Generation).To(BeNumerically(">", before))
+		}).Should(Succeed())
+		Eventually(func() error {
+			d := getDeployment(ctx, name)
+			original := d.DeepCopy()
+			for i := range d.Spec.Template.Spec.Containers {
+				if d.Spec.Template.Spec.Containers[i].Name == "manager" {
+					d.Spec.Template.Spec.Containers[i].Resources.Requests[corev1.ResourceMemory] = resource.MustParse("80Mi")
+				}
+			}
+			return k8sClient.Patch(ctx, d, client.MergeFrom(original))
+		}).Should(Succeed())
+		Eventually(func(g Gomega) {
+			got := managerResources(getDeployment(ctx, name))
+			g.Expect(got.Requests.Memory().Cmp(resource.MustParse("96Mi"))).To(BeZero())
+		}).Should(Succeed())
+		setResources(ctx, v1alpha1.ComponentKeyNodeHealthCheck, nil)
+		Eventually(func(g Gomega) {
+			g.Expect(managerResources(getDeployment(ctx, name))).To(Equal(defaults))
+		}).Should(Succeed())
+		Expect(getDeployment(ctx, "sbr-operator-controller-manager").Spec.Template).To(Equal(*other))
+		Expect(getDeployment(ctx, "node-healthcheck-node-remediation-console-plugin").Spec.Template).To(Equal(*plugin))
+		generation := getDeployment(ctx, name).Generation
+		Consistently(func() int64 { return getDeployment(ctx, name).Generation }, 2*time.Second, 100*time.Millisecond).Should(Equal(generation))
+		setEnabled(ctx, v1alpha1.ComponentKeyStorageBasedRemediation, false)
+		Eventually(func() bool {
+			return apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "sbr-operator-controller-manager"}, &appsv1.Deployment{}))
+		}).Should(BeTrue())
+	})
+
+	It("reports invalid effective resources without applying them and recovers after correction", func() {
+		const name = "sbr-operator-controller-manager"
+		setEnabled(ctx, v1alpha1.ComponentKeyStorageBasedRemediation, true)
+		Eventually(func() error {
+			return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, &appsv1.Deployment{})
+		}).Should(Succeed())
+		before := getDeployment(ctx, name).Spec.Template.DeepCopy()
+		bad := &corev1.ResourceRequirements{Limits: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("32Mi")}}
+		setResources(ctx, v1alpha1.ComponentKeyStorageBasedRemediation, bad)
+		Eventually(func(g Gomega) {
+			w := getWAC(ctx)
+			c := component(w, v1alpha1.ComponentKeyStorageBasedRemediation)
+			g.Expect(c.Phase).To(Equal(v1alpha1.ComponentPhaseDegraded))
+			g.Expect(c.Message).To(ContainSubstring("spec.components.storageBasedRemediation.manager.resources.requests.memory"))
+			g.Expect(c.Message).To(ContainSubstring("64Mi"))
+			g.Expect(c.Message).To(ContainSubstring("32Mi"))
+			g.Expect(meta.IsStatusConditionTrue(w.Status.Conditions, v1alpha1.ConditionDegraded)).To(BeTrue())
+		}).Should(Succeed())
+		Expect(getDeployment(ctx, name).Spec.Template).To(Equal(*before))
+		setResources(ctx, v1alpha1.ComponentKeyNodeHealthCheck, &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("48Mi")},
+		})
+		Eventually(func(g Gomega) {
+			got := managerResources(getDeployment(ctx, "node-healthcheck-controller-manager"))
+			g.Expect(got.Requests.Memory().Cmp(resource.MustParse("48Mi"))).To(BeZero())
+		}).Should(Succeed())
+		setResources(ctx, v1alpha1.ComponentKeyStorageBasedRemediation, nil)
+		Eventually(func(g Gomega) {
+			w := getWAC(ctx)
+			g.Expect(component(w, v1alpha1.ComponentKeyStorageBasedRemediation).Phase).To(Equal(v1alpha1.ComponentPhaseProgressing))
+			g.Expect(meta.IsStatusConditionTrue(w.Status.Conditions, v1alpha1.ConditionDegraded)).To(BeFalse())
+		}).Should(Succeed())
+		setResources(ctx, v1alpha1.ComponentKeyStorageBasedRemediation, bad)
+		setEnabled(ctx, v1alpha1.ComponentKeyStorageBasedRemediation, false)
+		Eventually(func(g Gomega) {
+			g.Expect(component(getWAC(ctx), v1alpha1.ComponentKeyStorageBasedRemediation).Phase).To(Equal(v1alpha1.ComponentPhaseDisabled))
+			g.Expect(apierrors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, &appsv1.Deployment{}))).To(BeTrue())
+		}).Should(Succeed())
+		setResources(ctx, v1alpha1.ComponentKeyStorageBasedRemediation, nil)
+		setResources(ctx, v1alpha1.ComponentKeyNodeHealthCheck, nil)
+	})
+
 	It("refuses to adopt a foreign object with the same name", func() {
 		foreign := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "sbr-operator-controller-manager", Namespace: ns},
 			Spec: appsv1.DeploymentSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foreign"}},
 				Template: corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "foreign"}},
 					Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "x", Image: "example.test/foreign"}}}}}}
 		Expect(k8sClient.Create(ctx, foreign)).To(Succeed())
-		setState(ctx, v1alpha1.ComponentKeyStorageBasedRemediation, v1alpha1.ComponentStateEnabled)
+		setResources(ctx, v1alpha1.ComponentKeyStorageBasedRemediation, &corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("5m")}})
+		setEnabled(ctx, v1alpha1.ComponentKeyStorageBasedRemediation, true)
 		Eventually(func(g Gomega) {
 			w := getWAC(ctx)
 			c := component(w, v1alpha1.ComponentKeyStorageBasedRemediation)
@@ -146,7 +408,7 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		}).Should(Succeed())
 		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(foreign), foreign)).To(Succeed())
 		Expect(foreign.Spec.Template.Spec.Containers[0].Image).To(Equal("example.test/foreign"))
-		setState(ctx, v1alpha1.ComponentKeyStorageBasedRemediation, v1alpha1.ComponentStateDisabled)
+		setEnabled(ctx, v1alpha1.ComponentKeyStorageBasedRemediation, false)
 		Eventually(func(g Gomega) {
 			c := component(getWAC(ctx), v1alpha1.ComponentKeyStorageBasedRemediation)
 			g.Expect(c.Phase).To(Equal(v1alpha1.ComponentPhaseDisabled))
@@ -154,10 +416,11 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		}).Should(Succeed())
 		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(foreign), foreign)).To(Succeed(), "WAO must not delete a foreign object on disable")
 		Expect(k8sClient.Delete(ctx, foreign)).To(Succeed()) // test cleanup, not WAO behavior
+		setResources(ctx, v1alpha1.ComponentKeyStorageBasedRemediation, nil)
 	})
 
 	It("removes the NHC operand and reports admission unavailable when disabled", func() {
-		setState(ctx, v1alpha1.ComponentKeyNodeHealthCheck, v1alpha1.ComponentStateDisabled)
+		setEnabled(ctx, v1alpha1.ComponentKeyNodeHealthCheck, false)
 		// Status is written after every operand object has been deleted, so wait for it first.
 		Eventually(func(g Gomega) {
 			c := component(getWAC(ctx), v1alpha1.ComponentKeyNodeHealthCheck)
@@ -171,7 +434,7 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 
 	It("creates no RBAC for any component and removes every runtime object on disable", func() {
 		for _, key := range v1alpha1.AllComponentKeys {
-			setState(ctx, key, v1alpha1.ComponentStateEnabled)
+			setEnabled(ctx, key, true)
 		}
 		Eventually(func(g Gomega) {
 			for _, key := range v1alpha1.AllComponentKeys {
@@ -188,7 +451,7 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 			}
 		}
 		for _, key := range v1alpha1.AllComponentKeys {
-			setState(ctx, key, v1alpha1.ComponentStateDisabled)
+			setEnabled(ctx, key, false)
 		}
 		Eventually(func(g Gomega) {
 			for _, def := range components.All() {
@@ -220,13 +483,13 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 					Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "agent", Image: "example.test/agent"}}}}}}
 		Expect(k8sClient.Create(ctx, ds)).To(Succeed())
 
-		setState(ctx, v1alpha1.ComponentKeySelfNodeRemediation, v1alpha1.ComponentStateEnabled)
+		setEnabled(ctx, v1alpha1.ComponentKeySelfNodeRemediation, true)
 		Eventually(func(g Gomega) {
 			g.Expect(component(getWAC(ctx), v1alpha1.ComponentKeySelfNodeRemediation).Phase).To(Equal(v1alpha1.ComponentPhaseProgressing))
 		}).Should(Succeed())
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "self-node-remediation-controller-manager"}, &appsv1.Deployment{})).To(Succeed())
 
-		setState(ctx, v1alpha1.ComponentKeySelfNodeRemediation, v1alpha1.ComponentStateDisabled)
+		setEnabled(ctx, v1alpha1.ComponentKeySelfNodeRemediation, false)
 		Eventually(func(g Gomega) {
 			w := getWAC(ctx)
 			c := component(w, v1alpha1.ComponentKeySelfNodeRemediation)
@@ -243,7 +506,7 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 
 	It("installs FAR, MDR and NMO with component-isolated selectors", func() {
 		for _, key := range []string{v1alpha1.ComponentKeyFenceAgentsRemediation, v1alpha1.ComponentKeyMachineDeletionRemediation, v1alpha1.ComponentKeyNodeMaintenance} {
-			setState(ctx, key, v1alpha1.ComponentStateEnabled)
+			setEnabled(ctx, key, true)
 		}
 		Eventually(func(g Gomega) {
 			w := getWAC(ctx)
@@ -260,7 +523,7 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "fence-agents-remediation-mutating-webhook-configuration"}, &admissionregistrationv1.MutatingWebhookConfiguration{})).To(Succeed())
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "node-maintenance-operator-validating-webhook-configuration"}, &admissionregistrationv1.ValidatingWebhookConfiguration{})).To(Succeed())
 		for _, key := range []string{v1alpha1.ComponentKeyFenceAgentsRemediation, v1alpha1.ComponentKeyMachineDeletionRemediation, v1alpha1.ComponentKeyNodeMaintenance} {
-			setState(ctx, key, v1alpha1.ComponentStateDisabled)
+			setEnabled(ctx, key, false)
 		}
 		Eventually(func(g Gomega) {
 			w := getWAC(ctx)
@@ -278,11 +541,11 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 		Expect(unstructured.SetNestedField(nm.Object, "wao-test-node", "spec", "nodeName")).To(Succeed())
 		Expect(unstructured.SetNestedField(nm.Object, "envtest", "spec", "reason")).To(Succeed())
 		Expect(k8sClient.Create(ctx, nm)).To(Succeed())
-		setState(ctx, v1alpha1.ComponentKeyNodeMaintenance, v1alpha1.ComponentStateEnabled)
+		setEnabled(ctx, v1alpha1.ComponentKeyNodeMaintenance, true)
 		Eventually(func(g Gomega) {
 			g.Expect(component(getWAC(ctx), v1alpha1.ComponentKeyNodeMaintenance).Phase).To(Equal(v1alpha1.ComponentPhaseProgressing))
 		}).Should(Succeed())
-		setState(ctx, v1alpha1.ComponentKeyNodeMaintenance, v1alpha1.ComponentStateDisabled)
+		setEnabled(ctx, v1alpha1.ComponentKeyNodeMaintenance, false)
 		Eventually(func(g Gomega) {
 			c := component(getWAC(ctx), v1alpha1.ComponentKeyNodeMaintenance)
 			g.Expect(c.Phase).To(Equal(v1alpha1.ComponentPhaseDisableIncomplete))
@@ -295,9 +558,13 @@ var _ = Describe("WorkloadAvailabilityConfig controller", Ordered, func() {
 	})
 
 	It("runs the disable sequence and drops its finalizer on deletion", func() {
-		setState(ctx, v1alpha1.ComponentKeyStorageBasedRemediation, v1alpha1.ComponentStateEnabled)
+		setEnabled(ctx, v1alpha1.ComponentKeyStorageBasedRemediation, true)
 		Eventually(func() error {
 			return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "sbr-operator-controller-manager"}, &appsv1.Deployment{})
+		}).Should(Succeed())
+		setResources(ctx, v1alpha1.ComponentKeyStorageBasedRemediation, &corev1.ResourceRequirements{Limits: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("32Mi")}})
+		Eventually(func(g Gomega) {
+			g.Expect(component(getWAC(ctx), v1alpha1.ComponentKeyStorageBasedRemediation).Phase).To(Equal(v1alpha1.ComponentPhaseDegraded))
 		}).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, getWAC(ctx))).To(Succeed())
 		Eventually(func() bool {

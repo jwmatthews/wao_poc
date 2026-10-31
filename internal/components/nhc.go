@@ -8,9 +8,11 @@ import (
 func NHC() Definition {
 	return Definition{
 		Key: v1alpha1.ComponentKeyNodeHealthCheck, ShortName: "nhc", ManifestDir: "nhc",
-		Deployments:  []string{"node-healthcheck-controller-manager", "node-healthcheck-node-remediation-console-plugin"},
-		Images:       []string{images.NHCManager, images.NHCConsole},
-		Webhooks:     []WebhookConfiguration{{Kind: "ValidatingWebhookConfiguration", Name: "node-healthcheck-validating-webhook-configuration"}},
-		ManagedKinds: []ResourceKind{{Group: "remediation.medik8s.io", Version: "v1alpha1", Kind: "NodeHealthCheck"}},
+		ManagerDeployment: "node-healthcheck-controller-manager",
+		ManagerContainer:  "manager",
+		Deployments:       []string{"node-healthcheck-controller-manager", "node-healthcheck-node-remediation-console-plugin"},
+		Images:            []string{images.NHCManager, images.NHCConsole},
+		Webhooks:          []WebhookConfiguration{{Kind: "ValidatingWebhookConfiguration", Name: "node-healthcheck-validating-webhook-configuration"}},
+		ManagedKinds:      []ResourceKind{{Group: "remediation.medik8s.io", Version: "v1alpha1", Kind: "NodeHealthCheck"}},
 	}
 }

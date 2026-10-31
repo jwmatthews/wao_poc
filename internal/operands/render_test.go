@@ -1,10 +1,13 @@
 package operands_test
 
 import (
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/medik8s/workload-availability-operator/api/v1alpha1"
@@ -12,6 +15,105 @@ import (
 	"github.com/medik8s/workload-availability-operator/internal/images"
 	"github.com/medik8s/workload-availability-operator/internal/operands"
 )
+
+func TestRenderedManagerResourcesForEveryComponent(t *testing.T) {
+	for _, def := range components.All() {
+		t.Run(def.Key, func(t *testing.T) {
+			for _, overrides := range []*corev1.ResourceRequirements{nil, {}, {
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("200m"), corev1.ResourceMemory: resource.MustParse("128Mi")},
+				Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1"), corev1.ResourceMemory: resource.MustParse("1Gi")},
+			}} {
+				objects, err := operands.Render(def, testNamespace, testImages())
+				if err != nil {
+					t.Fatal(err)
+				}
+				expected := make([]*unstructured.Unstructured, len(objects))
+				for i, obj := range objects {
+					expected[i] = obj.DeepCopy()
+				}
+				if overrides != nil && len(overrides.Requests) > 0 {
+					dep := find(t, expected, "Deployment", def.ManagerDeployment)
+					containers, _, err := unstructured.NestedSlice(dep.Object, "spec", "template", "spec", "containers")
+					if err != nil {
+						t.Fatal(err)
+					}
+					for _, raw := range containers {
+						container := raw.(map[string]any)
+						if container["name"] == def.ManagerContainer {
+							container["resources"] = map[string]any{
+								"requests": map[string]any{"cpu": "200m", "memory": "128Mi"},
+								"limits":   map[string]any{"cpu": "1", "memory": "1Gi"},
+							}
+						}
+					}
+					if err := unstructured.SetNestedSlice(dep.Object, containers, "spec", "template", "spec", "containers"); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if err := operands.ApplyManagerResources(def, objects, overrides); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(objects, expected) {
+					t.Fatal("resource override changed fields outside the selected manager resources")
+				}
+			}
+		})
+	}
+}
+
+func TestRenderRestoresPackagedResourcesAfterOverrides(t *testing.T) {
+	for _, def := range components.All() {
+		t.Run(def.Key, func(t *testing.T) {
+			first, err := operands.Render(def, testNamespace, testImages())
+			if err != nil {
+				t.Fatal(err)
+			}
+			overrides := &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1m")},
+				Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")},
+			}
+			if err := operands.ApplyManagerResources(def, first, overrides); err != nil {
+				t.Fatal(err)
+			}
+			second, err := operands.Render(def, testNamespace, testImages())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := operands.ApplyManagerResources(def, second, &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2m")},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			third, err := operands.Render(def, testNamespace, testImages())
+			if err != nil {
+				t.Fatal(err)
+			}
+			managerResources := func(objects []*unstructured.Unstructured) map[string]any {
+				dep := find(t, objects, "Deployment", def.ManagerDeployment)
+				containers, _, _ := unstructured.NestedSlice(dep.Object, "spec", "template", "spec", "containers")
+				for _, raw := range containers {
+					container := raw.(map[string]any)
+					if container["name"] == def.ManagerContainer {
+						resources, _, _ := unstructured.NestedMap(container, "resources")
+						return resources
+					}
+				}
+				t.Fatal("manager container is missing")
+				return nil
+			}
+			secondResources, packagedResources := managerResources(second), managerResources(third)
+			if !reflect.DeepEqual(secondResources["limits"], packagedResources["limits"]) {
+				t.Fatal("a previous render changed the next render's packaged limits")
+			}
+			if got := secondResources["requests"].(map[string]any)["cpu"]; got != "2m" {
+				t.Fatalf("second CPU request = %v, want 2m", got)
+			}
+			if got := managerResources(first)["requests"].(map[string]any)["cpu"]; got != "1m" {
+				t.Fatalf("second render changed the first CPU request to %v", got)
+			}
+		})
+	}
+}
 
 const testNamespace = "wao-ns"
 

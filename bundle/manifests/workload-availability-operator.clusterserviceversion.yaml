@@ -13,22 +13,22 @@ metadata:
           "spec": {
             "components": {
               "fenceAgentsRemediation": {
-                "state": "Disabled"
+                "enabled": false
               },
               "machineDeletionRemediation": {
-                "state": "Disabled"
+                "enabled": false
               },
               "nodeHealthCheck": {
-                "state": "Disabled"
+                "enabled": false
               },
               "nodeMaintenance": {
-                "state": "Disabled"
+                "enabled": false
               },
               "selfNodeRemediation": {
-                "state": "Disabled"
+                "enabled": false
               },
               "storageBasedRemediation": {
-                "state": "Disabled"
+                "enabled": false
               }
             }
           }
@@ -226,16 +226,242 @@ spec:
             displayName: Components
             path: components
           - description: |-
+              Runs the Fence Agents Remediation operator. Fencing requires separately
+              configured remediation resources and fence-agent credentials.
+            displayName: Fence Agents Remediation
+            path: components.fenceAgentsRemediation
+          - description: |-
+              Enabled runs the operator when true. The default is false.
+              Disabling removes its manager and managed installation resources.
+              Existing agents, configuration, and native resources can remain.
+              Complete active maintenance or remediation before disabling.
+            displayName: Fence Agents Remediation Enabled
+            path: components.fenceAgentsRemediation.enabled
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+          - description: Manager configures the component's manager container.
+            displayName: Fence Agents Remediation Manager
+            path: components.fenceAgentsRemediation.manager
+          - description: |-
+              Resources sets CPU and memory for the manager container only.
+              Omitted values retain the packaged defaults. Settings do not enable the component.
+              WAO checks effective values when the component is enabled.
+            displayName: Fence Agents Remediation Manager Resources
+            path: components.fenceAgentsRemediation.manager.resources
+          - displayName: Resource Claims
+            path: components.fenceAgentsRemediation.manager.resources.claims
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Set the manager CPU limit, for example 500m or 1. Leave empty to use the packaged default.
+            displayName: Fence Agents Remediation CPU Limit
+            path: components.fenceAgentsRemediation.manager.resources.limits.cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - description: Set the manager memory limit, for example 256Mi or 1Gi. Leave empty to use the packaged default.
+            displayName: Fence Agents Remediation Memory Limit
+            path: components.fenceAgentsRemediation.manager.resources.limits.memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - description: Set the manager CPU request, for example 100m or 1. Leave empty to use the packaged default.
+            displayName: Fence Agents Remediation CPU Request
+            path: components.fenceAgentsRemediation.manager.resources.requests.cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - description: Set the manager memory request, for example 128Mi or 1Gi. Leave empty to use the packaged default.
+            displayName: Fence Agents Remediation Memory Request
+            path: components.fenceAgentsRemediation.manager.resources.requests.memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - description: |-
+              Runs the Machine Deletion Remediation operator. Machine deletion requires
+              a separate remediation request.
+            displayName: Machine Deletion Remediation
+            path: components.machineDeletionRemediation
+          - description: |-
+              Enabled runs the operator when true. The default is false.
+              Disabling removes its manager and managed installation resources.
+              Existing agents, configuration, and native resources can remain.
+              Complete active maintenance or remediation before disabling.
+            displayName: Machine Deletion Remediation Enabled
+            path: components.machineDeletionRemediation.enabled
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+          - description: Manager configures the component's manager container.
+            displayName: Machine Deletion Remediation Manager
+            path: components.machineDeletionRemediation.manager
+          - description: |-
+              Resources sets CPU and memory for the manager container only.
+              Omitted values retain the packaged defaults. Settings do not enable the component.
+              WAO checks effective values when the component is enabled.
+            displayName: Machine Deletion Remediation Manager Resources
+            path: components.machineDeletionRemediation.manager.resources
+          - displayName: Resource Claims
+            path: components.machineDeletionRemediation.manager.resources.claims
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Set the manager CPU limit, for example 500m or 1. Leave empty to use the packaged default.
+            displayName: Machine Deletion Remediation CPU Limit
+            path: components.machineDeletionRemediation.manager.resources.limits.cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - description: Set the manager memory limit, for example 256Mi or 1Gi. Leave empty to use the packaged default.
+            displayName: Machine Deletion Remediation Memory Limit
+            path: components.machineDeletionRemediation.manager.resources.limits.memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - description: Set the manager CPU request, for example 100m or 1. Leave empty to use the packaged default.
+            displayName: Machine Deletion Remediation CPU Request
+            path: components.machineDeletionRemediation.manager.resources.requests.cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - description: Set the manager memory request, for example 128Mi or 1Gi. Leave empty to use the packaged default.
+            displayName: Machine Deletion Remediation Memory Request
+            path: components.machineDeletionRemediation.manager.resources.requests.memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - description: |-
               Runs the Node Health Check operator. Configure a NodeHealthCheck policy
               separately to enable automated health monitoring and remediation.
             displayName: Node Health Check
             path: components.nodeHealthCheck
+          - description: |-
+              Enabled runs the operator when true. The default is false.
+              Disabling removes its manager and managed installation resources.
+              Existing agents, configuration, and native resources can remain.
+              Complete active maintenance or remediation before disabling.
+            displayName: Node Health Check Enabled
+            path: components.nodeHealthCheck.enabled
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+          - description: Manager configures the component's manager container.
+            displayName: Node Health Check Manager
+            path: components.nodeHealthCheck.manager
+          - description: |-
+              Resources sets CPU and memory for the manager container only.
+              Omitted values retain the packaged defaults. Settings do not enable the component.
+              WAO checks effective values when the component is enabled.
+            displayName: Node Health Check Manager Resources
+            path: components.nodeHealthCheck.manager.resources
+          - displayName: Resource Claims
+            path: components.nodeHealthCheck.manager.resources.claims
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Set the manager CPU limit, for example 500m or 1. Leave empty to use the packaged default.
+            displayName: Node Health Check CPU Limit
+            path: components.nodeHealthCheck.manager.resources.limits.cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - description: Set the manager memory limit, for example 256Mi or 1Gi. Leave empty to use the packaged default.
+            displayName: Node Health Check Memory Limit
+            path: components.nodeHealthCheck.manager.resources.limits.memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - description: Set the manager CPU request, for example 100m or 1. Leave empty to use the packaged default.
+            displayName: Node Health Check CPU Request
+            path: components.nodeHealthCheck.manager.resources.requests.cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - description: Set the manager memory request, for example 128Mi or 1Gi. Leave empty to use the packaged default.
+            displayName: Node Health Check Memory Request
+            path: components.nodeHealthCheck.manager.resources.requests.memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - description: |-
+              Runs the Node Maintenance operator. Creating a NodeMaintenance resource
+              separately requests node cordoning and draining. Complete active maintenance
+              before disabling; stopping the manager does not uncordon a node.
+            displayName: Node Maintenance
+            path: components.nodeMaintenance
+          - description: |-
+              Enabled runs the operator when true. The default is false.
+              Disabling removes its manager and managed installation resources.
+              Existing agents, configuration, and native resources can remain.
+              Complete active maintenance or remediation before disabling.
+            displayName: Node Maintenance Enabled
+            path: components.nodeMaintenance.enabled
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+          - description: Manager configures the component's manager container.
+            displayName: Node Maintenance Manager
+            path: components.nodeMaintenance.manager
+          - description: |-
+              Resources sets CPU and memory for the manager container only.
+              Omitted values retain the packaged defaults. Settings do not enable the component.
+              WAO checks effective values when the component is enabled.
+            displayName: Node Maintenance Manager Resources
+            path: components.nodeMaintenance.manager.resources
+          - displayName: Resource Claims
+            path: components.nodeMaintenance.manager.resources.claims
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Set the manager CPU limit, for example 500m or 1. Leave empty to use the packaged default.
+            displayName: Node Maintenance CPU Limit
+            path: components.nodeMaintenance.manager.resources.limits.cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - description: Set the manager memory limit, for example 256Mi or 1Gi. Leave empty to use the packaged default.
+            displayName: Node Maintenance Memory Limit
+            path: components.nodeMaintenance.manager.resources.limits.memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - description: Set the manager CPU request, for example 100m or 1. Leave empty to use the packaged default.
+            displayName: Node Maintenance CPU Request
+            path: components.nodeMaintenance.manager.resources.requests.cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - description: Set the manager memory request, for example 128Mi or 1Gi. Leave empty to use the packaged default.
+            displayName: Node Maintenance Memory Request
+            path: components.nodeMaintenance.manager.resources.requests.memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
           - description: |-
               Runs the Self Node Remediation operator. Enabling this component creates
               its default configuration and starts privileged node agents on eligible
               nodes. Disabling does not remove existing node agents or their configuration.
             displayName: Self Node Remediation
             path: components.selfNodeRemediation
+          - description: |-
+              Enabled runs the operator when true. The default is false.
+              Disabling removes its manager and managed installation resources.
+              Existing agents, configuration, and native resources can remain.
+              Complete active maintenance or remediation before disabling.
+            displayName: Self Node Remediation Enabled
+            path: components.selfNodeRemediation.enabled
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+          - description: Manager configures the component's manager container.
+            displayName: Self Node Remediation Manager
+            path: components.selfNodeRemediation.manager
+          - description: |-
+              Resources sets CPU and memory for the manager container only.
+              Omitted values retain the packaged defaults. Settings do not enable the component.
+              WAO checks effective values when the component is enabled.
+            displayName: Self Node Remediation Manager Resources
+            path: components.selfNodeRemediation.manager.resources
+          - displayName: Resource Claims
+            path: components.selfNodeRemediation.manager.resources.claims
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Set the manager CPU limit, for example 500m or 1. Leave empty to use the packaged default.
+            displayName: Self Node Remediation CPU Limit
+            path: components.selfNodeRemediation.manager.resources.limits.cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - description: Set the manager memory limit, for example 256Mi or 1Gi. Leave empty to use the packaged default.
+            displayName: Self Node Remediation Memory Limit
+            path: components.selfNodeRemediation.manager.resources.limits.memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - description: Set the manager CPU request, for example 100m or 1. Leave empty to use the packaged default.
+            displayName: Self Node Remediation CPU Request
+            path: components.selfNodeRemediation.manager.resources.requests.cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - description: Set the manager memory request, for example 128Mi or 1Gi. Leave empty to use the packaged default.
+            displayName: Self Node Remediation Memory Request
+            path: components.selfNodeRemediation.manager.resources.requests.memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:text
           - description: |-
               Runs the Storage Based Remediation operator. Configure a
               StorageBasedRemediationConfig separately to deploy its agents and configure
@@ -244,81 +470,47 @@ spec:
             displayName: Storage Based Remediation
             path: components.storageBasedRemediation
           - description: |-
-              Runs the Node Maintenance operator. Creating a NodeMaintenance resource
-              separately requests node cordoning and draining. Complete active maintenance
-              before disabling; stopping the manager does not uncordon a node.
-            displayName: Node Maintenance
-            path: components.nodeMaintenance
-          - description: |-
-              Runs the Fence Agents Remediation operator. Fencing requires separately
-              configured remediation resources and fence-agent credentials.
-            displayName: Fence Agents Remediation
-            path: components.fenceAgentsRemediation
-          - description: |-
-              Runs the Machine Deletion Remediation operator. Machine deletion requires
-              a separate remediation request.
-            displayName: Machine Deletion Remediation
-            path: components.machineDeletionRemediation
-          - description: |-
-              Enabled runs the operator. Disabled removes its manager and managed
-              installation resources; existing agents, configuration, and native resources
-              can remain. Complete active maintenance or remediation before disabling.
-              Default: Disabled.
-            displayName: State
-            path: components.fenceAgentsRemediation.state
+              Enabled runs the operator when true. The default is false.
+              Disabling removes its manager and managed installation resources.
+              Existing agents, configuration, and native resources can remain.
+              Complete active maintenance or remediation before disabling.
+            displayName: Storage Based Remediation Enabled
+            path: components.storageBasedRemediation.enabled
             x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:select:Disabled
-              - urn:alm:descriptor:com.tectonic.ui:select:Enabled
+              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+          - description: Manager configures the component's manager container.
+            displayName: Storage Based Remediation Manager
+            path: components.storageBasedRemediation.manager
           - description: |-
-              Enabled runs the operator. Disabled removes its manager and managed
-              installation resources; existing agents, configuration, and native resources
-              can remain. Complete active maintenance or remediation before disabling.
-              Default: Disabled.
-            displayName: State
-            path: components.machineDeletionRemediation.state
+              Resources sets CPU and memory for the manager container only.
+              Omitted values retain the packaged defaults. Settings do not enable the component.
+              WAO checks effective values when the component is enabled.
+            displayName: Storage Based Remediation Manager Resources
+            path: components.storageBasedRemediation.manager.resources
+          - displayName: Resource Claims
+            path: components.storageBasedRemediation.manager.resources.claims
             x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:select:Disabled
-              - urn:alm:descriptor:com.tectonic.ui:select:Enabled
-          - description: |-
-              Enabled runs the operator. Disabled removes its manager and managed
-              installation resources; existing agents, configuration, and native resources
-              can remain. Complete active maintenance or remediation before disabling.
-              Default: Disabled.
-            displayName: State
-            path: components.nodeHealthCheck.state
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Set the manager CPU limit, for example 500m or 1. Leave empty to use the packaged default.
+            displayName: Storage Based Remediation CPU Limit
+            path: components.storageBasedRemediation.manager.resources.limits.cpu
             x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:select:Disabled
-              - urn:alm:descriptor:com.tectonic.ui:select:Enabled
-          - description: |-
-              Enabled runs the operator. Disabled removes its manager and managed
-              installation resources; existing agents, configuration, and native resources
-              can remain. Complete active maintenance or remediation before disabling.
-              Default: Disabled.
-            displayName: State
-            path: components.nodeMaintenance.state
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - description: Set the manager memory limit, for example 256Mi or 1Gi. Leave empty to use the packaged default.
+            displayName: Storage Based Remediation Memory Limit
+            path: components.storageBasedRemediation.manager.resources.limits.memory
             x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:select:Disabled
-              - urn:alm:descriptor:com.tectonic.ui:select:Enabled
-          - description: |-
-              Enabled runs the operator. Disabled removes its manager and managed
-              installation resources; existing agents, configuration, and native resources
-              can remain. Complete active maintenance or remediation before disabling.
-              Default: Disabled.
-            displayName: State
-            path: components.selfNodeRemediation.state
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - description: Set the manager CPU request, for example 100m or 1. Leave empty to use the packaged default.
+            displayName: Storage Based Remediation CPU Request
+            path: components.storageBasedRemediation.manager.resources.requests.cpu
             x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:select:Disabled
-              - urn:alm:descriptor:com.tectonic.ui:select:Enabled
-          - description: |-
-              Enabled runs the operator. Disabled removes its manager and managed
-              installation resources; existing agents, configuration, and native resources
-              can remain. Complete active maintenance or remediation before disabling.
-              Default: Disabled.
-            displayName: State
-            path: components.storageBasedRemediation.state
+              - urn:alm:descriptor:com.tectonic.ui:text
+          - description: Set the manager memory request, for example 128Mi or 1Gi. Leave empty to use the packaged default.
+            displayName: Storage Based Remediation Memory Request
+            path: components.storageBasedRemediation.manager.resources.requests.memory
             x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:select:Disabled
-              - urn:alm:descriptor:com.tectonic.ui:select:Enabled
+              - urn:alm:descriptor:com.tectonic.ui:text
         statusDescriptors:
           - description: |-
               Available, Progressing, and Degraded describe WAO reconciliation.
