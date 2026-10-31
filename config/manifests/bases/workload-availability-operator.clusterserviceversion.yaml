@@ -23,8 +23,7 @@ metadata:
     capabilities: Basic Install
     categories: OpenShift Optional
     console.openshift.io/plugins: '["node-remediation-console-plugin"]'
-    description: Proof of concept single operator that installs the six medik8s workload
-      availability operators (NHC, SNR, SBR, FAR, MDR, NMO) as managed operands.
+    description: Proof of concept single operator that installs the six medik8s workload availability operators (NHC, SNR, SBR, FAR, MDR, NMO) as managed operands.
     operatorframework.io/suggested-namespace: openshift-workload-availability
     operatorframework.io/suggested-namespace-template: '{"kind":"Namespace","apiVersion":"v1","metadata":{"name":"openshift-workload-availability","annotations":{"openshift.io/node-selector":""}}}'
     repository: https://github.com/jwmatthews/wao_poc
@@ -35,355 +34,355 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: Owned by WAO; served by the NHC operand when enabled.
-      displayName: Node Health Check
-      kind: NodeHealthCheck
-      name: nodehealthchecks.remediation.medik8s.io
-      resources:
-      - kind: Node
-        name: ""
-        version: v1
-      - kind: Lease
-        name: ""
-        version: v1
-      version: v1alpha1
-    - description: Owned by WAO; served by the SNR operand when enabled.
-      displayName: Self Node Remediation Config
-      kind: SelfNodeRemediationConfig
-      name: selfnoderemediationconfigs.self-node-remediation.medik8s.io
-      resources:
-      - kind: DaemonSet
-        name: ""
-        version: v1
-      - kind: Pod
-        name: ""
-        version: v1
-      version: v1alpha1
-    - description: Owned by WAO; served by the SNR operand when enabled.
-      displayName: Self Node Remediation
-      kind: SelfNodeRemediation
-      name: selfnoderemediations.self-node-remediation.medik8s.io
-      resources:
-      - kind: Node
-        name: ""
-        version: v1
-      - kind: Pod
-        name: ""
-        version: v1
-      - kind: VolumeAttachment
-        name: ""
-        version: v1
-      version: v1alpha1
-    - description: Owned by WAO; served by the SNR operand when enabled.
-      displayName: Self Node Remediation Template
-      kind: SelfNodeRemediationTemplate
-      name: selfnoderemediationtemplates.self-node-remediation.medik8s.io
-      resources:
-      - kind: SelfNodeRemediation
-        name: selfnoderemediations.self-node-remediation.medik8s.io
-        version: v1alpha1
-      version: v1alpha1
-    - description: Owned by WAO; served by the SBR operand when enabled.
-      displayName: Storage Based Remediation Config
-      kind: StorageBasedRemediationConfig
-      name: storagebasedremediationconfigs.storage-based-remediation.medik8s.io
-      resources:
-      - kind: DaemonSet
-        name: ""
-        version: v1
-      - kind: PersistentVolumeClaim
-        name: ""
-        version: v1
-      - kind: Job
-        name: ""
-        version: v1
-      version: v1alpha1
-    - description: Owned by WAO; served by the SBR operand when enabled.
-      displayName: Storage Based Remediation
-      kind: StorageBasedRemediation
-      name: storagebasedremediations.storage-based-remediation.medik8s.io
-      resources:
-      - kind: Node
-        name: ""
-        version: v1
-      - kind: StorageBasedRemediationConfig
-        name: storagebasedremediationconfigs.storage-based-remediation.medik8s.io
-        version: v1alpha1
-      version: v1alpha1
-    - description: Owned by WAO; served by the SBR operand when enabled.
-      displayName: Storage Based Remediation Template
-      kind: StorageBasedRemediationTemplate
-      name: storagebasedremediationtemplates.storage-based-remediation.medik8s.io
-      resources:
-      - kind: StorageBasedRemediation
-        name: storagebasedremediations.storage-based-remediation.medik8s.io
-        version: v1alpha1
-      version: v1alpha1
-    - description: Owned by WAO; served by the FAR operand when enabled.
-      displayName: Fence Agents Remediation
-      kind: FenceAgentsRemediation
-      name: fenceagentsremediations.fence-agents-remediation.medik8s.io
-      resources:
-      - kind: Node
-        name: ""
-        version: v1
-      - kind: Secret
-        name: ""
-        version: v1
-      version: v1alpha1
-    - description: Owned by WAO; served by the FAR operand when enabled.
-      displayName: Fence Agents Remediation Template
-      kind: FenceAgentsRemediationTemplate
-      name: fenceagentsremediationtemplates.fence-agents-remediation.medik8s.io
-      resources:
-      - kind: FenceAgentsRemediation
-        name: fenceagentsremediations.fence-agents-remediation.medik8s.io
-        version: v1alpha1
-      version: v1alpha1
-    - description: Owned by WAO; served by the MDR operand when enabled.
-      displayName: Machine Deletion Remediation
-      kind: MachineDeletionRemediation
-      name: machinedeletionremediations.machine-deletion-remediation.medik8s.io
-      resources:
-      - kind: Machine
-        name: machines.machine.openshift.io
-        version: v1beta1
-      - kind: Node
-        name: ""
-        version: v1
-      version: v1alpha1
-    - description: Owned by WAO; served by the MDR operand when enabled.
-      displayName: Machine Deletion Remediation Template
-      kind: MachineDeletionRemediationTemplate
-      name: machinedeletionremediationtemplates.machine-deletion-remediation.medik8s.io
-      resources:
-      - kind: MachineDeletionRemediation
-        name: machinedeletionremediations.machine-deletion-remediation.medik8s.io
-        version: v1alpha1
-      version: v1alpha1
-    - description: Owned by WAO; served by the NMO operand when enabled.
-      displayName: Node Maintenance
-      kind: NodeMaintenance
-      name: nodemaintenances.nodemaintenance.medik8s.io
-      resources:
-      - kind: Node
-        name: ""
-        version: v1
-      - kind: Pod
-        name: ""
-        version: v1
-      - kind: Lease
-        name: ""
-        version: v1
-      version: v1beta1
-    - description: |-
-        WorkloadAvailabilityConfig provides cluster-wide configuration for the six
-        medik8s component operators. WAO automatically creates this cluster-scoped
-        singleton with the name cluster and all components Disabled. Edit the existing
-        cluster resource to configure components. When creating it manually, use the
-        name cluster.
-      displayName: Workload Availability Config
-      kind: WorkloadAvailabilityConfig
-      name: workloadavailabilityconfigs.workloadavailability.medik8s.io
-      resources:
-      - kind: ConfigMap
-        name: ""
-        version: v1
-      - kind: Deployment
-        name: ""
-        version: v1
-      - kind: MutatingWebhookConfiguration
-        name: ""
-        version: v1
-      - kind: Service
-        name: ""
-        version: v1
-      - kind: ValidatingWebhookConfiguration
-        name: ""
-        version: v1
-      specDescriptors:
-      - description: |-
-          Choose which component operators WAO runs. All components default to
-          Disabled. Disabling removes the component manager and its managed
-          installation resources; resources created by that component can remain.
-          Disable a component only when it has no active work.
-        displayName: Components
-        path: components
-      - description: |-
-          Enabled runs the operator when true. The default is false.
-          Disabling removes its manager and managed installation resources.
-          Existing agents, configuration, and native resources can remain.
-          Complete active maintenance or remediation before disabling.
-        displayName: Enabled
-        path: components.fenceAgentsRemediation.enabled
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
-      - description: |-
-          Enabled runs the operator when true. The default is false.
-          Disabling removes its manager and managed installation resources.
-          Existing agents, configuration, and native resources can remain.
-          Complete active maintenance or remediation before disabling.
-        displayName: Enabled
-        path: components.machineDeletionRemediation.enabled
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
-      - description: |-
-          Enabled runs the operator when true. The default is false.
-          Disabling removes its manager and managed installation resources.
-          Existing agents, configuration, and native resources can remain.
-          Complete active maintenance or remediation before disabling.
-        displayName: Enabled
-        path: components.nodeHealthCheck.enabled
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
-      - description: |-
-          Enabled runs the operator when true. The default is false.
-          Disabling removes its manager and managed installation resources.
-          Existing agents, configuration, and native resources can remain.
-          Complete active maintenance or remediation before disabling.
-        displayName: Enabled
-        path: components.nodeMaintenance.enabled
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
-      - description: |-
-          Enabled runs the operator when true. The default is false.
-          Disabling removes its manager and managed installation resources.
-          Existing agents, configuration, and native resources can remain.
-          Complete active maintenance or remediation before disabling.
-        displayName: Enabled
-        path: components.selfNodeRemediation.enabled
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
-      - description: |-
-          Enabled runs the operator when true. The default is false.
-          Disabling removes its manager and managed installation resources.
-          Existing agents, configuration, and native resources can remain.
-          Complete active maintenance or remediation before disabling.
-        displayName: Enabled
-        path: components.storageBasedRemediation.enabled
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
-      - description: Manager configures the component's manager container.
-        displayName: Manager
-        path: components.fenceAgentsRemediation.manager
-      - description: |-
-          Resources sets CPU and memory for the manager container only.
-          Omitted values retain the packaged defaults. Settings do not enable the component.
-          WAO checks effective values when the component is enabled.
-        displayName: Manager Resources
-        path: components.fenceAgentsRemediation.manager.resources
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
-      - description: Manager configures the component's manager container.
-        displayName: Manager
-        path: components.machineDeletionRemediation.manager
-      - description: |-
-          Resources sets CPU and memory for the manager container only.
-          Omitted values retain the packaged defaults. Settings do not enable the component.
-          WAO checks effective values when the component is enabled.
-        displayName: Manager Resources
-        path: components.machineDeletionRemediation.manager.resources
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
-      - description: |-
-          Runs the Node Health Check operator. Configure a NodeHealthCheck policy
-          separately to enable automated health monitoring and remediation.
+      - description: Owned by WAO; served by the NHC operand when enabled.
         displayName: Node Health Check
-        path: components.nodeHealthCheck
-      - description: Manager configures the component's manager container.
-        displayName: Manager
-        path: components.nodeHealthCheck.manager
-      - description: |-
-          Resources sets CPU and memory for the manager container only.
-          Omitted values retain the packaged defaults. Settings do not enable the component.
-          WAO checks effective values when the component is enabled.
-        displayName: Manager Resources
-        path: components.nodeHealthCheck.manager.resources
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
-      - description: Manager configures the component's manager container.
-        displayName: Manager
-        path: components.nodeMaintenance.manager
-      - description: |-
-          Resources sets CPU and memory for the manager container only.
-          Omitted values retain the packaged defaults. Settings do not enable the component.
-          WAO checks effective values when the component is enabled.
-        displayName: Manager Resources
-        path: components.nodeMaintenance.manager.resources
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
-      - description: Manager configures the component's manager container.
-        displayName: Manager
-        path: components.selfNodeRemediation.manager
-      - description: |-
-          Resources sets CPU and memory for the manager container only.
-          Omitted values retain the packaged defaults. Settings do not enable the component.
-          WAO checks effective values when the component is enabled.
-        displayName: Manager Resources
-        path: components.selfNodeRemediation.manager.resources
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
-      - description: Manager configures the component's manager container.
-        displayName: Manager
-        path: components.storageBasedRemediation.manager
-      - description: |-
-          Resources sets CPU and memory for the manager container only.
-          Omitted values retain the packaged defaults. Settings do not enable the component.
-          WAO checks effective values when the component is enabled.
-        displayName: Manager Resources
-        path: components.storageBasedRemediation.manager.resources
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
-      - description: |-
-          Runs the Self Node Remediation operator. Enabling this component creates
-          its default configuration and starts privileged node agents on eligible
-          nodes. Disabling does not remove existing node agents or their configuration.
+        kind: NodeHealthCheck
+        name: nodehealthchecks.remediation.medik8s.io
+        resources:
+          - kind: Node
+            name: ""
+            version: v1
+          - kind: Lease
+            name: ""
+            version: v1
+        version: v1alpha1
+      - description: Owned by WAO; served by the SNR operand when enabled.
+        displayName: Self Node Remediation Config
+        kind: SelfNodeRemediationConfig
+        name: selfnoderemediationconfigs.self-node-remediation.medik8s.io
+        resources:
+          - kind: DaemonSet
+            name: ""
+            version: v1
+          - kind: Pod
+            name: ""
+            version: v1
+        version: v1alpha1
+      - description: Owned by WAO; served by the SNR operand when enabled.
         displayName: Self Node Remediation
-        path: components.selfNodeRemediation
-      - description: |-
-          Runs the Storage Based Remediation operator. Configure a
-          StorageBasedRemediationConfig separately to deploy its agents and configure
-          storage-based fencing. Existing agents and storage configuration can remain
-          after disabling.
+        kind: SelfNodeRemediation
+        name: selfnoderemediations.self-node-remediation.medik8s.io
+        resources:
+          - kind: Node
+            name: ""
+            version: v1
+          - kind: Pod
+            name: ""
+            version: v1
+          - kind: VolumeAttachment
+            name: ""
+            version: v1
+        version: v1alpha1
+      - description: Owned by WAO; served by the SNR operand when enabled.
+        displayName: Self Node Remediation Template
+        kind: SelfNodeRemediationTemplate
+        name: selfnoderemediationtemplates.self-node-remediation.medik8s.io
+        resources:
+          - kind: SelfNodeRemediation
+            name: selfnoderemediations.self-node-remediation.medik8s.io
+            version: v1alpha1
+        version: v1alpha1
+      - description: Owned by WAO; served by the SBR operand when enabled.
+        displayName: Storage Based Remediation Config
+        kind: StorageBasedRemediationConfig
+        name: storagebasedremediationconfigs.storage-based-remediation.medik8s.io
+        resources:
+          - kind: DaemonSet
+            name: ""
+            version: v1
+          - kind: PersistentVolumeClaim
+            name: ""
+            version: v1
+          - kind: Job
+            name: ""
+            version: v1
+        version: v1alpha1
+      - description: Owned by WAO; served by the SBR operand when enabled.
         displayName: Storage Based Remediation
-        path: components.storageBasedRemediation
-      - description: |-
-          Runs the Node Maintenance operator. Creating a NodeMaintenance resource
-          separately requests node cordoning and draining. Complete active maintenance
-          before disabling; stopping the manager does not uncordon a node.
-        displayName: Node Maintenance
-        path: components.nodeMaintenance
-      - description: |-
-          Runs the Fence Agents Remediation operator. Fencing requires separately
-          configured remediation resources and fence-agent credentials.
+        kind: StorageBasedRemediation
+        name: storagebasedremediations.storage-based-remediation.medik8s.io
+        resources:
+          - kind: Node
+            name: ""
+            version: v1
+          - kind: StorageBasedRemediationConfig
+            name: storagebasedremediationconfigs.storage-based-remediation.medik8s.io
+            version: v1alpha1
+        version: v1alpha1
+      - description: Owned by WAO; served by the SBR operand when enabled.
+        displayName: Storage Based Remediation Template
+        kind: StorageBasedRemediationTemplate
+        name: storagebasedremediationtemplates.storage-based-remediation.medik8s.io
+        resources:
+          - kind: StorageBasedRemediation
+            name: storagebasedremediations.storage-based-remediation.medik8s.io
+            version: v1alpha1
+        version: v1alpha1
+      - description: Owned by WAO; served by the FAR operand when enabled.
         displayName: Fence Agents Remediation
-        path: components.fenceAgentsRemediation
-      - description: |-
-          Runs the Machine Deletion Remediation operator. Machine deletion requires
-          a separate remediation request.
+        kind: FenceAgentsRemediation
+        name: fenceagentsremediations.fence-agents-remediation.medik8s.io
+        resources:
+          - kind: Node
+            name: ""
+            version: v1
+          - kind: Secret
+            name: ""
+            version: v1
+        version: v1alpha1
+      - description: Owned by WAO; served by the FAR operand when enabled.
+        displayName: Fence Agents Remediation Template
+        kind: FenceAgentsRemediationTemplate
+        name: fenceagentsremediationtemplates.fence-agents-remediation.medik8s.io
+        resources:
+          - kind: FenceAgentsRemediation
+            name: fenceagentsremediations.fence-agents-remediation.medik8s.io
+            version: v1alpha1
+        version: v1alpha1
+      - description: Owned by WAO; served by the MDR operand when enabled.
         displayName: Machine Deletion Remediation
-        path: components.machineDeletionRemediation
-      statusDescriptors:
+        kind: MachineDeletionRemediation
+        name: machinedeletionremediations.machine-deletion-remediation.medik8s.io
+        resources:
+          - kind: Machine
+            name: machines.machine.openshift.io
+            version: v1beta1
+          - kind: Node
+            name: ""
+            version: v1
+        version: v1alpha1
+      - description: Owned by WAO; served by the MDR operand when enabled.
+        displayName: Machine Deletion Remediation Template
+        kind: MachineDeletionRemediationTemplate
+        name: machinedeletionremediationtemplates.machine-deletion-remediation.medik8s.io
+        resources:
+          - kind: MachineDeletionRemediation
+            name: machinedeletionremediations.machine-deletion-remediation.medik8s.io
+            version: v1alpha1
+        version: v1alpha1
+      - description: Owned by WAO; served by the NMO operand when enabled.
+        displayName: Node Maintenance
+        kind: NodeMaintenance
+        name: nodemaintenances.nodemaintenance.medik8s.io
+        resources:
+          - kind: Node
+            name: ""
+            version: v1
+          - kind: Pod
+            name: ""
+            version: v1
+          - kind: Lease
+            name: ""
+            version: v1
+        version: v1beta1
       - description: |-
-          Available, Progressing, and Degraded describe WAO reconciliation.
-          Available means reconciliation succeeded, including when all components
-          are Disabled; it does not mean workloads are protected. Check component
-          status for retained resources after disabling.
-        displayName: Reconciliation Conditions
-        path: conditions
-        x-descriptors:
-        - urn:alm:descriptor:io.kubernetes.conditions
-      - description: Namespace where WAO installs component operators.
-        displayName: Installation Namespace
-        path: installNamespace
-        x-descriptors:
-        - urn:alm:descriptor:io.kubernetes:Namespace
-      - description: Configuration generation last processed by WAO.
-        displayName: Observed Generation
-        path: observedGeneration
-        x-descriptors:
-        - urn:alm:descriptor:text
-      version: v1alpha1
+          WorkloadAvailabilityConfig provides cluster-wide configuration for the six
+          medik8s component operators. WAO automatically creates this cluster-scoped
+          singleton with the name cluster and all components Disabled. Edit the existing
+          cluster resource to configure components. When creating it manually, use the
+          name cluster.
+        displayName: Workload Availability Config
+        kind: WorkloadAvailabilityConfig
+        name: workloadavailabilityconfigs.workloadavailability.medik8s.io
+        resources:
+          - kind: ConfigMap
+            name: ""
+            version: v1
+          - kind: Deployment
+            name: ""
+            version: v1
+          - kind: MutatingWebhookConfiguration
+            name: ""
+            version: v1
+          - kind: Service
+            name: ""
+            version: v1
+          - kind: ValidatingWebhookConfiguration
+            name: ""
+            version: v1
+        specDescriptors:
+          - description: |-
+              Choose which component operators WAO runs. All components default to
+              Disabled. Disabling removes the component manager and its managed
+              installation resources; resources created by that component can remain.
+              Disable a component only when it has no active work.
+            displayName: Components
+            path: components
+          - description: |-
+              Runs the Fence Agents Remediation operator. Fencing requires separately
+              configured remediation resources and fence-agent credentials.
+            displayName: Fence Agents Remediation
+            path: components.fenceAgentsRemediation
+          - description: |-
+              Enabled runs the operator when true. The default is false.
+              Disabling removes its manager and managed installation resources.
+              Existing agents, configuration, and native resources can remain.
+              Complete active maintenance or remediation before disabling.
+            displayName: Fence Agents Remediation Enabled
+            path: components.fenceAgentsRemediation.enabled
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+          - description: Manager configures the component's manager container.
+            displayName: Fence Agents Remediation Manager
+            path: components.fenceAgentsRemediation.manager
+          - description: |-
+              Resources sets CPU and memory for the manager container only.
+              Omitted values retain the packaged defaults. Settings do not enable the component.
+              WAO checks effective values when the component is enabled.
+            displayName: Fence Agents Remediation Manager Resources
+            path: components.fenceAgentsRemediation.manager.resources
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+          - description: |-
+              Runs the Machine Deletion Remediation operator. Machine deletion requires
+              a separate remediation request.
+            displayName: Machine Deletion Remediation
+            path: components.machineDeletionRemediation
+          - description: |-
+              Enabled runs the operator when true. The default is false.
+              Disabling removes its manager and managed installation resources.
+              Existing agents, configuration, and native resources can remain.
+              Complete active maintenance or remediation before disabling.
+            displayName: Machine Deletion Remediation Enabled
+            path: components.machineDeletionRemediation.enabled
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+          - description: Manager configures the component's manager container.
+            displayName: Machine Deletion Remediation Manager
+            path: components.machineDeletionRemediation.manager
+          - description: |-
+              Resources sets CPU and memory for the manager container only.
+              Omitted values retain the packaged defaults. Settings do not enable the component.
+              WAO checks effective values when the component is enabled.
+            displayName: Machine Deletion Remediation Manager Resources
+            path: components.machineDeletionRemediation.manager.resources
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+          - description: |-
+              Runs the Node Health Check operator. Configure a NodeHealthCheck policy
+              separately to enable automated health monitoring and remediation.
+            displayName: Node Health Check
+            path: components.nodeHealthCheck
+          - description: |-
+              Enabled runs the operator when true. The default is false.
+              Disabling removes its manager and managed installation resources.
+              Existing agents, configuration, and native resources can remain.
+              Complete active maintenance or remediation before disabling.
+            displayName: Node Health Check Enabled
+            path: components.nodeHealthCheck.enabled
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+          - description: Manager configures the component's manager container.
+            displayName: Node Health Check Manager
+            path: components.nodeHealthCheck.manager
+          - description: |-
+              Resources sets CPU and memory for the manager container only.
+              Omitted values retain the packaged defaults. Settings do not enable the component.
+              WAO checks effective values when the component is enabled.
+            displayName: Node Health Check Manager Resources
+            path: components.nodeHealthCheck.manager.resources
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+          - description: |-
+              Runs the Node Maintenance operator. Creating a NodeMaintenance resource
+              separately requests node cordoning and draining. Complete active maintenance
+              before disabling; stopping the manager does not uncordon a node.
+            displayName: Node Maintenance
+            path: components.nodeMaintenance
+          - description: |-
+              Enabled runs the operator when true. The default is false.
+              Disabling removes its manager and managed installation resources.
+              Existing agents, configuration, and native resources can remain.
+              Complete active maintenance or remediation before disabling.
+            displayName: Node Maintenance Enabled
+            path: components.nodeMaintenance.enabled
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+          - description: Manager configures the component's manager container.
+            displayName: Node Maintenance Manager
+            path: components.nodeMaintenance.manager
+          - description: |-
+              Resources sets CPU and memory for the manager container only.
+              Omitted values retain the packaged defaults. Settings do not enable the component.
+              WAO checks effective values when the component is enabled.
+            displayName: Node Maintenance Manager Resources
+            path: components.nodeMaintenance.manager.resources
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+          - description: |-
+              Runs the Self Node Remediation operator. Enabling this component creates
+              its default configuration and starts privileged node agents on eligible
+              nodes. Disabling does not remove existing node agents or their configuration.
+            displayName: Self Node Remediation
+            path: components.selfNodeRemediation
+          - description: |-
+              Enabled runs the operator when true. The default is false.
+              Disabling removes its manager and managed installation resources.
+              Existing agents, configuration, and native resources can remain.
+              Complete active maintenance or remediation before disabling.
+            displayName: Self Node Remediation Enabled
+            path: components.selfNodeRemediation.enabled
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+          - description: Manager configures the component's manager container.
+            displayName: Self Node Remediation Manager
+            path: components.selfNodeRemediation.manager
+          - description: |-
+              Resources sets CPU and memory for the manager container only.
+              Omitted values retain the packaged defaults. Settings do not enable the component.
+              WAO checks effective values when the component is enabled.
+            displayName: Self Node Remediation Manager Resources
+            path: components.selfNodeRemediation.manager.resources
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+          - description: |-
+              Runs the Storage Based Remediation operator. Configure a
+              StorageBasedRemediationConfig separately to deploy its agents and configure
+              storage-based fencing. Existing agents and storage configuration can remain
+              after disabling.
+            displayName: Storage Based Remediation
+            path: components.storageBasedRemediation
+          - description: |-
+              Enabled runs the operator when true. The default is false.
+              Disabling removes its manager and managed installation resources.
+              Existing agents, configuration, and native resources can remain.
+              Complete active maintenance or remediation before disabling.
+            displayName: Storage Based Remediation Enabled
+            path: components.storageBasedRemediation.enabled
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+          - description: Manager configures the component's manager container.
+            displayName: Storage Based Remediation Manager
+            path: components.storageBasedRemediation.manager
+          - description: |-
+              Resources sets CPU and memory for the manager container only.
+              Omitted values retain the packaged defaults. Settings do not enable the component.
+              WAO checks effective values when the component is enabled.
+            displayName: Storage Based Remediation Manager Resources
+            path: components.storageBasedRemediation.manager.resources
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+        statusDescriptors:
+          - description: |-
+              Available, Progressing, and Degraded describe WAO reconciliation.
+              Available means reconciliation succeeded, including when all components
+              are Disabled; it does not mean workloads are protected. Check component
+              status for retained resources after disabling.
+            displayName: Reconciliation Conditions
+            path: conditions
+            x-descriptors:
+              - urn:alm:descriptor:io.kubernetes.conditions
+          - description: Namespace where WAO installs component operators.
+            displayName: Installation Namespace
+            path: installNamespace
+            x-descriptors:
+              - urn:alm:descriptor:io.kubernetes:Namespace
+          - description: Configuration generation last processed by WAO.
+            displayName: Observed Generation
+            path: observedGeneration
+            x-descriptors:
+              - urn:alm:descriptor:text
+        version: v1alpha1
   description: |
     Proof of concept. One package owning the NHC, SNR, SBR, FAR, MDR and NMO APIs plus a
     cluster-scoped WorkloadAvailabilityConfig. Component operators run unchanged from their
@@ -396,36 +395,36 @@ spec:
       deployments: null
     strategy: ""
   installModes:
-  - supported: false
-    type: OwnNamespace
-  - supported: false
-    type: SingleNamespace
-  - supported: false
-    type: MultiNamespace
-  - supported: true
-    type: AllNamespaces
+    - supported: false
+      type: OwnNamespace
+    - supported: false
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: true
+      type: AllNamespaces
   keywords:
-  - remediation
-  - node
-  - availability
-  - medik8s
+    - remediation
+    - node
+    - availability
+    - medik8s
   maturity: alpha
   minKubeVersion: 1.25.0
   provider:
     name: wao_poc
   relatedImages:
-  - image: quay.io/medik8s/node-healthcheck-operator@sha256:663b732436fb0da81098502d6844321ec9d098b89186bbef47ee1ac3debb3ec4
-    name: nhc-manager
-  - image: quay.io/medik8s/self-node-remediation-operator@sha256:c75e3787fd8c3ca373d7d39fd889af2703c0c47a42a07418f5ff215912e37c11
-    name: snr-manager
-  - image: quay.io/medik8s/storage-based-remediation-operator@sha256:ebb3f7550968953c6a0c2f56ed2e1b5b57462fcf32d383d67ff25e0ca77fd718
-    name: sbr-manager
-  - image: quay.io/medik8s/storage-based-remediation-agent@sha256:1689514e537d1f2dbc19f27047fee80fa755e74f5c263eecb900500b49b92f56
-    name: sbr-agent
-  - image: quay.io/medik8s/fence-agents-remediation-operator@sha256:d1289cfa144169d1c8af67c03129c1cf6a5283906c10b481ceb1d299f7bb5d4c
-    name: far-manager
-  - image: quay.io/medik8s/machine-deletion-remediation-operator@sha256:421090014368c5c29bd96a6e99a4062570de9d3dbfe91cb12d3fd0a9420b1b01
-    name: mdr-manager
-  - image: quay.io/medik8s/node-maintenance-operator@sha256:d0ae352a382193ed587b9fe6c4d1b24586ca007f98417e8ebae33b31f540c235
-    name: nmo-manager
+    - image: quay.io/medik8s/node-healthcheck-operator@sha256:663b732436fb0da81098502d6844321ec9d098b89186bbef47ee1ac3debb3ec4
+      name: nhc-manager
+    - image: quay.io/medik8s/self-node-remediation-operator@sha256:c75e3787fd8c3ca373d7d39fd889af2703c0c47a42a07418f5ff215912e37c11
+      name: snr-manager
+    - image: quay.io/medik8s/storage-based-remediation-operator@sha256:ebb3f7550968953c6a0c2f56ed2e1b5b57462fcf32d383d67ff25e0ca77fd718
+      name: sbr-manager
+    - image: quay.io/medik8s/storage-based-remediation-agent@sha256:1689514e537d1f2dbc19f27047fee80fa755e74f5c263eecb900500b49b92f56
+      name: sbr-agent
+    - image: quay.io/medik8s/fence-agents-remediation-operator@sha256:d1289cfa144169d1c8af67c03129c1cf6a5283906c10b481ceb1d299f7bb5d4c
+      name: far-manager
+    - image: quay.io/medik8s/machine-deletion-remediation-operator@sha256:421090014368c5c29bd96a6e99a4062570de9d3dbfe91cb12d3fd0a9420b1b01
+      name: mdr-manager
+    - image: quay.io/medik8s/node-maintenance-operator@sha256:d0ae352a382193ed587b9fe6c4d1b24586ca007f98417e8ebae33b31f540c235
+      name: nmo-manager
   version: 0.0.0

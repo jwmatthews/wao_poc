@@ -177,7 +177,7 @@ The default is `false` for all six components.
 Set `spec.components.<key>.manager.resources` to configure its manager CPU and memory.
 Omitted resource values retain the packaged defaults.
 
-Use the OpenShift console form to edit `WorkloadAvailabilityConfig/cluster`.
+Use the OpenShift console CSV details controls to edit `WorkloadAvailabilityConfig/cluster`.
 Each component has an Enabled switch and Manager Resources controls.
 WAO normally creates this singleton automatically.
 

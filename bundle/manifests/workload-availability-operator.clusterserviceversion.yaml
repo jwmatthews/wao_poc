@@ -226,78 +226,52 @@ spec:
             displayName: Components
             path: components
           - description: |-
+              Runs the Fence Agents Remediation operator. Fencing requires separately
+              configured remediation resources and fence-agent credentials.
+            displayName: Fence Agents Remediation
+            path: components.fenceAgentsRemediation
+          - description: |-
               Enabled runs the operator when true. The default is false.
               Disabling removes its manager and managed installation resources.
               Existing agents, configuration, and native resources can remain.
               Complete active maintenance or remediation before disabling.
-            displayName: Enabled
+            displayName: Fence Agents Remediation Enabled
             path: components.fenceAgentsRemediation.enabled
             x-descriptors:
               - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
-          - description: |-
-              Enabled runs the operator when true. The default is false.
-              Disabling removes its manager and managed installation resources.
-              Existing agents, configuration, and native resources can remain.
-              Complete active maintenance or remediation before disabling.
-            displayName: Enabled
-            path: components.machineDeletionRemediation.enabled
-            x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
-          - description: |-
-              Enabled runs the operator when true. The default is false.
-              Disabling removes its manager and managed installation resources.
-              Existing agents, configuration, and native resources can remain.
-              Complete active maintenance or remediation before disabling.
-            displayName: Enabled
-            path: components.nodeHealthCheck.enabled
-            x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
-          - description: |-
-              Enabled runs the operator when true. The default is false.
-              Disabling removes its manager and managed installation resources.
-              Existing agents, configuration, and native resources can remain.
-              Complete active maintenance or remediation before disabling.
-            displayName: Enabled
-            path: components.nodeMaintenance.enabled
-            x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
-          - description: |-
-              Enabled runs the operator when true. The default is false.
-              Disabling removes its manager and managed installation resources.
-              Existing agents, configuration, and native resources can remain.
-              Complete active maintenance or remediation before disabling.
-            displayName: Enabled
-            path: components.selfNodeRemediation.enabled
-            x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
-          - description: |-
-              Enabled runs the operator when true. The default is false.
-              Disabling removes its manager and managed installation resources.
-              Existing agents, configuration, and native resources can remain.
-              Complete active maintenance or remediation before disabling.
-            displayName: Enabled
-            path: components.storageBasedRemediation.enabled
-            x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
           - description: Manager configures the component's manager container.
-            displayName: Manager
+            displayName: Fence Agents Remediation Manager
             path: components.fenceAgentsRemediation.manager
           - description: |-
               Resources sets CPU and memory for the manager container only.
               Omitted values retain the packaged defaults. Settings do not enable the component.
               WAO checks effective values when the component is enabled.
-            displayName: Manager Resources
+            displayName: Fence Agents Remediation Manager Resources
             path: components.fenceAgentsRemediation.manager.resources
             x-descriptors:
               - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+          - description: |-
+              Runs the Machine Deletion Remediation operator. Machine deletion requires
+              a separate remediation request.
+            displayName: Machine Deletion Remediation
+            path: components.machineDeletionRemediation
+          - description: |-
+              Enabled runs the operator when true. The default is false.
+              Disabling removes its manager and managed installation resources.
+              Existing agents, configuration, and native resources can remain.
+              Complete active maintenance or remediation before disabling.
+            displayName: Machine Deletion Remediation Enabled
+            path: components.machineDeletionRemediation.enabled
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
           - description: Manager configures the component's manager container.
-            displayName: Manager
+            displayName: Machine Deletion Remediation Manager
             path: components.machineDeletionRemediation.manager
           - description: |-
               Resources sets CPU and memory for the manager container only.
               Omitted values retain the packaged defaults. Settings do not enable the component.
               WAO checks effective values when the component is enabled.
-            displayName: Manager Resources
+            displayName: Machine Deletion Remediation Manager Resources
             path: components.machineDeletionRemediation.manager.resources
             x-descriptors:
               - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
@@ -306,48 +280,50 @@ spec:
               separately to enable automated health monitoring and remediation.
             displayName: Node Health Check
             path: components.nodeHealthCheck
+          - description: |-
+              Enabled runs the operator when true. The default is false.
+              Disabling removes its manager and managed installation resources.
+              Existing agents, configuration, and native resources can remain.
+              Complete active maintenance or remediation before disabling.
+            displayName: Node Health Check Enabled
+            path: components.nodeHealthCheck.enabled
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
           - description: Manager configures the component's manager container.
-            displayName: Manager
+            displayName: Node Health Check Manager
             path: components.nodeHealthCheck.manager
           - description: |-
               Resources sets CPU and memory for the manager container only.
               Omitted values retain the packaged defaults. Settings do not enable the component.
               WAO checks effective values when the component is enabled.
-            displayName: Manager Resources
+            displayName: Node Health Check Manager Resources
             path: components.nodeHealthCheck.manager.resources
             x-descriptors:
               - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+          - description: |-
+              Runs the Node Maintenance operator. Creating a NodeMaintenance resource
+              separately requests node cordoning and draining. Complete active maintenance
+              before disabling; stopping the manager does not uncordon a node.
+            displayName: Node Maintenance
+            path: components.nodeMaintenance
+          - description: |-
+              Enabled runs the operator when true. The default is false.
+              Disabling removes its manager and managed installation resources.
+              Existing agents, configuration, and native resources can remain.
+              Complete active maintenance or remediation before disabling.
+            displayName: Node Maintenance Enabled
+            path: components.nodeMaintenance.enabled
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
           - description: Manager configures the component's manager container.
-            displayName: Manager
+            displayName: Node Maintenance Manager
             path: components.nodeMaintenance.manager
           - description: |-
               Resources sets CPU and memory for the manager container only.
               Omitted values retain the packaged defaults. Settings do not enable the component.
               WAO checks effective values when the component is enabled.
-            displayName: Manager Resources
+            displayName: Node Maintenance Manager Resources
             path: components.nodeMaintenance.manager.resources
-            x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
-          - description: Manager configures the component's manager container.
-            displayName: Manager
-            path: components.selfNodeRemediation.manager
-          - description: |-
-              Resources sets CPU and memory for the manager container only.
-              Omitted values retain the packaged defaults. Settings do not enable the component.
-              WAO checks effective values when the component is enabled.
-            displayName: Manager Resources
-            path: components.selfNodeRemediation.manager.resources
-            x-descriptors:
-              - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
-          - description: Manager configures the component's manager container.
-            displayName: Manager
-            path: components.storageBasedRemediation.manager
-          - description: |-
-              Resources sets CPU and memory for the manager container only.
-              Omitted values retain the packaged defaults. Settings do not enable the component.
-              WAO checks effective values when the component is enabled.
-            displayName: Manager Resources
-            path: components.storageBasedRemediation.manager.resources
             x-descriptors:
               - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
           - description: |-
@@ -357,6 +333,26 @@ spec:
             displayName: Self Node Remediation
             path: components.selfNodeRemediation
           - description: |-
+              Enabled runs the operator when true. The default is false.
+              Disabling removes its manager and managed installation resources.
+              Existing agents, configuration, and native resources can remain.
+              Complete active maintenance or remediation before disabling.
+            displayName: Self Node Remediation Enabled
+            path: components.selfNodeRemediation.enabled
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+          - description: Manager configures the component's manager container.
+            displayName: Self Node Remediation Manager
+            path: components.selfNodeRemediation.manager
+          - description: |-
+              Resources sets CPU and memory for the manager container only.
+              Omitted values retain the packaged defaults. Settings do not enable the component.
+              WAO checks effective values when the component is enabled.
+            displayName: Self Node Remediation Manager Resources
+            path: components.selfNodeRemediation.manager.resources
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+          - description: |-
               Runs the Storage Based Remediation operator. Configure a
               StorageBasedRemediationConfig separately to deploy its agents and configure
               storage-based fencing. Existing agents and storage configuration can remain
@@ -364,21 +360,25 @@ spec:
             displayName: Storage Based Remediation
             path: components.storageBasedRemediation
           - description: |-
-              Runs the Node Maintenance operator. Creating a NodeMaintenance resource
-              separately requests node cordoning and draining. Complete active maintenance
-              before disabling; stopping the manager does not uncordon a node.
-            displayName: Node Maintenance
-            path: components.nodeMaintenance
+              Enabled runs the operator when true. The default is false.
+              Disabling removes its manager and managed installation resources.
+              Existing agents, configuration, and native resources can remain.
+              Complete active maintenance or remediation before disabling.
+            displayName: Storage Based Remediation Enabled
+            path: components.storageBasedRemediation.enabled
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+          - description: Manager configures the component's manager container.
+            displayName: Storage Based Remediation Manager
+            path: components.storageBasedRemediation.manager
           - description: |-
-              Runs the Fence Agents Remediation operator. Fencing requires separately
-              configured remediation resources and fence-agent credentials.
-            displayName: Fence Agents Remediation
-            path: components.fenceAgentsRemediation
-          - description: |-
-              Runs the Machine Deletion Remediation operator. Machine deletion requires
-              a separate remediation request.
-            displayName: Machine Deletion Remediation
-            path: components.machineDeletionRemediation
+              Resources sets CPU and memory for the manager container only.
+              Omitted values retain the packaged defaults. Settings do not enable the component.
+              WAO checks effective values when the component is enabled.
+            displayName: Storage Based Remediation Manager Resources
+            path: components.storageBasedRemediation.manager.resources
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
         statusDescriptors:
           - description: |-
               Available, Progressing, and Degraded describe WAO reconciliation.

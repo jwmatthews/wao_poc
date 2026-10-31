@@ -19,6 +19,15 @@ import (
 const waoCRDFile = "workloadavailability.medik8s.io_workloadavailabilityconfigs.yaml"
 const waoCSVFile = "workload-availability-operator.clusterserviceversion.yaml"
 
+var componentDisplayNames = map[string]string{
+	"nodeHealthCheck":            "Node Health Check",
+	"selfNodeRemediation":        "Self Node Remediation",
+	"storageBasedRemediation":    "Storage Based Remediation",
+	"fenceAgentsRemediation":     "Fence Agents Remediation",
+	"machineDeletionRemediation": "Machine Deletion Remediation",
+	"nodeMaintenance":            "Node Maintenance",
+}
+
 // These checks protect the console form contract in both generated copies.
 func TestResourceConfigurationSchemaAndConsole(t *testing.T) {
 	for _, artifact := range []struct {
@@ -53,13 +62,15 @@ func TestResourceConfigurationSchemaAndConsole(t *testing.T) {
 				}
 			}
 			byPath := map[string]map[string]any{}
-			for _, entry := range descriptors {
+			positions := map[string]int{}
+			for index, entry := range descriptors {
 				descriptor := entry.(map[string]any)
 				path, _ := descriptor["path"].(string)
 				if _, duplicate := byPath[path]; duplicate {
 					t.Errorf("duplicate descriptor path %q", path)
 				}
 				byPath[path] = descriptor
+				positions[path] = index
 				resourceSchemaAt(t, schema, "spec."+path)
 				if strings.HasSuffix(path, ".state") {
 					t.Errorf("legacy state descriptor %q", path)
@@ -76,6 +87,10 @@ func TestResourceConfigurationSchemaAndConsole(t *testing.T) {
 				}
 			}
 			for _, key := range v1alpha1.AllComponentKeys {
+				prefix := "components." + key
+				if positions[prefix+".manager.resources"] != positions[prefix+".enabled"]+2 {
+					t.Errorf("%s enable and resource controls are not adjacent to its Manager descriptor", key)
+				}
 				for _, control := range []struct{ suffix, name, kind string }{
 					{"enabled", "Enabled", "booleanSwitch"},
 					{"manager.resources", "Manager Resources", "resourceRequirements"},
@@ -86,8 +101,9 @@ func TestResourceConfigurationSchemaAndConsole(t *testing.T) {
 						t.Errorf("missing %s descriptor", path)
 						continue
 					}
-					if descriptor["displayName"] != control.name {
-						t.Errorf("%s display name = %v, want %s", path, descriptor["displayName"], control.name)
+					wantName := componentDisplayNames[key] + " " + control.name
+					if descriptor["displayName"] != wantName {
+						t.Errorf("%s display name = %v, want %s", path, descriptor["displayName"], wantName)
 					}
 					xDescriptors, _, err := unstructured.NestedStringSlice(descriptor, "x-descriptors")
 					if err != nil {

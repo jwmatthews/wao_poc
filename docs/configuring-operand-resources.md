@@ -53,23 +53,50 @@ The six component keys are:
 
 WAO normally creates the singleton named `cluster` when it starts.
 Edit this existing object when it is present.
-Each component section provides an Enabled switch and Manager Resources controls.
+The creation form provides component sections with Enabled switches and Manager Resources controls.
 These controls use boolean values and Kubernetes resource quantities.
 
-1. Open the installed Workload Availability Operator in the OpenShift console.
-2. Select its `WorkloadAvailabilityConfig` resource.
-3. Open the existing `cluster` object.
-4. Select the form editor.
-5. Set the component's Enabled switch as required.
-6. Enter CPU or memory quantities in its Manager Resources controls.
-7. Save the object.
-8. Check the component status and its manager Deployment.
-
 If the singleton is absent, use the console's Create form.
+Open the installed Workload Availability Operator.
+Select its `WorkloadAvailabilityConfig` resource, then select Create.
 Keep the required name `cluster`.
 The initial example sets all six components to `enabled: false`.
-The creation form provides the same switches and resource controls.
 WAO does not accept other configuration names.
+
+The console's standard Edit action can open YAML for this cluster-scoped resource.
+The CSV details page provides switches and resource dialogs for editing without YAML.
+Each editable label includes its component name.
+Use the following commands to obtain that page's address.
+Set `KUBECONFIG` to your cluster's kubeconfig path first.
+These commands require `jq`.
+
+```sh
+wao_namespace="$(oc --kubeconfig "$KUBECONFIG" get workloadavailabilityconfig cluster -o jsonpath='{.status.installNamespace}')" &&
+wao_csv="$(oc --kubeconfig "$KUBECONFIG" get csv -n "$wao_namespace" -o json | jq -er '
+  [.items[] | select(.status.phase == "Succeeded") |
+    select(any(.spec.customresourcedefinitions.owned[]?;
+      .name == "workloadavailabilityconfigs.workloadavailability.medik8s.io")) |
+    .metadata.name] |
+  if length == 1 then .[0] else error("Expected one successful WAO CSV") end
+')" &&
+wao_console="$(oc --kubeconfig "$KUBECONFIG" get route console -n openshift-console -o jsonpath='{.spec.host}')" &&
+printf 'https://%s/k8s/ns/%s/clusterserviceversions/%s/workloadavailability.medik8s.io~v1alpha1~WorkloadAvailabilityConfig/cluster\n' "$wao_console" "$wao_namespace" "$wao_csv"
+```
+
+1. Open the printed address.
+2. Change the required component's Enabled switch.
+3. Select Confirm change beside the switch.
+4. Select its resource requests or resource limits to open the resource dialog.
+5. Enter CPU or memory quantities.
+6. Save the dialog.
+7. Check the component status and its manager Deployment.
+
+Leave the Storage fields empty.
+The standard console control displays these fields, but WAO supports CPU and memory only.
+Untouched fields remain omitted.
+If the console reports that the object changed, close the dialog.
+Wait for the current rollout to finish.
+Open the dialog again before saving your change.
 
 Enabling Self Node Remediation starts privileged node agents on eligible nodes.
 Disabling a component removes its manager and managed installation resources.

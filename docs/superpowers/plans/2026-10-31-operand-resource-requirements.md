@@ -10,7 +10,7 @@
 
 **Spec:** [Issue #38](https://github.com/jwmatthews/wao_poc/issues/38), [issue #43](https://github.com/jwmatthews/wao_poc/issues/43), and the user's explicit boolean API requirement. Console CR creation is part of the required behavior.
 
-**Status:** Tasks 1–5 are implemented. Final checks and console inspection remain in Task 6.
+**Status:** Implementation and console checks are complete. Task 6 records the verification commands.
 
 **Repository baseline:** `e7ea1854365400607a42e18beac35c75d59daf22`, inspected on 2026-10-31.
 
@@ -185,12 +185,12 @@ Reuse server-side apply, the existing ownership check, and the Deployment watch.
 Add these CSV `specDescriptors` for each of the six components:
 
 ```yaml
-- displayName: Enabled
+- displayName: Node Health Check Enabled
   description: Run the Node Health Check operator. The default is false.
   path: components.nodeHealthCheck.enabled
   x-descriptors:
     - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
-- displayName: Manager Resources
+- displayName: Node Health Check Manager Resources
   description: Set CPU and memory for the manager container only.
   path: components.nodeHealthCheck.manager.resources
   x-descriptors:
@@ -199,17 +199,30 @@ Add these CSV `specDescriptors` for each of the six components:
 
 Replace the old State selectors with boolean switches. Remove their `.state` descriptor paths and `select:Enabled` / `select:Disabled` values. Preserve each component's explanatory text, including the effects of enabling SNR.
 
-Use nested schema objects and descriptor names to group each switch with its resource controls. Do not use the deprecated `fieldGroup` descriptor. Do not hide these controls under advanced settings.
+Use nested schema objects to group controls in the creation form.
+The CSV details renderer groups only the first object level.
+Run `hack/manager-resource-descriptors.sh` after Operator SDK generates the base CSV.
+Derive component names from the parent descriptors.
+Add each component name to its enable, manager, and resource labels.
+Sort descriptor paths to keep each component's controls together.
+Offline tests check these labels and their positions in both CSVs.
+Do not use the deprecated `fieldGroup` descriptor.
+Do not hide these controls under advanced settings.
 
 Update the CSV's `metadata.annotations.alm-examples` to use `enabled: false` for all six components. Keep the name `cluster` and omit resource overrides from this default example. Put the form controls under `spec.customresourcedefinitions.owned[].specDescriptors`. These descriptors and the example annotation serve different purposes.
 
-Support both creation and editing through the console form. A user must be able to enable a component and enter resources without editing YAML. The creation form must show all components disabled initially.
+Support creation through the console form and editing through the CSV details controls.
+A user must be able to enable a component and enter resources without editing YAML.
+The creation form must show all components disabled initially.
+Cluster-scoped resource links can open the generic details page, where Edit opens YAML.
+Document the CSV details address, the switch confirmation, and the resource dialogs.
+Leave the standard control's Storage fields empty because WAO supports CPU and memory only.
 
 WAO already creates the singleton automatically. Document that users normally edit this existing object. Manual creation uses the same form and the required name `cluster` when the singleton is absent. Do not remove automatic creation or permit additional singleton names.
 
 Generate descriptors from API markers through the existing bundle workflow. Check the generated base CSV and bundle CSV. The `order` marker alone does not prove the final form layout.
 
-The OpenShift Console `release-4.20` reference documents boolean switches, resource controls, and automatic schema grouping. No target cluster version was supplied. Check both creation and editing on the authorized target version before declaring the console requirement complete.
+The OpenShift Console `release-4.20` reference documents boolean switches, resource controls, and automatic schema grouping. No target cluster version was supplied. Check both creation and CSV details editing on the authorized target version before declaring the console requirement complete.
 
 ## Task 1: Replace the state input and add resource fields
 
@@ -573,11 +586,11 @@ go test ./api/v1alpha1 ./internal/components ./internal/operands -count=1
 `make test` currently runs the controller package. It does not replace the command above.
 
 - [x] Run `make bundle-reset` after all source changes.
-- [ ] Run `make check` before each implementation commit.
-- [ ] Make small local commits after the corresponding tests pass.
-- [ ] Preserve the configured Git identity and required Codex trailer.
-- [ ] Run `make test-offline` on the clean implementation tree.
-- [ ] Run `make test` on that tree.
+- [x] Run `make check` before each implementation commit.
+- [x] Make small local commits after the corresponding tests pass.
+- [x] Preserve the configured Git identity and required Codex trailer.
+- [x] Run `make test-offline` on the clean implementation tree.
+- [x] Run `make test` on that tree.
 - [x] Run `git diff --check`.
 
 The current working tree contains unrelated untracked files. Preserve them. Execute implementation in an isolated worktree so `verify-no-changes` can check a clean tree. Do not remove the user's files to satisfy that check.
@@ -586,35 +599,35 @@ The current working tree contains unrelated untracked files. Preserve them. Exec
 
 The following checks need a disposable cluster with classic OLM and explicit session authorization. Use the shared `dev/dev.mk` workflow. Do not recreate the removed cluster scripts.
 
-- [ ] Identify the authorized cluster and its OpenShift Console version.
-- [ ] Deploy with an explicit kubeconfig through `make dev-olm-deploy`.
-- [ ] Check that all six components have `enabled: false` after installation.
-- [ ] Use this fresh installation, with no operands enabled, for the creation test.
-- [ ] Remove only the empty singleton and wait for its deletion to complete.
-- [ ] Open the console's Create form without restarting WAO.
-- [ ] Check that the example supplies the singleton name `cluster` and six false enable flags.
-- [ ] Check that all six switches and resource controls appear in their component sections.
-- [ ] Recreate the singleton through the form with every component disabled.
-- [ ] Check that creation succeeds without YAML editing or operand workload creation.
-- [ ] Open the existing `WorkloadAvailabilityConfig/cluster` in the console form.
-- [ ] Check all six component sections for the Enabled switch and resource controls.
-- [ ] Check that saved enable values are booleans and that the CR contains no component `state` input.
-- [ ] Check CPU units, memory units, partial values, save behavior, and removal of an override.
-- [ ] Check that form editing does not insert resource defaults into untouched components.
-- [ ] Enable NHC with a valid resource override.
-- [ ] Change one NHC resource value through the form.
-- [ ] Check the resulting Deployment rollout and effective manager resources.
-- [ ] Check that the console plugin and other component templates remain unchanged.
-- [ ] Submit an invalid effective request/limit pair on NHC and check the status message.
-- [ ] Correct the pair and check recovery.
-- [ ] Remove the override and check restoration of packaged defaults.
-- [ ] Set NHC's switch to false and check the normal manager removal behavior.
+- [x] Identify the authorized cluster and its OpenShift Console version.
+- [x] Deploy with an explicit kubeconfig through `make dev-olm-deploy`.
+- [x] Check that all six components have `enabled: false` after installation.
+- [x] Use this fresh installation, with no operands enabled, for the creation test.
+- [x] Remove only the empty singleton and wait for its deletion to complete.
+- [x] Open the console's Create form without restarting WAO.
+- [x] Check that the example supplies the singleton name `cluster` and six false enable flags.
+- [x] Check that all six switches and resource controls appear in their component sections.
+- [x] Recreate the singleton through the form with every component disabled.
+- [x] Check that creation succeeds without YAML editing or operand workload creation.
+- [x] Open the existing `WorkloadAvailabilityConfig/cluster` on the CSV details page.
+- [x] Check all six component sections for the Enabled switch and resource controls.
+- [x] Check that saved enable values are booleans and that the CR contains no component `state` input.
+- [x] Check CPU units, memory units, partial values, save behavior, and removal of an override.
+- [x] Check that console editing does not insert resource defaults into untouched components.
+- [x] Enable NHC with a valid resource override.
+- [x] Change one NHC resource value through a CSV details dialog.
+- [x] Check the resulting Deployment rollout and effective manager resources.
+- [x] Check that the console plugin and other component templates remain unchanged.
+- [x] Submit an invalid effective request/limit pair on NHC and check the status message.
+- [x] Correct the pair and check recovery.
+- [x] Remove the override and check restoration of packaged defaults.
+- [x] Set NHC's switch to false and check the normal manager removal behavior.
 
 NHC provides a rollout check without requiring a real health policy. Do not create a `NodeHealthCheck` policy, remediation request, `StorageBasedRemediationConfig`, or `NodeMaintenance` for these tests. Do not enable SNR merely to inspect its controls because enabling it starts agents.
 
 Use server-side dry-run for admission-only checks. Never capture Secret values or cluster-identifying details in repository documents. Review any sanitized test report before committing it.
 
-If the target console version cannot edit the nested resources correctly, the console requirement remains incomplete. Record the exact behavior before changing the API or descriptor approach.
+If the target console version cannot edit nested resources through the CSV details controls, the console requirement remains incomplete.
 
 ## Acceptance coverage
 
@@ -644,3 +657,9 @@ If the target console version cannot edit the nested resources correctly, the co
 - [Quantity CEL library version registration](https://github.com/kubernetes/apiserver/blob/v0.33.0/pkg/cel/environment/base.go).
 - [Project overlay guide](../../operand-config-overlays.md).
 - [Project manifest update guide](../../updating-operand-manifests.md).
+
+The console inspection required two changes to the original approach.
+The CSV details page needs component names in its flattened labels.
+Cluster-scoped resource links can open the generic YAML editor instead of that page.
+The user guide provides a command for the CSV details address.
+The generation helper and offline tests preserve the corrected labels.
