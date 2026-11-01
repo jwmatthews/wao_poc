@@ -4,6 +4,9 @@ This repository is a **proof of concept** for consolidating the
 [medik8s](https://github.com/medik8s) node remediation operators behind a single
 operator, the Workload Availability Operator (WAO).
 
+Start with the [overview and first trial](docs/Overview.md) for the design,
+key decisions, and a guided installation.
+
 The POC installs all six upstream components as managed operands:
 
 | Component | What it does |
