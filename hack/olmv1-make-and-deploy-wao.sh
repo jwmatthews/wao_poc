@@ -9,7 +9,7 @@
 # Set SKIP_BUILD=1 to reuse images already pushed for $VERSION and only (re)install.
 #
 # Usage, from anywhere:
-#   ./hack/wao-olmv1-make_and_deploy.sh
+#   ./hack/olmv1-make-and-deploy-wao.sh
 
 # Stop on the first failed command, on unset variables, and on failures inside pipelines.
 set -euo pipefail
