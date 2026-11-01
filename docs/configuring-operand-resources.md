@@ -82,6 +82,31 @@ For example, Storage Based Remediation currently requests `64Mi` of memory.
 A memory limit of `32Mi` alone conflicts with that request.
 Also reduce the request if you require that limit.
 
+## MDR packaged defaults
+
+WAO supplies these defaults for the Machine Deletion Remediation (MDR) manager:
+
+| Resource | Request | Limit |
+| --- | --- | --- |
+| CPU | `100m` | `100m` |
+| Memory | `64Mi` | `128Mi` |
+
+The WAO runtime overlay defines these values.
+See [issue #40](https://github.com/jwmatthews/wao_poc/issues/40) for the startup observations.
+The issue does not establish minimum or production memory requirements.
+
+An enabled MDR uses these defaults when its WAC resource fields are omitted.
+Valid explicit overrides continue to apply after an upgrade.
+Removing an override restores that entry's default from the installed WAO version.
+
+A memory limit below `64Mi` requires an explicit request that does not exceed the limit.
+Otherwise, validation reports a conflict and preserves the last valid Deployment.
+
+WAO embeds these defaults in its binary.
+Changing the overlay requires runtime manifest generation and a new WAO image.
+Deploy that image through an updated WAO bundle to change an installed operator.
+MDR needs no image rebuild.
+
 ## Validation and status
 
 The Kubernetes API checks each value with a CEL `isQuantity` rule.

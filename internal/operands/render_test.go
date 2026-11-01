@@ -267,6 +267,68 @@ func TestRenderWebhookOperandsMountOneCertVolume(t *testing.T) {
 	}
 }
 
+func TestRenderMDRManagerDefaults(t *testing.T) {
+	for _, tc := range []struct {
+		name                       string
+		overrides                  *corev1.ResourceRequirements
+		requestMemory, limitMemory string
+	}{
+		{name: "packaged defaults", requestMemory: "64Mi", limitMemory: "128Mi"},
+		{name: "empty overrides", overrides: &corev1.ResourceRequirements{}, requestMemory: "64Mi", limitMemory: "128Mi"},
+		{
+			name: "partial memory override",
+			overrides: &corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("256Mi")},
+			},
+			requestMemory: "64Mi", limitMemory: "256Mi",
+		},
+		{
+			name: "explicit old values remain valid",
+			overrides: &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("20Mi")},
+				Limits:   corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("30Mi")},
+			},
+			requestMemory: "20Mi", limitMemory: "30Mi",
+		},
+		{name: "fresh render restores defaults", requestMemory: "64Mi", limitMemory: "128Mi"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			def := components.MDR()
+			objects, err := operands.Render(def, testNamespace, testImages())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := operands.ApplyManagerResources(def, objects, tc.overrides); err != nil {
+				t.Fatal(err)
+			}
+			deployment := find(t, objects, "Deployment", def.ManagerDeployment)
+			containers, found, err := unstructured.NestedSlice(deployment.Object, "spec", "template", "spec", "containers")
+			if err != nil || !found {
+				t.Fatalf("containers missing: %v", err)
+			}
+			for _, raw := range containers {
+				container := raw.(map[string]any)
+				if container["name"] != def.ManagerContainer {
+					continue
+				}
+				got, found, err := unstructured.NestedMap(container, "resources")
+				if err != nil || !found {
+					t.Fatalf("manager resources missing: %v", err)
+				}
+				want := map[string]any{
+					"requests": map[string]any{"cpu": "100m", "memory": tc.requestMemory},
+					"limits":   map[string]any{"cpu": "100m", "memory": tc.limitMemory},
+				}
+				if !reflect.DeepEqual(got, want) {
+					t.Fatalf("manager resources = %v, want %v", got, want)
+				}
+				return
+			}
+			t.Fatal("manager container missing")
+		})
+	}
+}
+
 func TestRenderSNRReplacesAgentImageEnv(t *testing.T) {
 	def, _ := components.ByKey(v1alpha1.ComponentKeySelfNodeRemediation)
 	objs, err := operands.Render(def, testNamespace, testImages())

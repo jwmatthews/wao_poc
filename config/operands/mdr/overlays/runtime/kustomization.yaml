@@ -25,3 +25,10 @@ labels:
         path: spec/selector
     pairs:
       workloadavailability.medik8s.io/component: machineDeletionRemediation
+patches:
+  - path: manager_resources_patch.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: machine-deletion-remediation-controller-manager
