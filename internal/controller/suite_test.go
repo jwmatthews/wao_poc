@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -12,10 +13,13 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -29,6 +33,9 @@ var (
 	k8sClient client.Client
 	testEnv   *envtest.Environment
 	cancel    context.CancelFunc
+	// Arm one stale status write to exercise the running controller's conflict recovery.
+	staleStatusVersion atomic.Pointer[string]
+	statusConflictSeen atomic.Bool
 )
 
 func testImages() images.Set {
@@ -65,7 +72,28 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})).To(Succeed())
-	mgr, err := ctrl.NewManager(cfg, ctrl.Options{Scheme: scheme.Scheme, Metrics: metricsserver.Options{BindAddress: "0"}})
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+		Scheme: scheme.Scheme, Metrics: metricsserver.Options{BindAddress: "0"},
+		NewClient: func(cfg *rest.Config, opts client.Options) (client.Client, error) {
+			c, err := client.NewWithWatch(cfg, opts)
+			if err != nil {
+				return nil, err
+			}
+			return interceptor.NewClient(c, interceptor.Funcs{
+				SubResourceUpdate: func(ctx context.Context, c client.Client, subresource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+					if _, ok := obj.(*v1alpha1.WorkloadAvailabilityConfig); ok && subresource == "status" {
+						if stale := staleStatusVersion.Swap(nil); stale != nil {
+							obj.SetResourceVersion(*stale)
+							err := c.Status().Update(ctx, obj, opts...)
+							statusConflictSeen.Store(apierrors.IsConflict(err))
+							return err
+						}
+					}
+					return c.SubResource(subresource).Update(ctx, obj, opts...)
+				},
+			}), nil
+		},
+	})
 	Expect(err).NotTo(HaveOccurred())
 	Expect((&WorkloadAvailabilityConfigReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Namespace: ns, Images: testImages()}).SetupWithManager(mgr)).To(Succeed())
 	go func() { defer GinkgoRecover(); Expect(mgr.Start(ctx)).To(Succeed()) }()

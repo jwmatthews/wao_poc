@@ -10,6 +10,7 @@ import (
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -84,6 +85,7 @@ func (r *WorkloadAvailabilityConfigReconciler) Reconcile(ctx context.Context, re
 		return ctrl.Result{Requeue: true}, r.Update(ctx, wac)
 	}
 
+	previousStatus := wac.Status.DeepCopy()
 	statuses := make([]v1alpha1.ComponentStatus, 0, len(components.All()))
 	var errs []error
 	progressing, retained := false, false
@@ -117,8 +119,10 @@ func (r *WorkloadAvailabilityConfigReconciler) Reconcile(ctx context.Context, re
 		wac.Status.ReleaseSet = append(wac.Status.ReleaseSet, v1alpha1.ImageReference{Name: k, Image: r.Images.Get(k)})
 	}
 	wac.Status.Conditions = summarize(wac.Status.Conditions, statuses, joined, wac.Generation)
-	if err := r.Status().Update(ctx, wac); err != nil {
-		return ctrl.Result{}, err
+	if !equality.Semantic.DeepEqual(*previousStatus, wac.Status) {
+		if err := r.Status().Update(ctx, wac); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 	if joined != nil {
 		return ctrl.Result{}, joined
