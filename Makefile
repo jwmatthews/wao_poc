@@ -412,15 +412,16 @@ scorecard: operator-sdk
 ##@ Working with Bundle
 
 .PHONY: bundle
-bundle: verify-previous-version verify-skip-range ## Generate bundle manifests and metadata, then validate generated files.
+bundle: verify-previous-version verify-skip-range ## Generate bundle manifests and metadata, update CSV fields, then validate generated files.
 	# Validate before starting generation, including under parallel Make.
-	$(MAKE) manifests kustomize operator-sdk
+	$(MAKE) manifests kustomize operator-sdk yq
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	YQ=$(YQ) bash hack/manager-resource-descriptors.sh $(MANIFESTS_DIR)/bases/$(OPERATOR_NAME).clusterserviceversion.yaml
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	# LoadRestrictionsNone: config/operands/sbr/overlays/rbac lists a copied file that SBR's own kustomization omits.
 	$(KUSTOMIZE) build --load-restrictor LoadRestrictionsNone $(MANIFESTS_DIR) | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) --extra-service-accounts $(OPERAND_SERVICE_ACCOUNTS) $(BUNDLE_METADATA_OPTS)
-	$(MAKE) bundle-validate
+	# bundle-update stamps replaces/skipRange/icon and runs bundle-validate.
+	$(MAKE) bundle-update
 
 .PHONY: bundle-k8s
 bundle-k8s: bundle ## Alias for bundle target
@@ -448,7 +449,6 @@ bundle-update: verify-previous-version verify-skip-range yq ## Update CSV fields
 .PHONY: bundle-reset
 bundle-reset: yq ## Revert all version or build date related changes
 	$(MAKE) bundle VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) IMG=$(IMAGE_TAG_BASE):v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
-	$(MAKE) bundle-update VERSION=$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
 	$(YQ) -i '.metadata.annotations.createdAt = ""' "$(CSV)"
 	$(MAKE) bundle-validate VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
 
@@ -497,7 +497,6 @@ bundle-validate: operator-sdk ## Validate the bundle directory with additional v
 
 .PHONY: bundle-build
 bundle-build: bundle ## Build the bundle image.
-	$(MAKE) bundle-update
 	$(CONTAINER_TOOL) build --platform $(PLATFORM) -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: bundle-push
